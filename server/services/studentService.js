@@ -1,10 +1,10 @@
-const { kvGet, kvSet } = require('../../database/services/dbService');
+const { readPortalData, writePortalData } = require('../../database/services/dbService');
 
 async function trackStudentActivity(email) {
   const streakKey = `student_streak:${email}`;
   const now = new Date();
   const today = now.toISOString().split('T')[0];
-  const streakData = (await kvGet(streakKey)) || { currentStreak: 0, longestStreak: 0, lastActivityDate: null, dates: [] };
+  const streakData = (await readPortalData(streakKey)) || { currentStreak: 0, longestStreak: 0, lastActivityDate: null, dates: [] };
   if (streakData.lastActivityDate === today) return streakData;
   
   const yesterday = new Date(now);
@@ -21,7 +21,7 @@ async function trackStudentActivity(email) {
   streakData.lastActivityDate = today;
   if (!streakData.dates.includes(today)) streakData.dates.push(today);
   
-  await kvSet(streakKey, streakData);
+  await writePortalData(streakKey, streakData);
   return streakData;
 }
 

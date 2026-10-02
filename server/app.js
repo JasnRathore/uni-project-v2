@@ -23,11 +23,11 @@ app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 
 // Debug students route (from index.js)
 const { requireAuth } = require('./middleware/authMiddleware');
-const { kvGet } = require('../database/services/dbService');
+const { readPortalData } = require('../database/services/dbService');
 app.get('/api/debug/students', requireAuth, async (req, res) => {
   try {
     const user = req.user;
-    const students = (await kvGet(`students:${user.id}`)) || [];
+    const students = (await readPortalData(`students:${user.id}`)) || [];
     return res.json({ students, count: Array.isArray(students) ? students.length : 0 });
   } catch (err) {
     return res.status(500).json({ error: err.message });

@@ -1,7 +1,10 @@
-const { getSupabaseClient, kvSet, kvGetByPrefix } = require('../../database/services/dbService');
+const {
+  getAuthService,
+  getDatabaseClient,
+  writePortalData,
+} = require('../../database/services/dbService');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { v4: uuidv4 } = require('uuid');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'super-secret';
 
@@ -11,18 +14,19 @@ const login = async (req, res) => {
     const { email, password } = req.body;
     if (!email || !password) return res.status(400).json({ error: 'Email and password are required' });
 
-    const supabase = getSupabaseClient();
-    // Look up user by email via the Turso-backed shim
-    const { getTursoClient } = require('../../database/services/dbService');
-    const db = getTursoClient();
-    const result = await db.execute({ sql: 'SELECT * FROM users WHERE email = ?', args: [email] });
+    const db = getDatabaseClient();
+    const result = await db.execute({
+      sql: 'SELECT id, email, password_hash, metadata_json FROM users WHERE email = ? COLLATE NOCASE',
+      args: [email.trim()],
+    });
     if (result.rows.length === 0) return res.status(401).json({ error: 'Invalid login credentials' });
 
     const user = result.rows[0];
-    const valid = await bcrypt.compare(password, user.password);
+    const valid = await bcrypt.compare(password, user.password_hash);
     if (!valid) return res.status(401).json({ error: 'Invalid login credentials' });
 
-    const metadata = JSON.parse(user.metadata || '{}');
+    const { unpackMetadata } = require('../../database/services/dbService');
+    const metadata = unpackMetadata(user.metadata_json).user_metadata;
     const token = jwt.sign(
       { id: user.id, email: user.email, role: metadata.role || 'teacher', name: metadata.name || '' },
       JWT_SECRET,
@@ -46,7 +50,7 @@ const login = async (req, res) => {
 
 const signup = async (req, res) => {
   try {
-    const supabase = getSupabaseClient();
+    const supabase = getAuthService();
     const { email, password, name, role, ...rest } = req.body;
     if (!email || !password || !name) return res.status(400).json({ error: 'Email, password and name are required' });
     const { data, error } = await supabase.auth.admin.createUser({
@@ -64,7 +68,7 @@ const signup = async (req, res) => {
 
 const studentSignup = async (req, res) => {
   try {
-    const supabase = getSupabaseClient();
+    const supabase = getAuthService();
     const { email, password, name, username, rollNumber, batch, class: className, ...rest } = req.body;
     if (!email || !password || !name) return res.status(400).json({ error: 'Email, password and name are required' });
 
@@ -77,25 +81,26 @@ const studentSignup = async (req, res) => {
     if (error) return res.status(400).json({ error: error.message });
 
     let matchedClassId = null;
+    let matchedClassName = className || '';
     if (className) {
-      try {
-        const allClassesEntries = await kvGetByPrefix('classes:');
-        for (const entry of allClassesEntries) {
-          const classes = Array.isArray(entry.value) ? entry.value : [];
-          const match = classes.find(c => c.name === className || c.subject === className);
-          if (match) { matchedClassId = match.id; break; }
-        }
-      } catch (e) { /* ignore */ }
+      const db = getDatabaseClient();
+      const result = await db.execute({
+        sql: 'SELECT id, name FROM classes WHERE name = ? OR subject = ? LIMIT 1',
+        args: [className, className],
+      });
+      if (result.rows[0]) {
+        matchedClassId = result.rows[0].id;
+        matchedClassName = result.rows[0].name;
+      }
     }
 
-    const profileKey = `student_profile:${email}`;
-    await kvSet(profileKey, {
+    await writePortalData(`student_profile:${email}`, {
       email,
       name,
       username: username || '',
       rollNumber: rollNumber || '',
       batch: batch || '',
-      className: className || '',
+      className: matchedClassName,
       classId: matchedClassId || null,
       totalPoints: 0,
       currentLevel: 1,
@@ -115,7 +120,7 @@ const reactivateAccount = async (req, res) => {
     const user = req.user;
     if (!user) return res.status(401).json({ error: 'Unauthorized' });
 
-    const supabase = getSupabaseClient();
+    const supabase = getAuthService();
     const { error: updateError } = await supabase.auth.admin.updateUserById(user.id, {
       user_metadata: { ...user.user_metadata, accountDisabled: false },
     });

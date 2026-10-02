@@ -1,9 +1,10 @@
 # Key-value store to SQL migration guide
 
-This guide describes a planned migration to `new_schema.sql`. It does **not**
-change the application, run DDL, or migrate live data. Keep the current
-application and database unchanged until the migration has been implemented,
-tested against a copy, and explicitly approved for cutover.
+This guide describes the migration to `new_schema.sql`. The snapshot importer
+can populate a new local SQLite database, but it does **not** change the
+application or connect to/migrate the configured live database. Keep the
+current application and database unchanged until the migration has been tested
+against a complete backup and explicitly approved for cutover.
 
 ## Target model
 
@@ -109,6 +110,87 @@ further. Preserve original key strings in the provenance map.
     acceptance checks. Keep a final pre-cutover backup and a documented
     rollback point. Do not delete `kv_store` until the new application has
     operated successfully and the rollback window has closed.
+
+## Local snapshot importer
+
+`database/migrations/migrate_snapshot.py` is a standard-library Python importer
+for an offline CSV export of `kv_store` and an optional SQLite `users` backup.
+It creates a **new** target database, applies `new_schema.sql`, imports
+normalizable records, and preserves each KV key/value in `legacy_record_map`.
+It refuses to overwrite an existing target. It does not accept a Turso URL or
+make network connections.
+
+Example from the repository root (choose a target path that does not already
+exist):
+
+```powershell
+python database\migrations\migrate_snapshot.py `
+  --source-csv kv_store_2fad19e1_rows.csv `
+  --target-db migration-dry-run.db
+```
+
+Add `--users-db <backup.db>` only when that SQLite file is a consistent backup
+of the same source environment as the KV export. The current `local.db` has
+already been reset to the new empty schema, so it is not a source users backup.
+Omitting `--users-db` leaves accounts unresolved; it does not create
+placeholder authentication users. Review `unresolved_counts_by_reason` in the
+JSON report before considering a data cutover.
+
+### Dry-run performed
+
+The local dry run used the checked-in 170-row CSV and the repository's local
+SQLite database as the available account snapshot. Its source database had
+only one user row, and none of the eight teacher IDs present in the export
+matched that user's ID. The target database was created under the Copilot
+session files directory, not in the repository or configured Turso database.
+
+| Target table | Rows imported |
+| --- | ---: |
+| `users` | 1 |
+| `teacher_profiles` | 0 |
+| `students` | 28 |
+| `classes` | 0 |
+| `teacher_students` | 0 |
+| `tasks` | 22 |
+| `task_assignments` | 96 |
+| `grades` | 57 |
+| `notifications` | 105 |
+| `student_activity` / `student_activity_days` | 1 / 1 |
+| `daily_quests` / `daily_quest_views` | 1 / 3 |
+| `usernames` | 0 |
+| `legacy_record_map` | 170 |
+
+The SQL import completed with no foreign-key violations, but it is **not ready
+for cutover**. Teacher profiles, classes, and roster memberships were held back
+because their owners are absent from the supplied account snapshot. The
+username index values likewise reference user IDs not present in that
+snapshot. Task ownership and the daily quest owner also remain unresolved; the
+three daily-quest seen flags could not be linked to a student. Fifteen student
+records had no resolvable email and remain available in the provenance map
+rather than being assigned invented identities. Supply a consistent full
+users/KV backup, resolve these records, and rerun to a fresh target before
+proceeding.
+
+## Current local database state
+
+After the dry run, the repository's `local.db` was reset at the user's request
+and initialized with the empty schema from `new_schema.sql`. The previous file
+(one user row and two KV rows) was preserved as a private session backup outside
+the repository. The initialized database passed `PRAGMA integrity_check` and
+`PRAGMA foreign_key_check`; all target tables were empty at initialization.
+
+The application now targets the local SQLite database when
+`DATABASE_TARGET=local` and uses the relational tables for authentication and
+portal data. The server-side relational data adapter preserves existing API
+payloads while storing classes, memberships, tasks, assignments, grades,
+notifications, profiles, activity, quests, and usernames in their target
+tables. It does not create or query a `kv_store` table. Root `.env.local`
+selects local mode for this checkout and is git-ignored.
+
+The configured Turso database was not migrated or modified. To point the
+application at Turso, first apply the schema and migrate/verify that database,
+then set `DATABASE_TARGET=turso`; the runtime deliberately does not bootstrap
+or rewrite a remote database automatically.
 
 ## Data-quality and reconciliation notes
 

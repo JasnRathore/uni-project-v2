@@ -29,6 +29,7 @@ import { Alert, AlertDescription } from "./ui/alert";
 import { TakeQuiz } from "./TakeQuiz";
 import { NotificationsDropdown } from "./NotificationsDropdown";
 import { StudentProfile } from "./StudentProfile";
+import { StudentLeaderboard } from "./StudentLeaderboard";
 import {
   Trophy,
   Star,
@@ -991,107 +992,7 @@ export function StudentDashboard({
                 )}
 
                 {activeView === "leaderboard" && (
-                  <div className="space-y-8 animate-in fade-in duration-500 overflow-hidden">
-                    <div className="text-center max-w-2xl mx-auto space-y-4">
-                      <div className="inline-block p-3 bg-indigo-50 rounded-3xl mb-2">
-                        <Trophy className="w-12 h-12 text-indigo-600" />
-                      </div>
-                      <h2 className="text-4xl font-black text-gray-900 tracking-tight">
-                        STUDENT LEADERBOARD
-                      </h2>
-                      <p className="text-gray-500 font-medium">
-                        Top performers across all dental departments. Rank is
-                        based on total EXP earned from assignments and quizzes.
-                      </p>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-8">
-                      {/* Mock Leaderboard display - in real app, fetch from backend */}
-                      {[
-                        {
-                          rank: 2,
-                          name: "Dr. Aryan Sharma",
-                          xp: 4850,
-                          level: 12,
-                        },
-                        {
-                          rank: 1,
-                          name: student?.name,
-                          xp: stats.totalEXP,
-                          level: stats.level,
-                        },
-                        {
-                          rank: 3,
-                          name: "Dr. Isha Patel",
-                          xp: 4200,
-                          level: 10,
-                        },
-                      ]
-                        .sort((a, b) => a.rank - b.rank)
-                        .map((user, idx) => (
-                          <Card
-                            key={idx}
-                            className={`border-0 shadow-xl relative overflow-hidden ${
-                              user.name === student?.name
-                                ? "bg-gradient-to-br from-indigo-600 to-purple-700 text-white scale-110 z-10"
-                                : "bg-white"
-                            }`}
-                          >
-                            <CardContent className="p-8 text-center">
-                              <div
-                                className={`w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-6 text-2xl font-black italic ${
-                                  user.rank === 1
-                                    ? "bg-amber-100 text-amber-600"
-                                    : user.rank === 2
-                                      ? "bg-slate-100 text-slate-600"
-                                      : "bg-orange-50 text-orange-600"
-                                } ${user.name === student?.name ? "!bg-white/20 !text-white" : ""}`}
-                              >
-                                #{user.rank}
-                              </div>
-                              <Avatar className="w-20 h-20 border-4 border-white/20 shadow-xl mx-auto mb-4">
-                                <AvatarFallback className="bg-indigo-500 text-white text-xl font-bold">
-                                  {user.name?.slice(0, 2).toUpperCase()}
-                                </AvatarFallback>
-                              </Avatar>
-                              <h4 className="text-xl font-black mb-1 truncate">
-                                {user.name}
-                              </h4>
-                              <p
-                                className={`text-xs font-bold uppercase tracking-widest mb-6 ${
-                                  user.name === student?.name
-                                    ? "text-indigo-100"
-                                    : "text-gray-400"
-                                }`}
-                              >
-                                LEVEL {user.level}
-                              </p>
-                              <div
-                                className={`p-4 rounded-2xl ${
-                                  user.name === student?.name
-                                    ? "bg-white/10"
-                                    : "bg-slate-50"
-                                }`}
-                              >
-                                <p
-                                  className={`text-[10px] font-black uppercase tracking-widest ${
-                                    user.name === student?.name
-                                      ? "text-indigo-100"
-                                      : "text-gray-400"
-                                  }`}
-                                >
-                                  Current EXP
-                                </p>
-                                <p className="text-2xl font-black italic">
-                                  {user.xp}{" "}
-                                  <span className="text-xs not-italic">XP</span>
-                                </p>
-                              </div>
-                            </CardContent>
-                          </Card>
-                        ))}
-                    </div>
-                  </div>
+                  <StudentLeaderboard accessToken={accessToken} />
                 )}
               </div>
         </div>

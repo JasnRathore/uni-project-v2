@@ -9,19 +9,23 @@ const getUser = async (authHeader) => {
     const decoded = jwt.verify(token, JWT_SECRET);
 
     // Fetch full user data from DB to populate user_metadata
-    const { getTursoClient } = require('../../database/services/dbService');
-    const db = getTursoClient();
-    const result = await db.execute({ sql: 'SELECT * FROM users WHERE id = ?', args: [decoded.id] });
+    const { getDatabaseClient } = require('../../database/services/dbService');
+    const db = getDatabaseClient();
+    const result = await db.execute({
+      sql: 'SELECT id, email, name, role, metadata_json, created_at FROM users WHERE id = ?',
+      args: [decoded.id],
+    });
 
     if (result.rows.length === 0) return null;
     const row = result.rows[0];
-    const metadata = JSON.parse(row.metadata || '{}');
+    const { unpackMetadata } = require('../../database/services/dbService');
+    const metadata = unpackMetadata(row.metadata_json);
 
     return {
       id: row.id,
       email: row.email,
-      user_metadata: metadata,
-      app_metadata: {},
+      user_metadata: metadata.user_metadata,
+      app_metadata: metadata.app_metadata,
       last_sign_in_at: null,
       created_at: row.created_at,
     };

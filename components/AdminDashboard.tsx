@@ -657,6 +657,20 @@ export function AdminDashboard({ currentUser: initialUser, onLogout, accessToken
           />
         );
       case 'class-view':
+        if (!selectedClass) {
+          return (
+            <div className="p-6">
+              <p className="text-muted-foreground">
+                {isLoadingData ? 'Loading class...' : 'This class could not be found.'}
+              </p>
+              {!isLoadingData && (
+                <Button className="mt-4" onClick={() => setActiveView('classes')}>
+                  Back to Classes
+                </Button>
+              )}
+            </div>
+          );
+        }
         return (
           <ClassView
             classData={selectedClass}
@@ -682,6 +696,20 @@ export function AdminDashboard({ currentUser: initialUser, onLogout, accessToken
           />
         );
       case 'add-quiz':
+        if (!selectedClass) {
+          return (
+            <div className="p-6">
+              <p className="text-muted-foreground">
+                {isLoadingData ? 'Loading class...' : 'Select a class before creating a quiz.'}
+              </p>
+              {!isLoadingData && (
+                <Button className="mt-4" onClick={() => setActiveView('classes')}>
+                  Back to Classes
+                </Button>
+              )}
+            </div>
+          );
+        }
         return (
           <AddQuiz
             classData={selectedClass}
