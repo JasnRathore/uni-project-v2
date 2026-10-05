@@ -292,9 +292,11 @@ export const dentalClasses = [
   }
 ];
 
+export type DentalClass = (typeof dentalClasses)[number];
+
 // Get classes grouped by year
 export const getClassesByYear = () => {
-  const grouped = {
+  const grouped: Record<DentalClass['grade'], DentalClass[]> = {
     'BDS 1st Year': [],
     'BDS 2nd Year': [],
     'BDS 3rd Year': [],

@@ -1,194 +1,156 @@
 "use client";
+
 import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Textarea } from './ui/textarea';
-import { ArrowLeft, UserPlus, Save } from 'lucide-react';
+import { Save } from 'lucide-react';
 import { toast } from 'sonner';
-import { dentalClasses, getClassesByYear } from './utils/dentalClasses';
 
 interface AddStudentProps {
   onBack: () => void;
-  classes: any[];
-  onAddStudent: (student: any) => void;
+  classes: Array<{ id: string | number; name: string; subject?: string }>;
+  onAddStudent: (student: any) => Promise<void>;
 }
 
 export function AddStudent({ onBack, classes, onAddStudent }: AddStudentProps) {
-  const classesByYear = getClassesByYear();
+  const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     classId: '',
     subjects: '',
-    notes: ''
+    notes: '',
   });
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (!formData.name || !formData.email || !formData.classId) {
-      toast.error('Please fill in all required fields');
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!formData.name.trim() || !formData.email.trim()) {
+      toast.error('Enter the student name and email address.');
+      return;
+    }
+    const selectedClass = classes.find(classItem => String(classItem.id) === formData.classId);
+    if (!selectedClass) {
+      toast.error('Select a class before adding the student.');
       return;
     }
 
-    const selectedClass = dentalClasses.find(c => c.id === formData.classId);
-    
     const newStudent = {
       id: Date.now(),
-      name: formData.name,
-      email: formData.email,
-      classId: formData.classId,
-      className: selectedClass?.name || '',
-      avatar: formData.name.split(' ').map(n => n[0]).join('').toUpperCase(),
+      name: formData.name.trim(),
+      email: formData.email.trim(),
+      classId: selectedClass.id,
+      className: selectedClass.name,
+      avatar: formData.name.split(' ').map(name => name[0]).join('').toUpperCase(),
       currentLevel: 1,
       totalPoints: 0,
       gameProgress: 0,
       lastActive: 'Just joined',
       status: 'active',
-      subjects: formData.subjects ? formData.subjects.split(',').map(s => s.trim()) : [selectedClass?.subject || ''],
+      subjects: formData.subjects
+        ? formData.subjects.split(',').map(subject => subject.trim()).filter(Boolean)
+        : selectedClass.subject ? [selectedClass.subject] : [],
       averageGrade: 0,
-      notes: formData.notes
+      notes: formData.notes.trim(),
     };
 
-    onAddStudent(newStudent);
-    toast.success('Student added successfully!');
-    setFormData({
-      name: '',
-      email: '',
-      classId: '',
-      subjects: '',
-      notes: ''
-    });
-  };
-
-  const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
+    setIsSaving(true);
+    try {
+      await onAddStudent(newStudent);
+      setFormData({ name: '', email: '', classId: '', subjects: '', notes: '' });
+      toast.success('Student added successfully.');
+      onBack();
+    } catch (error) {
+      console.error('Error adding student:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to add student.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
-    <div className="p-6">
-      <div className="mb-6">
-        <Button 
-          onClick={onBack}
-          variant="outline"
-          className="mb-4"
-        >
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Back to Students
-        </Button>
-        
-        <div className="p-6 bg-gradient-to-r from-green-500 to-emerald-600 rounded-2xl text-white shadow-xl">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-white/20 rounded-lg">
-              <UserPlus className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-medium">Add New Dental Student</h1>
-              <p className="text-white/90">Create a new dental student profile and assign to a class</p>
-            </div>
-          </div>
+    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="new-student-name">Full name</Label>
+          <Input
+            id="new-student-name"
+            autoComplete="name"
+            value={formData.name}
+            onChange={event => setFormData({ ...formData, name: event.target.value })}
+            placeholder="Student's full name"
+            required
+          />
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="new-student-email">Email address</Label>
+          <Input
+            id="new-student-email"
+            type="email"
+            autoComplete="email"
+            value={formData.email}
+            onChange={event => setFormData({ ...formData, email: event.target.value })}
+            placeholder="student@school.edu"
+            required
+          />
         </div>
       </div>
 
-      <Card className="max-w-2xl mx-auto shadow-lg border-0 bg-gradient-to-br from-white to-gray-50">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <UserPlus className="w-5 h-5 text-green-600" />
-            Student Information
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Full Name *</Label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) => handleInputChange('name', e.target.value)}
-                  placeholder="Enter student's full name"
-                  required
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="email">Email Address *</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => handleInputChange('email', e.target.value)}
-                  placeholder="student@school.edu"
-                  required
-                />
-              </div>
-            </div>
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="new-student-class">Class</Label>
+        <Select
+          value={formData.classId}
+          onValueChange={value => setFormData({ ...formData, classId: value ?? '' })}
+        >
+          <SelectTrigger id="new-student-class" className="w-full">
+            <SelectValue placeholder="Select a class" />
+          </SelectTrigger>
+          <SelectContent>
+            {classes.map(classItem => (
+              <SelectItem key={classItem.id} value={String(classItem.id)}>
+                {classItem.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {classes.length === 0 && (
+          <p className="text-sm text-muted-foreground">Add a class before adding a student.</p>
+        )}
+      </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="class">Class *</Label>
-              <Select value={formData.classId} onValueChange={(value) => handleInputChange('classId', value)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a class" />
-                </SelectTrigger>
-                <SelectContent className="max-h-[400px]">
-                  {Object.entries(classesByYear).map(([year, yearClasses]) => (
-                    <React.Fragment key={year}>
-                      <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground bg-muted/50">
-                        {year}
-                      </div>
-                        {yearClasses.map((classItem: any) => (
-                        <SelectItem key={classItem.id} value={classItem.id}>
-                          {classItem.subject}
-                        </SelectItem>
-                      ))}
-                    </React.Fragment>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-sm text-muted-foreground">
-                Select the appropriate dental college class and year
-              </p>
-            </div>
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="new-student-subjects">Subjects <span className="text-muted-foreground">(optional)</span></Label>
+        <Input
+          id="new-student-subjects"
+          value={formData.subjects}
+          onChange={event => setFormData({ ...formData, subjects: event.target.value })}
+          placeholder="Separate subjects with commas"
+        />
+      </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="subjects">Subjects (comma-separated)</Label>
-              <Input
-                id="subjects"
-                value={formData.subjects}
-                onChange={(e) => handleInputChange('subjects', e.target.value)}
-                placeholder="Oral Pathology, Periodontology, Endodontics"
-              />
-              <p className="text-sm text-muted-foreground">
-                Enter dental subjects separated by commas
-              </p>
-            </div>
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="new-student-notes">Additional notes <span className="text-muted-foreground">(optional)</span></Label>
+        <Textarea
+          id="new-student-notes"
+          value={formData.notes}
+          onChange={event => setFormData({ ...formData, notes: event.target.value })}
+          placeholder="Add relevant student information"
+          rows={3}
+        />
+      </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="notes">Additional Notes</Label>
-              <Textarea
-                id="notes"
-                value={formData.notes}
-                onChange={(e) => handleInputChange('notes', e.target.value)}
-                placeholder="Any additional information about the dental student (clinical requirements, special accommodations, etc.)..."
-                rows={3}
-              />
-            </div>
-
-            <Button 
-              type="submit" 
-              className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white border-0 shadow-md hover:shadow-lg transition-all"
-            >
-              <Save className="w-4 h-4 mr-2" />
-              Add Student
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
-    </div>
+      <div className="flex justify-end gap-2 pt-2">
+        <Button type="button" variant="outline" onClick={onBack} disabled={isSaving}>
+          Cancel
+        </Button>
+        <Button type="submit" disabled={isSaving || classes.length === 0}>
+          <Save data-icon="inline-start" />
+          {isSaving ? 'Adding…' : 'Add student'}
+        </Button>
+      </div>
+    </form>
   );
 }

@@ -1,15 +1,23 @@
+const path = require('node:path');
+require('dotenv').config({ path: path.resolve(__dirname, '..', '..', '.env') });
+
 const { createClient } = require('@libsql/client');
+const { ensureDatabaseSchema } = require('./schemaService');
 const bcrypt = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
 
 let client = null;
+let schemaReady = null;
 
 const getDatabaseUrl = () => {
   const target = (process.env.DATABASE_TARGET || '').toLowerCase();
-  if (target === 'local') return 'file:local.db';
+  if (target === 'local') return process.env.LOCAL_DATABASE_URL || 'file:local.db';
   if (target === 'turso') {
     if (!process.env.TURSO_DATABASE_URL) {
       throw new Error('DATABASE_TARGET=turso requires TURSO_DATABASE_URL');
+    }
+    if (!process.env.TURSO_AUTH_TOKEN) {
+      throw new Error('DATABASE_TARGET=turso requires TURSO_AUTH_TOKEN');
     }
     return process.env.TURSO_DATABASE_URL;
   }
@@ -26,6 +34,16 @@ const getDatabaseClient = () => {
     });
   }
   return client;
+};
+
+const ensureDatabaseReady = () => {
+  if (!schemaReady) {
+    schemaReady = ensureDatabaseSchema(getDatabaseClient()).catch(error => {
+      schemaReady = null;
+      throw new Error(`Database schema initialization failed: ${error.message}`);
+    });
+  }
+  return schemaReady;
 };
 
 const unpackMetadata = value => {
@@ -204,6 +222,7 @@ const withTransaction = (...args) => require('./relationalDataService').withTran
 module.exports = {
   getAuthService,
   getDatabaseClient,
+  ensureDatabaseReady,
   authUserFromRow,
   unpackMetadata,
   readPortalData,

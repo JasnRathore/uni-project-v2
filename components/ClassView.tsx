@@ -11,6 +11,7 @@ import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Textarea } from './ui/textarea';
 import { toast } from 'sonner';
+import { RoleAvatar } from './RoleAvatar';
 import { 
   ArrowLeft, 
   Users, 
@@ -298,26 +299,8 @@ export function ClassView({ classData, students, onBack, onAddTask, onAddQuiz, a
 
   const activeStudents = displayStudents.filter(s => s.status === 'active').length;
   
-  const getGradeColor = (grade) => {
-    const gradeNumber = parseInt(grade);
-    if (gradeNumber <= 5) return 'bg-gradient-to-r from-green-400 to-emerald-500';
-    if (gradeNumber <= 8) return 'bg-gradient-to-r from-blue-400 to-blue-500';
-    if (gradeNumber <= 10) return 'bg-gradient-to-r from-purple-400 to-purple-500';
-    return 'bg-gradient-to-r from-orange-400 to-red-500';
-  };
-
-  const getProgressColor = (progress) => {
-    if (progress >= 80) return 'bg-green-500';
-    if (progress >= 60) return 'bg-blue-500';
-    if (progress >= 40) return 'bg-yellow-500';
-    return 'bg-red-500';
-  };
-
-  const getGradeColorByScore = (score) => {
-    if (score >= 90) return 'text-green-600 bg-green-100';
-    if (score >= 75) return 'text-blue-600 bg-blue-100';
-    if (score >= 60) return 'text-yellow-600 bg-yellow-100';
-    return 'text-red-600 bg-red-100';
+  const getGradeColorByScore = (score: number) => {
+    return score < 60 ? 'destructive' : 'secondary';
   };
 
   const handleGradeDialogClose = () => {
@@ -346,7 +329,6 @@ export function ClassView({ classData, students, onBack, onAddTask, onAddQuiz, a
         <div className="flex gap-3">
           <Button
             onClick={onAddQuiz}
-            className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white border-0 shadow-md"
           >
             <Plus className="w-4 h-4 mr-2" />
             Add Quiz
@@ -354,7 +336,6 @@ export function ClassView({ classData, students, onBack, onAddTask, onAddQuiz, a
           <Button
             size="sm"
             onClick={onAddTask}
-            className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white border-0 shadow-md"
           >
             <Plus className="w-4 h-4 mr-2" />
             Add Task
@@ -363,82 +344,77 @@ export function ClassView({ classData, students, onBack, onAddTask, onAddQuiz, a
       </div>
 
       {/* Class Header */}
-      <div className="mb-6 p-6 bg-gradient-to-r from-purple-500 to-blue-600 rounded-2xl text-white shadow-xl">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div className="flex-1">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="p-3 bg-white/20 rounded-lg">
-                <BookOpen className="w-8 h-8 text-white" />
+      <Card className="mb-6">
+        <CardContent className="flex flex-col justify-between gap-6 p-6 md:flex-row md:items-center">
+          <div className="min-w-0">
+            <div className="mb-3 flex items-center gap-3">
+              <div className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                <BookOpen className="size-5" />
               </div>
-              <div>
-                <h1 className="text-2xl font-medium">{classData.name}</h1>
-                <p className="text-white/90 text-sm mt-1">{classData.subject}</p>
+              <div className="min-w-0">
+                <h2 className="truncate text-xl font-semibold tracking-tight">{classData.name}</h2>
+                <p className="mt-1 text-sm text-muted-foreground">{classData.subject}</p>
               </div>
             </div>
-            <Badge className={`${getGradeColor(classData.grade)} text-white border-0`}>
-              {classData.grade}
-            </Badge>
+            <Badge variant="secondary">{classData.grade}</Badge>
+            {classData.description && (
+              <p className="mt-3 max-w-3xl text-sm text-muted-foreground">{classData.description}</p>
+            )}
           </div>
-          <div className="flex gap-4">
-            <div className="text-center bg-white/20 rounded-lg p-4">
-              <div className="flex items-center gap-2 mb-1">
-                <Users className="w-4 h-4" />
-                <p className="text-sm text-white/90">Enrolled</p>
+          <div className="grid shrink-0 grid-cols-2 gap-3">
+            <div className="min-w-32 rounded-lg border bg-muted/50 p-4">
+              <div className="mb-1 flex items-center gap-2 text-sm text-muted-foreground">
+                <Users className="size-4" />
+                <span>Enrolled</span>
               </div>
-              <p className="text-2xl font-semibold">{enrolledStudents.length}/{classData.capacity}</p>
+              <p className="text-xl font-semibold tabular-nums">{enrolledStudents.length}/{classData.capacity}</p>
             </div>
-            <div className="text-center bg-white/20 rounded-lg p-4">
-              <div className="flex items-center gap-2 mb-1">
-                <TrendingUp className="w-4 h-4" />
-                <p className="text-sm text-white/90">Active</p>
+            <div className="min-w-32 rounded-lg border bg-muted/50 p-4">
+              <div className="mb-1 flex items-center gap-2 text-sm text-muted-foreground">
+                <TrendingUp className="size-4" />
+                <span>Active</span>
               </div>
-              <p className="text-2xl font-semibold">{activeStudents}</p>
+              <p className="text-xl font-semibold tabular-nums">{activeStudents}</p>
             </div>
           </div>
-        </div>
-        
-        {classData.description && (
-          <p className="mt-4 text-white/90">
-            {classData.description}
-          </p>
-        )}
-      </div>
+        </CardContent>
+      </Card>
 
       {/* Statistics Cards - REMOVED Progress Bars */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-        <Card className="border-0 shadow-lg bg-gradient-to-br from-blue-50 to-white">
+        <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <Target className="w-4 h-4 text-blue-500" />
+              <Target className="w-4 h-4 text-muted-foreground" />
               Average Progress
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-semibold mb-2 text-blue-600">{averageProgress}%</div>
+            <div className="mb-2 text-3xl font-semibold tabular-nums text-foreground">{averageProgress}%</div>
           </CardContent>
         </Card>
 
-        <Card className="border-0 shadow-lg bg-gradient-to-br from-green-50 to-white">
+        <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <Award className="w-4 h-4 text-green-500" />
+              <Award className="w-4 h-4 text-muted-foreground" />
               Average Grade
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-semibold mb-2 text-green-600">{averageGrade}%</div>
+            <div className="mb-2 text-3xl font-semibold tabular-nums text-foreground">{averageGrade}%</div>
           </CardContent>
         </Card>
 
-        <Card className="border-0 shadow-lg bg-gradient-to-br from-purple-50 to-white">
+        <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <BarChart3 className="w-4 h-4 text-purple-500" />
+              <BarChart3 className="w-4 h-4 text-muted-foreground" />
               Capacity
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-semibold mb-2 text-purple-600">
+            <div className="mb-2 text-3xl font-semibold tabular-nums text-foreground">
               {Math.round((enrolledStudents.length / classData.capacity) * 100)}%
             </div>
           </CardContent>
@@ -461,10 +437,10 @@ export function ClassView({ classData, students, onBack, onAddTask, onAddQuiz, a
 
         <TabsContent value="all" className="space-y-4">
           {enrolledStudents.length === 0 ? (
-            <Card className="border-0 shadow-lg">
+            <Card>
               <CardContent className="p-12 text-center">
-                <div className="p-4 bg-gradient-to-br from-gray-100 to-gray-200 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-                  <Users className="w-8 h-8 text-gray-400" />
+                <div className="mx-auto mb-4 flex size-16 items-center justify-center rounded-full bg-muted">
+                  <Users className="size-8 text-muted-foreground" />
                 </div>
                 <h3 className="text-lg font-medium mb-2">No Students Enrolled</h3>
                 <p className="text-muted-foreground">
@@ -474,17 +450,18 @@ export function ClassView({ classData, students, onBack, onAddTask, onAddQuiz, a
             </Card>
           ) : (
             displayStudents.map((student) => (
-              <Card 
-                key={student.id} 
-                className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 bg-gradient-to-br from-white to-gray-50"
-              >
+              <Card key={student.id}>
                 <CardContent className="p-6">
                   <div className="flex flex-col md:flex-row gap-6">
                     {/* Student Info */}
                     <div className="flex items-start gap-4 flex-1">
-                      <div className="w-16 h-16 bg-gradient-to-br from-purple-400 to-blue-500 rounded-full flex items-center justify-center text-white font-semibold text-xl shadow-lg">
-                        {student.avatar}
-                      </div>
+                      <RoleAvatar
+                        role="student"
+                        identifier={student.id || student.email}
+                        name={student.name || 'Student'}
+                        className="size-16 shadow-lg"
+                        fallbackClassName="text-xl font-semibold"
+                      />
                       <div className="flex-1">
                         <h3 className="text-lg font-medium mb-1">{student.name}</h3>
                         <p className="text-sm text-muted-foreground mb-2">{student.email}</p>
@@ -504,36 +481,36 @@ export function ClassView({ classData, students, onBack, onAddTask, onAddQuiz, a
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
                       <div className="text-center">
                         <div className="flex items-center justify-center gap-1 mb-1">
-                          <GraduationCap className="w-4 h-4 text-purple-500" />
+                          <GraduationCap className="w-4 h-4 text-muted-foreground" />
                           <p className="text-xs text-muted-foreground">Level</p>
                         </div>
-                        <p className="text-xl font-semibold text-purple-600">{student.currentLevel}</p>
+                        <p className="text-xl font-semibold tabular-nums text-foreground">{student.currentLevel}</p>
                       </div>
                       
                       <div className="text-center">
                         <div className="flex items-center justify-center gap-1 mb-1">
-                          <Award className="w-4 h-4 text-yellow-500" />
+                          <Award className="w-4 h-4 text-muted-foreground" />
                           <p className="text-xs text-muted-foreground">Points</p>
                         </div>
-                        <p className="text-xl font-semibold text-yellow-600">{student.totalPoints}</p>
+                        <p className="text-xl font-semibold tabular-nums text-foreground">{student.totalPoints}</p>
                       </div>
                       
                       <div className="text-center">
                         <div className="flex items-center justify-center gap-1 mb-1">
-                          <Target className="w-4 h-4 text-blue-500" />
+                          <Target className="w-4 h-4 text-muted-foreground" />
                           <p className="text-xs text-muted-foreground">Progress</p>
                         </div>
                         <div className="flex items-center justify-center gap-1">
-                          <p className="text-xl font-semibold text-blue-600">{student.gameProgress}%</p>
+                          <p className="text-xl font-semibold tabular-nums text-foreground">{student.gameProgress}%</p>
                         </div>
                       </div>
                       
                       <div className="text-center">
                         <div className="flex items-center justify-center gap-1 mb-1">
-                          <BarChart3 className="w-4 h-4 text-green-500" />
+                          <BarChart3 className="w-4 h-4 text-muted-foreground" />
                           <p className="text-xs text-muted-foreground">Grade</p>
                         </div>
-                        <Badge className={`${getGradeColorByScore(student.averageGrade)} text-lg px-2 py-1 border-0`}>
+                        <Badge variant={getGradeColorByScore(student.averageGrade)} className="text-lg">
                           {student.averageGrade}%
                         </Badge>
                       </div>
@@ -546,32 +523,32 @@ export function ClassView({ classData, students, onBack, onAddTask, onAddQuiz, a
                       <span className="text-xs text-muted-foreground">Game Progress</span>
                       <span className="text-xs font-medium">{student.gameProgress}%</span>
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div className="h-2 w-full rounded-full bg-muted">
                       <div 
-                        className={`h-2 rounded-full ${getProgressColor(student.gameProgress)} transition-all duration-500`}
+                        className="h-full rounded-full bg-primary transition-[width] duration-300"
                         style={{ width: `${student.gameProgress}%` }}
                       />
                     </div>
                   </div>
 
                   {/* Streak and Task Completion */}
-                  <div className="mt-4 grid grid-cols-2 gap-3 p-3 bg-gradient-to-br from-orange-50 to-pink-50 rounded-lg border border-orange-200">
+                  <div className="mt-4 grid grid-cols-2 gap-3 rounded-lg border bg-muted/50 p-3">
                     <div className="text-center">
                       <div className="flex items-center justify-center gap-1 mb-1">
-                        <Flame className="w-4 h-4 text-orange-500" />
+                        <Flame className="w-4 h-4 text-muted-foreground" />
                         <span className="text-xs text-muted-foreground">Current Streak</span>
                       </div>
-                      <p className="text-2xl font-bold text-orange-600">
+                      <p className="text-2xl font-semibold tabular-nums text-foreground">
                         {student.streakData?.currentStreak || 0}
                       </p>
                       <p className="text-xs text-muted-foreground">days</p>
                     </div>
                     <div className="text-center">
                       <div className="flex items-center justify-center gap-1 mb-1">
-                        <CheckCircle2 className="w-4 h-4 text-green-500" />
+                        <CheckCircle2 className="w-4 h-4 text-muted-foreground" />
                         <span className="text-xs text-muted-foreground">Tasks Completed</span>
                       </div>
-                      <p className="text-2xl font-bold text-green-600">
+                      <p className="text-2xl font-semibold tabular-nums text-foreground">
                         {student.taskData?.completedCount || 0}<span className="text-lg text-muted-foreground">/{student.taskData?.totalCount || 0}</span>
                       </p>
                       <p className="text-xs text-muted-foreground">
@@ -584,11 +561,11 @@ export function ClassView({ classData, students, onBack, onAddTask, onAddQuiz, a
                   </div>
 
                   {/* Add Grade Button */}
-                  <div className="mt-4 pt-4 border-t border-gray-200">
+                  <div className="mt-4 border-t pt-4">
                     <Button
                       onClick={() => handleGradeDialogOpen(student)}
                       variant="outline"
-                      className="w-full bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white border-0 shadow-md"
+                      className="w-full"
                     >
                       <FileEdit className="w-4 h-4 mr-2" />
                       Add/Upload Grade
@@ -602,10 +579,10 @@ export function ClassView({ classData, students, onBack, onAddTask, onAddQuiz, a
 
         <TabsContent value="active" className="space-y-4">
           {enrolledStudents.filter(s => s.status === 'active').length === 0 ? (
-            <Card className="border-0 shadow-lg">
+            <Card>
               <CardContent className="p-12 text-center">
-                <div className="p-4 bg-gradient-to-br from-gray-100 to-gray-200 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-                  <Users className="w-8 h-8 text-gray-400" />
+                <div className="mx-auto mb-4 flex size-16 items-center justify-center rounded-full bg-muted">
+                  <Users className="size-8 text-muted-foreground" />
                 </div>
                 <h3 className="text-lg font-medium mb-2">No Active Students</h3>
                 <p className="text-muted-foreground">
@@ -615,16 +592,17 @@ export function ClassView({ classData, students, onBack, onAddTask, onAddQuiz, a
             </Card>
           ) : (
             enrolledStudents.filter(s => s.status === 'active').map((student) => (
-              <Card 
-                key={student.id} 
-                className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 bg-gradient-to-br from-white to-gray-50"
-              >
+              <Card key={student.id}>
                 <CardContent className="p-6">
                   <div className="flex flex-col md:flex-row gap-6">
                     <div className="flex items-start gap-4 flex-1">
-                      <div className="w-16 h-16 bg-gradient-to-br from-purple-400 to-blue-500 rounded-full flex items-center justify-center text-white font-semibold text-xl shadow-lg">
-                        {student.avatar}
-                      </div>
+                      <RoleAvatar
+                        role="student"
+                        identifier={student.id || student.email}
+                        name={student.name || 'Student'}
+                        className="size-16 shadow-lg"
+                        fallbackClassName="text-xl font-semibold"
+                      />
                       <div className="flex-1">
                         <h3 className="text-lg font-medium mb-1">{student.name}</h3>
                         <p className="text-sm text-muted-foreground mb-2">{student.email}</p>
@@ -640,31 +618,31 @@ export function ClassView({ classData, students, onBack, onAddTask, onAddQuiz, a
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
                       <div className="text-center">
                         <div className="flex items-center justify-center gap-1 mb-1">
-                          <GraduationCap className="w-4 h-4 text-purple-500" />
+                          <GraduationCap className="w-4 h-4 text-muted-foreground" />
                           <p className="text-xs text-muted-foreground">Level</p>
                         </div>
-                        <p className="text-xl font-semibold text-purple-600">{student.currentLevel}</p>
+                        <p className="text-xl font-semibold tabular-nums text-foreground">{student.currentLevel}</p>
                       </div>
                       <div className="text-center">
                         <div className="flex items-center justify-center gap-1 mb-1">
-                          <Award className="w-4 h-4 text-yellow-500" />
+                          <Award className="w-4 h-4 text-muted-foreground" />
                           <p className="text-xs text-muted-foreground">Points</p>
                         </div>
-                        <p className="text-xl font-semibold text-yellow-600">{student.totalPoints}</p>
+                        <p className="text-xl font-semibold tabular-nums text-foreground">{student.totalPoints}</p>
                       </div>
                       <div className="text-center">
                         <div className="flex items-center justify-center gap-1 mb-1">
-                          <Target className="w-4 h-4 text-blue-500" />
+                          <Target className="w-4 h-4 text-muted-foreground" />
                           <p className="text-xs text-muted-foreground">Progress</p>
                         </div>
-                        <p className="text-xl font-semibold text-blue-600">{student.gameProgress}%</p>
+                        <p className="text-xl font-semibold tabular-nums text-foreground">{student.gameProgress}%</p>
                       </div>
                       <div className="text-center">
                         <div className="flex items-center justify-center gap-1 mb-1">
-                          <BarChart3 className="w-4 h-4 text-green-500" />
+                          <BarChart3 className="w-4 h-4 text-muted-foreground" />
                           <p className="text-xs text-muted-foreground">Grade</p>
                         </div>
-                        <Badge className={`${getGradeColorByScore(student.averageGrade)} text-lg px-2 py-1 border-0`}>
+                        <Badge variant={getGradeColorByScore(student.averageGrade)} className="text-lg">
                           {student.averageGrade}%
                         </Badge>
                       </div>
@@ -675,20 +653,20 @@ export function ClassView({ classData, students, onBack, onAddTask, onAddQuiz, a
                       <span className="text-xs text-muted-foreground">Game Progress</span>
                       <span className="text-xs font-medium">{student.gameProgress}%</span>
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div className="h-2 w-full rounded-full bg-muted">
                       <div 
-                        className={`h-2 rounded-full ${getProgressColor(student.gameProgress)} transition-all duration-500`}
+                        className="h-full rounded-full bg-primary transition-[width] duration-300"
                         style={{ width: `${student.gameProgress}%` }}
                       />
                     </div>
                   </div>
 
                   {/* Add Grade Button */}
-                  <div className="mt-4 pt-4 border-t border-gray-200">
+                  <div className="mt-4 border-t pt-4">
                     <Button
                       onClick={() => handleGradeDialogOpen(student)}
                       variant="outline"
-                      className="w-full bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white border-0 shadow-md"
+                      className="w-full"
                     >
                       <FileEdit className="w-4 h-4 mr-2" />
                       Add/Upload Grade
@@ -702,10 +680,10 @@ export function ClassView({ classData, students, onBack, onAddTask, onAddQuiz, a
 
         <TabsContent value="inactive" className="space-y-4">
           {enrolledStudents.filter(s => s.status === 'inactive').length === 0 ? (
-            <Card className="border-0 shadow-lg">
+            <Card>
               <CardContent className="p-12 text-center">
-                <div className="p-4 bg-gradient-to-br from-gray-100 to-gray-200 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-                  <Users className="w-8 h-8 text-gray-400" />
+                <div className="mx-auto mb-4 flex size-16 items-center justify-center rounded-full bg-muted">
+                  <Users className="size-8 text-muted-foreground" />
                 </div>
                 <h3 className="text-lg font-medium mb-2">No Inactive Students</h3>
                 <p className="text-muted-foreground">
@@ -715,16 +693,17 @@ export function ClassView({ classData, students, onBack, onAddTask, onAddQuiz, a
             </Card>
           ) : (
             enrolledStudents.filter(s => s.status === 'inactive').map((student) => (
-              <Card 
-                key={student.id} 
-                className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 bg-gradient-to-br from-white to-gray-50"
-              >
+              <Card key={student.id}>
                 <CardContent className="p-6">
                   <div className="flex flex-col md:flex-row gap-6">
                     <div className="flex items-start gap-4 flex-1">
-                      <div className="w-16 h-16 bg-gradient-to-br from-gray-400 to-gray-500 rounded-full flex items-center justify-center text-white font-semibold text-xl shadow-lg">
-                        {student.avatar}
-                      </div>
+                      <RoleAvatar
+                        role="student"
+                        identifier={student.id || student.email}
+                        name={student.name || 'Student'}
+                        className="size-16 shadow-lg"
+                        fallbackClassName="text-xl font-semibold"
+                      />
                       <div className="flex-1">
                         <h3 className="text-lg font-medium mb-1">{student.name}</h3>
                         <p className="text-sm text-muted-foreground mb-2">{student.email}</p>
@@ -740,31 +719,31 @@ export function ClassView({ classData, students, onBack, onAddTask, onAddQuiz, a
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
                       <div className="text-center">
                         <div className="flex items-center justify-center gap-1 mb-1">
-                          <GraduationCap className="w-4 h-4 text-purple-500" />
+                          <GraduationCap className="w-4 h-4 text-muted-foreground" />
                           <p className="text-xs text-muted-foreground">Level</p>
                         </div>
-                        <p className="text-xl font-semibold text-purple-600">{student.currentLevel}</p>
+                        <p className="text-xl font-semibold tabular-nums text-foreground">{student.currentLevel}</p>
                       </div>
                       <div className="text-center">
                         <div className="flex items-center justify-center gap-1 mb-1">
-                          <Award className="w-4 h-4 text-yellow-500" />
+                          <Award className="w-4 h-4 text-muted-foreground" />
                           <p className="text-xs text-muted-foreground">Points</p>
                         </div>
-                        <p className="text-xl font-semibold text-yellow-600">{student.totalPoints}</p>
+                        <p className="text-xl font-semibold tabular-nums text-foreground">{student.totalPoints}</p>
                       </div>
                       <div className="text-center">
                         <div className="flex items-center justify-center gap-1 mb-1">
-                          <Target className="w-4 h-4 text-blue-500" />
+                          <Target className="w-4 h-4 text-muted-foreground" />
                           <p className="text-xs text-muted-foreground">Progress</p>
                         </div>
-                        <p className="text-xl font-semibold text-blue-600">{student.gameProgress}%</p>
+                        <p className="text-xl font-semibold tabular-nums text-foreground">{student.gameProgress}%</p>
                       </div>
                       <div className="text-center">
                         <div className="flex items-center justify-center gap-1 mb-1">
-                          <BarChart3 className="w-4 h-4 text-green-500" />
+                          <BarChart3 className="w-4 h-4 text-muted-foreground" />
                           <p className="text-xs text-muted-foreground">Grade</p>
                         </div>
-                        <Badge className={`${getGradeColorByScore(student.averageGrade)} text-lg px-2 py-1 border-0`}>
+                        <Badge variant={getGradeColorByScore(student.averageGrade)} className="text-lg">
                           {student.averageGrade}%
                         </Badge>
                       </div>
@@ -775,20 +754,20 @@ export function ClassView({ classData, students, onBack, onAddTask, onAddQuiz, a
                       <span className="text-xs text-muted-foreground">Game Progress</span>
                       <span className="text-xs font-medium">{student.gameProgress}%</span>
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div className="h-2 w-full rounded-full bg-muted">
                       <div 
-                        className={`h-2 rounded-full ${getProgressColor(student.gameProgress)} transition-all duration-500`}
+                        className="h-full rounded-full bg-primary transition-[width] duration-300"
                         style={{ width: `${student.gameProgress}%` }}
                       />
                     </div>
                   </div>
 
                   {/* Add Grade Button */}
-                  <div className="mt-4 pt-4 border-t border-gray-200">
+                  <div className="mt-4 border-t pt-4">
                     <Button
                       onClick={() => handleGradeDialogOpen(student)}
                       variant="outline"
-                      className="w-full bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white border-0 shadow-md"
+                      className="w-full"
                     >
                       <FileEdit className="w-4 h-4 mr-2" />
                       Add/Upload Grade
@@ -815,8 +794,8 @@ export function ClassView({ classData, students, onBack, onAddTask, onAddQuiz, a
           
           {studentAttemptedTasks.length === 0 ? (
             <div className="py-8 text-center space-y-4">
-              <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-orange-100 to-red-100 rounded-full mb-2">
-                <BookOpen className="w-8 h-8 text-orange-600" />
+              <div className="mb-2 inline-flex size-16 items-center justify-center rounded-full bg-muted">
+                <BookOpen className="size-8 text-muted-foreground" />
               </div>
               <div>
                 <h3 className="text-lg font-medium mb-2">No Tasks Assigned Yet</h3>
@@ -837,12 +816,12 @@ export function ClassView({ classData, students, onBack, onAddTask, onAddQuiz, a
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-sm text-blue-800 flex items-center gap-2">
+              <div className="rounded-lg border bg-muted/50 p-3">
+                <p className="flex items-center gap-2 text-sm text-foreground">
                   <CheckCircle className="w-4 h-4" />
                   <span><strong>{studentAttemptedTasks.length}</strong> task(s)/quiz(zes) assigned to student</span>
                 </p>
-                <p className="text-xs text-blue-700 mt-1">
+                <p className="mt-1 text-xs text-muted-foreground">
                   You can grade any task, including those not attempted (e.g., assign F for incomplete work)
                 </p>
               </div>
@@ -861,7 +840,7 @@ export function ClassView({ classData, students, onBack, onAddTask, onAddQuiz, a
                       <SelectItem key={task.id} value={task.id}>
                         <div className="flex items-center gap-2">
                           {task.type === 'quiz' ? '📝' : '📋'} {task.title}
-                          {task.completed && <Badge className="ml-2 bg-green-100 text-green-700 border-0">Completed</Badge>}
+                          {task.completed && <Badge className="ml-2" variant="secondary">Completed</Badge>}
                         </div>
                       </SelectItem>
                     ))}
@@ -946,7 +925,7 @@ export function ClassView({ classData, students, onBack, onAddTask, onAddQuiz, a
                 </Button>
                 <Button
                   onClick={handleAddGrade}
-                  className="bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white border-0 shadow-md"
+
                   disabled={!newGrade.taskId || !newGrade.grade || !newGrade.subject}
                 >
                   <CheckCircle className="w-4 h-4 mr-2" />

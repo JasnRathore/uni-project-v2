@@ -15,9 +15,10 @@ interface AddTaskProps {
   onAddTask: (task: any) => void;
   students: any[];
   accessToken: string;
+  embedded?: boolean;
 }
 
-export function AddTask({ classData, onBack, onAddTask, students, accessToken }: AddTaskProps) {
+export function AddTask({ classData, onBack, onAddTask, students, accessToken, embedded = false }: AddTaskProps) {
   const [taskData, setTaskData] = useState({
     title: '',
     description: '',
@@ -56,6 +57,7 @@ export function AddTask({ classData, onBack, onAddTask, students, accessToken }:
       if (!response.ok) throw new Error(data.error || `Task creation failed (${response.status})`);
       onAddTask(data);
       toast.success(`Quest "${taskData.title}" assigned to ${data.assignedCount || 0} student(s) in ${classData.name}!`);
+      if (embedded) onBack();
     } catch (error: any) {
       console.error('Error creating task:', error);
       toast.error(error.message || 'Failed to create task');
@@ -63,31 +65,31 @@ export function AddTask({ classData, onBack, onAddTask, students, accessToken }:
   };
 
   return (
-    <div className="p-6 max-w-3xl mx-auto">
-      <Button
+    <div className={embedded ? 'w-full' : 'mx-auto max-w-3xl p-6'}>
+      {!embedded && <Button
         onClick={onBack}
         variant="ghost"
         className="mb-6"
       >
         <ArrowLeft className="w-4 h-4 mr-2" />
         Back to Class
-      </Button>
+      </Button>}
 
-      <Card className="border-0 shadow-xl bg-gradient-to-br from-white to-gray-50">
-        <CardHeader className="bg-gradient-to-r from-amber-500 via-orange-500 to-pink-500 text-white rounded-t-lg">
+      <Card className={embedded ? "gap-0 py-0 shadow-none ring-0" : undefined}>
+        {!embedded && <CardHeader className="border-b">
           <CardTitle className="flex items-center gap-2">
             <Sparkles className="w-6 h-6" />
             Create Daily Quest for {classData.name}
           </CardTitle>
-          <p className="text-sm text-white/90 mt-2">
+          <p className="mt-2 text-sm text-muted-foreground">
             ✨ This quest will be assigned to all students in this class and appear on their dashboard
           </p>
-        </CardHeader>
-        <CardContent className="p-6">
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div>
+        </CardHeader>}
+        <CardContent className={embedded ? "p-0" : "p-6"}>
+          <form onSubmit={handleSubmit} className="grid gap-6 lg:grid-cols-2">
+            <div className="lg:col-span-2">
               <Label htmlFor="title" className="flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-amber-500" />
+                <Sparkles className="w-4 h-4 text-primary" />
                 Quest Title *
               </Label>
               <Input
@@ -99,7 +101,7 @@ export function AddTask({ classData, onBack, onAddTask, students, accessToken }:
               />
             </div>
 
-            <div>
+            <div className="lg:col-span-2">
               <Label htmlFor="description">Quest Description *</Label>
               <Textarea
                 id="description"
@@ -124,7 +126,7 @@ export function AddTask({ classData, onBack, onAddTask, students, accessToken }:
 
               <div>
                 <Label htmlFor="maxPoints" className="flex items-center gap-2">
-                  <Zap className="w-4 h-4 text-amber-500" />
+                  <Zap className="w-4 h-4 text-primary" />
                   Reward Points *
                 </Label>
                 <Input
@@ -141,7 +143,7 @@ export function AddTask({ classData, onBack, onAddTask, students, accessToken }:
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="dueDate" className="flex items-center gap-2">
-                  <Calendar className="w-4 h-4 text-amber-500" />
+                  <Calendar className="w-4 h-4 text-primary" />
                   Due Date *
                 </Label>
                 <Input
@@ -157,7 +159,7 @@ export function AddTask({ classData, onBack, onAddTask, students, accessToken }:
                 <Label htmlFor="priority">Priority</Label>
                 <Select
                   value={taskData.priority}
-                  onValueChange={(value) => setTaskData({ ...taskData, priority: value })}
+                  onValueChange={(value) => setTaskData({ ...taskData, priority: value ?? taskData.priority })}
                 >
                   <SelectTrigger className="mt-2">
                     <SelectValue placeholder="Select priority" />
@@ -171,22 +173,22 @@ export function AddTask({ classData, onBack, onAddTask, students, accessToken }:
               </div>
             </div>
 
-            <div className="p-4 bg-gradient-to-r from-amber-50 to-orange-50 rounded-lg border-2 border-amber-200">
+            <div className="rounded-lg border bg-muted/50 p-4 lg:col-span-2">
               <div className="flex items-start gap-3">
-                <Sparkles className="w-5 h-5 text-amber-600 mt-0.5" />
+                <Sparkles className="mt-0.5 size-5 text-muted-foreground" />
                 <div>
-                  <h4 className="font-medium text-amber-900">Quest Assignment</h4>
-                  <p className="text-sm text-amber-800 mt-1">
+                  <h4 className="font-medium text-foreground">Quest Assignment</h4>
+                  <p className="mt-1 text-sm text-muted-foreground">
                     This daily quest will be automatically assigned to all {classData.studentCount} student(s) currently enrolled in {classData.name}. It will appear as a highlighted quest card on their dashboard!
                   </p>
                 </div>
               </div>
             </div>
 
-            <div className="flex gap-3 pt-4">
+            <div className="flex gap-3 pt-4 lg:col-span-2">
               <Button
                 type="submit"
-                className="flex-1 bg-gradient-to-r from-amber-500 via-orange-500 to-pink-500 hover:from-amber-600 hover:via-orange-600 hover:to-pink-600 text-white border-0 shadow-md"
+                className="flex-1"
               >
                 <Sparkles className="w-4 h-4 mr-2" />
                 Create Quest

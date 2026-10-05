@@ -1,5 +1,5 @@
-import App from '@/components/App';
+import { StudentApp } from "@/components/StudentApp";
 
 export default function StudentLoginPage() {
-  return <App />;
+  return <StudentApp />;
 }

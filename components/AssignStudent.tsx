@@ -2,8 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
-import { Badge } from './ui/badge';
-import { Avatar, AvatarFallback } from './ui/avatar';
+import { RoleAvatar } from './RoleAvatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { ArrowLeft, UserPlus, UserMinus, Trophy, Star, Flame, CheckCircle2, ListTodo } from 'lucide-react';
 import { toast } from 'sonner';
@@ -149,104 +148,98 @@ export function AssignStudent({ student, classes, onBack, onAssignSuccess, acces
   };
 
   return (
-    <div className="p-6">
+    <div className="mx-auto w-full max-w-7xl p-4 sm:p-6 lg:p-8">
       <div className="mb-6">
         <Button onClick={onBack} variant="ghost" className="mb-4">
           <ArrowLeft className="w-4 h-4 mr-2" />
           Back to Students
         </Button>
-
-        <h1 className="text-2xl font-bold mb-2">Assign Student to Class</h1>
-        <p className="text-muted-foreground">
-          Manage class assignment for portal-registered student
-        </p>
       </div>
 
-      <div className="max-w-2xl">
+      <div className="grid gap-6 xl:grid-cols-2 xl:items-start">
         {/* Student Info Card */}
-        <Card className="mb-6 border-0 shadow-lg bg-gradient-to-br from-purple-50 to-white">
+        <Card>
           <CardHeader>
             <CardTitle className="text-lg">Student Information</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-4 mb-4">
-              <Avatar className="w-16 h-16 ring-2 ring-purple-200">
-                <AvatarFallback className="bg-gradient-to-br from-purple-400 to-blue-500 text-white text-lg">
-                  {student.avatar}
-                </AvatarFallback>
-              </Avatar>
+              <RoleAvatar
+                role="student"
+                identifier={student.id || student.email}
+                name={student.name || 'Student'}
+                className="size-16 ring-2 ring-primary/20"
+                fallbackClassName="text-lg"
+              />
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-1">
                   <h3 className="font-semibold text-lg">{student.name}</h3>
-                  <Badge className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white border-0">
-                    Portal User
-                  </Badge>
                 </div>
                 <p className="text-sm text-muted-foreground">{student.email}</p>
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-4 p-4 bg-white rounded-lg border">
+            <div className="grid grid-cols-3 gap-4 rounded-lg border bg-muted/50 p-4">
               <div className="text-center">
                 <div className="flex items-center justify-center gap-1 mb-1">
-                  <Trophy className="w-4 h-4 text-yellow-500" />
+                  <Trophy className="w-4 h-4 text-muted-foreground" />
                   <span className="text-sm font-medium">Level</span>
                 </div>
-                <p className="text-2xl font-bold text-purple-600">{student.currentLevel}</p>
+                <p className="text-2xl font-semibold tabular-nums text-foreground">{student.currentLevel}</p>
               </div>
               <div className="text-center">
                 <div className="flex items-center justify-center gap-1 mb-1">
-                  <Star className="w-4 h-4 text-blue-500" />
+                  <Star className="w-4 h-4 text-muted-foreground" />
                   <span className="text-sm font-medium">EXP</span>
                 </div>
-                <p className="text-2xl font-bold text-blue-600">{student.totalPoints}</p>
+                <p className="text-2xl font-semibold tabular-nums text-foreground">{student.totalPoints}</p>
               </div>
               <div className="text-center">
                 <div className="flex items-center justify-center gap-1 mb-1">
                   <span className="text-sm font-medium">Avg Grade</span>
                 </div>
-                <p className="text-2xl font-bold text-green-600">{student.averageGrade}%</p>
+                <p className="text-2xl font-semibold tabular-nums text-foreground">{student.averageGrade}%</p>
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-4 p-4 bg-white rounded-lg border mt-4">
+            <div className="mt-4 grid grid-cols-3 gap-4 rounded-lg border bg-muted/50 p-4">
               <div className="text-center">
                 <div className="flex items-center justify-center gap-1 mb-1">
-                  <Flame className="w-4 h-4 text-red-500" />
+                  <Flame className="w-4 h-4 text-muted-foreground" />
                   <span className="text-sm font-medium">Current Streak</span>
                 </div>
-                <p className="text-2xl font-bold text-red-600">{streakData.currentStreak}</p>
+                <p className="text-2xl font-semibold tabular-nums text-foreground">{streakData.currentStreak}</p>
               </div>
               <div className="text-center">
                 <div className="flex items-center justify-center gap-1 mb-1">
-                  <CheckCircle2 className="w-4 h-4 text-green-500" />
+                  <CheckCircle2 className="w-4 h-4 text-muted-foreground" />
                   <span className="text-sm font-medium">Longest Streak</span>
                 </div>
-                <p className="text-2xl font-bold text-green-600">{streakData.longestStreak}</p>
+                <p className="text-2xl font-semibold tabular-nums text-foreground">{streakData.longestStreak}</p>
               </div>
               <div className="text-center">
                 <div className="flex items-center justify-center gap-1 mb-1">
-                  <ListTodo className="w-4 h-4 text-blue-500" />
+                  <ListTodo className="w-4 h-4 text-muted-foreground" />
                   <span className="text-sm font-medium">Tasks</span>
                 </div>
-                <p className="text-2xl font-bold text-blue-600">{taskData.completedCount}/{taskData.totalCount}</p>
+                <p className="text-2xl font-semibold tabular-nums text-foreground">{taskData.completedCount}/{taskData.totalCount}</p>
               </div>
             </div>
           </CardContent>
         </Card>
 
         {/* Class Assignment Card */}
-        <Card className="border-0 shadow-lg">
+        <Card>
           <CardHeader>
             <CardTitle className="text-lg">Class Assignment</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             {student.isAssigned && (
-              <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                <p className="text-sm font-medium text-blue-900 mb-1">
+              <div className="rounded-lg border bg-muted/50 p-4">
+                <p className="mb-1 text-sm font-medium text-muted-foreground">
                   Currently Assigned To:
                 </p>
-                <p className="text-lg font-semibold text-blue-700">
+                <p className="text-lg font-semibold text-foreground">
                   {student.className}
                 </p>
               </div>
@@ -278,7 +271,7 @@ export function AssignStudent({ student, classes, onBack, onAssignSuccess, acces
               <Button
                 onClick={handleAssignToClass}
                 disabled={isAssigning || !selectedClassId || classes.length === 0}
-                className="flex-1 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white border-0"
+                className="flex-1"
               >
                 <UserPlus className="w-4 h-4 mr-2" />
                 {student.isAssigned ? 'Update Assignment' : 'Assign to Class'}
@@ -288,8 +281,7 @@ export function AssignStudent({ student, classes, onBack, onAssignSuccess, acces
                 <Button
                   onClick={handleUnassign}
                   disabled={isAssigning}
-                  variant="outline"
-                  className="border-red-200 text-red-600 hover:bg-red-50"
+                  variant="destructive"
                 >
                   <UserMinus className="w-4 h-4 mr-2" />
                   Unassign

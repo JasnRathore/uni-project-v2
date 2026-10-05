@@ -6,12 +6,18 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { GraduationCap, Mail, Lock, LogIn, UserPlus, ArrowLeft } from 'lucide-react';
 
-export function StudentLogin({ onLogin, onSwitchToSignup, onSwitchToAdmin }) {
+interface StudentLoginProps {
+  onLogin: (email: string, password: string) => Promise<void>;
+  onSwitchToSignup: () => void;
+  onSwitchToAdmin: () => void;
+}
+
+export function StudentLogin({ onLogin, onSwitchToSignup, onSwitchToAdmin }: StudentLoginProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
     try {
@@ -24,26 +30,26 @@ export function StudentLogin({ onLogin, onSwitchToSignup, onSwitchToAdmin }) {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center p-4">
+    <main className="flex min-h-dvh items-center justify-center bg-muted/40 p-4">
       <div className="w-full max-w-md">
         <Button
           onClick={onSwitchToAdmin}
           variant="ghost"
-          className="text-white hover:bg-white/20 mb-4"
+          className="mb-4"
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
           Back to Portal Selection
         </Button>
         
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-20 h-20 bg-white/20 backdrop-blur-lg rounded-full mb-4 shadow-2xl">
-            <GraduationCap className="w-10 h-10 text-white" />
+          <div className="mb-4 inline-flex size-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+            <GraduationCap className="size-7" />
           </div>
-          <h1 className="text-4xl font-bold text-white mb-2">Student Portal</h1>
-          <p className="text-white/90">Access your dental college progress</p>
+          <h1 className="mb-2 text-3xl font-semibold tracking-tight text-foreground">Student Portal</h1>
+          <p className="text-muted-foreground">Access your dental college progress</p>
         </div>
 
-        <Card className="border-0 shadow-2xl bg-white/95 backdrop-blur-lg">
+        <Card className="border-border/80 shadow-sm">
           <CardHeader className="space-y-2 pb-6">
             <CardTitle className="text-2xl text-center">Welcome Back!</CardTitle>
             <CardDescription className="text-center">
@@ -86,7 +92,7 @@ export function StudentLogin({ onLogin, onSwitchToSignup, onSwitchToAdmin }) {
               <Button
                 type="submit"
                 disabled={isLoading}
-                className="w-full h-11 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white border-0 shadow-lg"
+                className="h-11 w-full"
               >
                 {isLoading ? (
                   <div className="flex items-center gap-2">
@@ -108,7 +114,7 @@ export function StudentLogin({ onLogin, onSwitchToSignup, onSwitchToAdmin }) {
                   <span className="w-full border-t" />
                 </div>
                 <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-white px-2 text-muted-foreground">
+                  <span className="bg-card px-2 text-muted-foreground">
                     New student?
                   </span>
                 </div>
@@ -136,6 +142,6 @@ export function StudentLogin({ onLogin, onSwitchToSignup, onSwitchToAdmin }) {
           </CardContent>
         </Card>
       </div>
-    </div>
+    </main>
   );
 }

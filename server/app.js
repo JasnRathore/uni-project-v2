@@ -1,16 +1,30 @@
-require('dotenv').config({ path: '../.env' }); // Load root .env
+const path = require('node:path');
+require('dotenv').config({ path: path.resolve(__dirname, '..', '.env') });
 const express = require('express');
 const cors = require('cors');
 
 const teacherRoutes = require('./routes/teacher');
 const studentRoutes = require('./routes/student');
 const authRoutes = require('./routes/auth');
+const { ensureDatabaseReady } = require('../database/services/dbService');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
 app.use(cors({ origin: '*', methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], allowedHeaders: ['Content-Type', 'Authorization'] }));
 app.use(express.json());
+app.use(async (_req, res, next) => {
+  try {
+    await ensureDatabaseReady();
+    return next();
+  } catch (error) {
+    console.error('Database initialization failed:', error);
+    return res.status(503).json({
+      error: 'Database is not ready',
+      detail: error.message,
+    });
+  }
+});
 
 // Routes
 app.use('/api/teacher', teacherRoutes);

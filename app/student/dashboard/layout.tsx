@@ -4,13 +4,26 @@ import React, { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   BookOpen,
+  GraduationCap,
   Home,
   ListTodo,
   LogOut,
   Trophy,
   User,
 } from 'lucide-react';
-import { Sidebar, SidebarContent, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+  SidebarTrigger,
+} from '@/components/ui/sidebar';
 import { DASHBOARD_LOGOUT_EVENT } from '@/lib/dashboard-events';
 import { supabase } from '@/components/utils/supabase/client';
 
@@ -59,49 +72,64 @@ export default function StudentDashboardLayout({
 
   return (
     <SidebarProvider>
-      <div className="flex h-screen">
-        <Sidebar>
+      <div className="flex min-h-svh">
+        <Sidebar collapsible="icon">
           <SidebarHeader>
-            <div className="p-4 flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-indigo-50">
-                <Home className="w-6 h-6 text-indigo-600" />
+            <div className="flex items-center gap-3 px-3 py-4 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:py-2">
+              <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground">
+                <GraduationCap aria-hidden="true" className="size-5" />
               </div>
-              <div>
-                <h2 className="font-semibold">Student Portal</h2>
-                <p className="text-sm text-muted-foreground">{studentName}</p>
+              <div className="min-w-0 group-data-[collapsible=icon]:hidden">
+                <p className="truncate text-sm font-semibold">Student portal</p>
+                <p className="truncate text-xs text-muted-foreground">{studentName}</p>
               </div>
             </div>
           </SidebarHeader>
           <SidebarContent>
+            <SidebarGroup>
+              <SidebarGroupLabel>Learning</SidebarGroupLabel>
+              <SidebarMenu>
+                {menuItems.map(item => (
+                  <SidebarMenuItem key={item.id}>
+                    <SidebarMenuButton
+                      onClick={() => router.push(item.id === 'dashboard' ? '/student/dashboard' : `/student/dashboard/${item.id}`)}
+                      isActive={activeView === item.id}
+                      tooltip={item.label}
+                      aria-current={activeView === item.id ? 'page' : undefined}
+                    >
+                      <item.icon aria-hidden="true" />
+                      <span className="group-data-[collapsible=icon]:hidden">{item.label}</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroup>
+          </SidebarContent>
+          <SidebarFooter>
             <SidebarMenu>
-              {menuItems.map(item => (
-                <SidebarMenuItem key={item.id}>
-                  <SidebarMenuButton
-                    onClick={() => router.push(item.id === 'dashboard' ? '/student/dashboard' : `/student/dashboard/${item.id}`)}
-                    isActive={activeView === item.id}
-                  >
-                    <item.icon className="w-4 h-4" />
-                    <span>{item.label}</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
               <SidebarMenuItem>
-                <SidebarMenuButton onClick={logout}>
-                  <LogOut className="w-4 h-4" />
-                  <span>Logout</span>
+                <SidebarMenuButton onClick={logout} tooltip="Logout">
+                  <LogOut aria-hidden="true" />
+                  <span className="group-data-[collapsible=icon]:hidden">Logout</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
-          </SidebarContent>
+          </SidebarFooter>
         </Sidebar>
-        <div className="flex-1 min-w-0 flex flex-col bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-          <header className="hidden lg:flex border-b bg-white/80 backdrop-blur-sm p-4 items-center gap-2 shadow-sm">
+        <div className="flex min-w-0 flex-1 flex-col bg-background">
+          <header className="hidden min-h-14 items-center gap-3 border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/80 lg:flex">
             <SidebarTrigger />
-            <h1 className="text-lg font-semibold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-              {titles[activeView] || 'Dashboard'}
-            </h1>
+            <div className="min-w-0">
+              <h1 className="truncate text-sm font-semibold">
+                {titles[activeView] || 'Dashboard'}
+              </h1>
+              <p className="text-xs text-muted-foreground">Learning workspace</p>
+            </div>
+            <span className="ml-auto max-w-48 truncate text-sm text-muted-foreground">
+              {studentName}
+            </span>
           </header>
-          <main className="flex-1 min-h-0 overflow-y-auto">{children}</main>
+          <main id="main-content" className="min-h-0 flex-1 overflow-y-auto">{children}</main>
         </div>
       </div>
     </SidebarProvider>

@@ -1,6 +1,12 @@
 "use client";
-import App from '../components/App';
+import { PortalLanding } from "../components/PortalLanding";
+import { Toaster } from "../components/ui/sonner";
 
 export default function Home() {
-  return <App />;
+  return (
+    <>
+      <PortalLanding />
+      <Toaster />
+    </>
+  );
 }

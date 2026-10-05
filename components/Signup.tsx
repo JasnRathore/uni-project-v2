@@ -8,8 +8,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Mail, Lock, Eye, EyeOff, User, BookOpen, GraduationCap, Loader2, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 
+export interface SignupCredentials {
+  name: string;
+  email: string;
+  password: string;
+  confirmPassword: string;
+  department: string;
+  qualification: string;
+}
+
 interface SignupProps {
-  onSignup: (credentials: any) => void;
+  onSignup: (credentials: SignupCredentials) => void | Promise<void>;
   onSwitchToLogin: () => void;
   onBack: () => void;
 }
@@ -27,7 +36,7 @@ export function Signup({ onSignup, onSwitchToLogin, onBack }: SignupProps) {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSignup = async (e) => {
+  const handleSignup = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
     if (!formData.name || !formData.email || !formData.password || !formData.department) {
@@ -56,12 +65,12 @@ export function Signup({ onSignup, onSwitchToLogin, onBack }: SignupProps) {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50 p-4">
+    <main className="flex min-h-dvh items-center justify-center bg-muted/40 p-4">
       <div className="w-full max-w-md">
         {onBack && (
           <button
             onClick={onBack}
-            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-purple-600 transition-colors mb-6 group"
+            className="group mb-6 flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
           >
             <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
             Back to Portal Selection
@@ -69,16 +78,16 @@ export function Signup({ onSignup, onSwitchToLogin, onBack }: SignupProps) {
         )}
         {/* Logo/Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-600 rounded-2xl mb-4 shadow-lg">
-            <GraduationCap className="w-10 h-10 text-white" />
+          <div className="mb-4 inline-flex size-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+            <GraduationCap className="size-7" />
           </div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+          <h1 className="text-3xl font-semibold tracking-tight text-foreground">
             Dental College Portal
           </h1>
           <p className="text-muted-foreground mt-2">Create Your Teacher Account</p>
         </div>
 
-        <Card className="border-0 shadow-2xl">
+        <Card className="border-border/80 shadow-sm">
           <CardHeader className="space-y-1 pb-4">
             <CardTitle className="text-2xl text-center">Join Our Faculty!</CardTitle>
             <CardDescription className="text-center">
@@ -123,7 +132,7 @@ export function Signup({ onSignup, onSwitchToLogin, onBack }: SignupProps) {
                 <Label htmlFor="department">Department *</Label>
                 <Select 
                   value={formData.department} 
-                  onValueChange={(value) => setFormData({ ...formData, department: value })}
+                  onValueChange={(value) => setFormData({ ...formData, department: value ?? '' })}
                   disabled={isLoading}
                 >
                   <SelectTrigger id="department">
@@ -213,7 +222,7 @@ export function Signup({ onSignup, onSwitchToLogin, onBack }: SignupProps) {
 
               <Button
                 type="submit"
-                className="w-full bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white border-0"
+                className="w-full"
                 disabled={isLoading}
               >
                 {isLoading ? (
@@ -233,7 +242,7 @@ export function Signup({ onSignup, onSwitchToLogin, onBack }: SignupProps) {
                 <button
                   type="button"
                   onClick={onSwitchToLogin}
-                  className="text-purple-600 hover:text-purple-700 font-medium hover:underline"
+                  className="font-medium text-primary hover:underline"
                   disabled={isLoading}
                 >
                   Sign in here
@@ -243,6 +252,6 @@ export function Signup({ onSignup, onSwitchToLogin, onBack }: SignupProps) {
           </CardContent>
         </Card>
       </div>
-    </div>
+    </main>
   );
 }

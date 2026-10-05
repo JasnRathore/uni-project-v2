@@ -1,21 +1,21 @@
 "use client";
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { Button } from './ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { StudentsList } from './StudentsList';
 import { StudentProfile } from './StudentProfile';
 import { MarksManagement } from './MarksManagement';
 import { AddStudent } from './AddStudent';
-import { AddClass } from './AddClass';
 import { ClassManagement } from './ClassManagement';
 import { ClassView } from './ClassView';
-import { AddTask } from './AddTask';
 import { AddQuiz } from './AddQuiz';
 import { TasksAndQuizzesManagement } from './TasksAndQuizzesManagement';
+import { TaskSubmissionsPage } from './TaskSubmissionsPage';
 import { EditTask } from './EditTask';
 import { Settings } from './Settings';
 import { AssignStudent } from './AssignStudent';
-import { RegisteredStudentsList } from './RegisteredStudentsList';
+import { RoleAvatar } from './RoleAvatar';
 import { DebugPanel } from './DebugPanel';
 import { AddDailyTask } from './AddDailyTask';
 import { 
@@ -23,11 +23,7 @@ import {
   GraduationCap, 
   BookOpen, 
   School,
-  Plus,
-  Sparkles
 } from 'lucide-react';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Label } from './ui/label';
 import { toast } from 'sonner';
 import { projectId } from './utils/supabase/info';
 
@@ -85,7 +81,7 @@ export function AdminDashboard({ currentUser: initialUser, onLogout, accessToken
 
     if (activeView === 'class-view' || activeView === 'add-task' || activeView === 'add-quiz') {
       setSelectedClass(classes.find(item => String(item.id) === detailId) || null);
-    } else if (activeView === 'edit-task') {
+    } else if (activeView === 'edit-task' || activeView === 'task-submissions') {
       setSelectedTask(tasks.find(item => String(item.id) === detailId) || null);
     } else if (activeView === 'profile' || activeView === 'assign-student') {
       const allStudents = [...registeredStudents, ...students];
@@ -318,20 +314,41 @@ export function AdminDashboard({ currentUser: initialUser, onLogout, accessToken
 
   const getDefaultClasses = () => [];
 
-  const handleAddStudent = (newStudent: any) => {
-    setStudents(prev => [...prev, newStudent]);
+  const handleAddStudent = async (newStudent: any) => {
+    if (allStudents.some(student => student.email?.toLowerCase() === newStudent.email?.toLowerCase())) {
+      throw new Error('A student with this email already exists.');
+    }
+
+    const nextStudents = [...students, newStudent];
+    const response = await fetch('/api/teacher/students', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: ['Bearer', accessToken].join(' '),
+      },
+      body: JSON.stringify({ students: nextStudents }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(data.error || `Failed to save student (${response.status})`);
+    }
+
+    setStudents(nextStudents);
     // Update class student count
     setClasses((prev: any[]) => prev.map((cls: any) => 
       cls.id === newStudent.classId 
-        ? { ...cls, studentCount: cls.studentCount + 1 }
+        ? { ...cls, studentCount: (Number(cls.studentCount) || 0) + 1 }
         : cls
     ));
-    setActiveView('students');
   };
 
   const handleAddClass = (newClass: any) => {
+    if (classes.some(classItem => classItem.id === newClass.id)) {
+      toast.error('This curriculum class has already been added.');
+      return false;
+    }
     setClasses(prev => [...prev, newClass]);
-    setActiveView('classes');
+    return true;
   };
 
   const handleViewClass = (classToView: any) => {
@@ -503,16 +520,11 @@ export function AdminDashboard({ currentUser: initialUser, onLogout, accessToken
     }
   };
 
-  const [selectedBatch, setSelectedBatch] = useState('All');
-  const [selectedClassName, setSelectedClassName] = useState('All');
-
-  const renderContent = () => {
-    // Combine manually added students with registered students, deduplicating by email.
-    // Registered portal students take precedence (more reliable data).
-    // Filter out the teacher/admin account.
+  // Registered portal records take precedence when an email appears in both data sources.
+  const allStudents = useMemo(() => {
     const teacherEmail = currentUser?.email?.toLowerCase();
-    const emailsSeen = new Set();
-    const allStudents = [...registeredStudents, ...students]
+    const emailsSeen = new Set<string>();
+    return [...registeredStudents, ...students]
       .filter(s => {
         if (!s?.email) return false;
         const email = s.email.toLowerCase();
@@ -522,85 +534,29 @@ export function AdminDashboard({ currentUser: initialUser, onLogout, accessToken
         emailsSeen.add(email);
         return true;
       });
+  }, [registeredStudents, students, currentUser?.email]);
 
-    const filteredStudents = allStudents.filter(student => {
-      const batchMatch = selectedBatch === 'All' || student.batch === selectedBatch;
-      const className = student.className || student.class;
-      const classMatch = selectedClassName === 'All' || className === selectedClassName;
-      return batchMatch && classMatch;
-    });
-    
+  const renderContent = () => {
     switch (activeView) {
       case 'students':
-        return (
-          <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row gap-4 bg-white p-4 rounded-xl shadow-sm border">
-              <div className="flex-1">
-                <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-2 block">Filter by Batch</Label>
-                <Select value={selectedBatch} onValueChange={setSelectedBatch}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select Batch" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="All">All Batches</SelectItem>
-                    <SelectItem value="I BDS">I BDS</SelectItem>
-                    <SelectItem value="II BDS">II BDS</SelectItem>
-                    <SelectItem value="III BDS">III BDS</SelectItem>
-                    <SelectItem value="IV BDS">IV BDS</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex-1">
-                <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-2 block">Filter by Class</Label>
-                <Select value={selectedClassName} onValueChange={setSelectedClassName}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select Class" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="All">All Classes</SelectItem>
-                    <SelectItem value="Oral Anatomy">Oral Anatomy</SelectItem>
-                    <SelectItem value="Dental Materials">Dental Materials</SelectItem>
-                    <SelectItem value="Oral Pathology">Oral Pathology</SelectItem>
-                    <SelectItem value="Pharmacology">Pharmacology</SelectItem>
-                    <SelectItem value="General Surgery">General Surgery</SelectItem>
-                    <SelectItem value="General Medicine">General Medicine</SelectItem>
-                    <SelectItem value="Oral Surgery">Oral Surgery</SelectItem>
-                    <SelectItem value="Prosthodontics">Prosthodontics</SelectItem>
-                    <SelectItem value="Orthodontics">Orthodontics</SelectItem>
-                    <SelectItem value="Periodontics">Periodontics</SelectItem>
-                    <SelectItem value="Pedodontics">Pedodontics</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <StudentsList 
-              accessToken={accessToken}
-              onSelectStudent={(student) => {
-                setSelectedStudent(student);
-                // Route portal students to assign view
-                if (student.isRegistered) {
-                  setActiveView('assign-student', student.email || student.id);
-                } else {
-                  setActiveView('profile', student.email || student.id);
-                }
-              }}
-              students={filteredStudents}
-              classes={classes}
-              onRefresh={loadRegisteredStudents}
-            />
-          </div>
-        );
       case 'portal-students':
         return (
-          <RegisteredStudentsList
-            students={filteredStudents}
-            onBack={() => setActiveView('dashboard')}
-            onSelectStudent={(student: any) => {
-              setSelectedStudent(student);
-              setActiveView('assign-student', student.email || student.id);
-            }}
+          <StudentsList
+            key={activeView}
             accessToken={accessToken}
+            onSelectStudent={(student) => {
+              setSelectedStudent(student);
+              if (student.isRegistered) {
+                setActiveView('assign-student', student.email || student.id);
+              } else {
+                setActiveView('profile', student.email || student.id);
+              }
+            }}
+            students={allStudents}
+            classes={classes}
+            onRefresh={loadRegisteredStudents}
+            onAddStudent={handleAddStudent}
+            initialRegistrationFilter={activeView === 'portal-students' ? 'portal' : 'all'}
           />
         );
       case 'profile':
@@ -651,7 +607,7 @@ export function AdminDashboard({ currentUser: initialUser, onLogout, accessToken
           <ClassManagement
             classes={classes}
             students={allStudents}
-            onAddClass={() => setActiveView('add-class')}
+            onAddClass={handleAddClass}
             onViewClass={handleViewClass}
             onDeleteClass={handleDeleteClass}
           />
@@ -727,6 +683,28 @@ export function AdminDashboard({ currentUser: initialUser, onLogout, accessToken
             onSave={handleSaveTask}
           />
         );
+      case 'task-submissions':
+        if (!selectedTask) {
+          return (
+            <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 p-6">
+              <p className="text-muted-foreground">
+                {isLoadingData ? 'Loading task...' : 'The requested task could not be found.'}
+              </p>
+              {!isLoadingData && (
+                <Button className="w-fit" onClick={() => setActiveView('tasks-quizzes')}>
+                  Back to tasks and quizzes
+                </Button>
+              )}
+            </div>
+          );
+        }
+        return (
+          <TaskSubmissionsPage
+            task={selectedTask}
+            accessToken={accessToken}
+            onBack={() => setActiveView('tasks-quizzes')}
+          />
+        );
       case 'tasks-quizzes':
         return (
           <TasksAndQuizzesManagement
@@ -735,6 +713,8 @@ export function AdminDashboard({ currentUser: initialUser, onLogout, accessToken
             students={allStudents}
             onEditTask={handleEditTask}
             onDeleteTask={handleDeleteTask}
+            onCreateTask={newTask => setTasks(prev => [newTask, ...prev])}
+            onManageStudents={task => setActiveView('task-submissions', task.id)}
             accessToken={accessToken}
           />
         );
@@ -746,13 +726,7 @@ export function AdminDashboard({ currentUser: initialUser, onLogout, accessToken
             onAddStudent={handleAddStudent}
           />
         );
-      case 'add-class':
-        return (
-          <AddClass
-            onBack={() => setActiveView('classes')}
-            onAddClass={handleAddClass}
-          />
-        );
+      case 'grades':
       case 'marks':
         return <MarksManagement students={allStudents} classes={classes} accessToken={accessToken} projectId={projectId} />;
       case 'settings':
@@ -761,123 +735,97 @@ export function AdminDashboard({ currentUser: initialUser, onLogout, accessToken
         return <DebugPanel accessToken={accessToken} />;
       default:
         return (
-          <div className="p-6">
-            <div className="mb-6 p-6 bg-gradient-to-r from-purple-500 to-blue-600 rounded-2xl text-white shadow-xl">
-              <h1 className="mb-2 text-2xl">Welcome back, Dr. {currentUser.name}! 🦷</h1>
-              <p className="text-white/90">
-                Ready to guide your dental students through their clinical and academic journey today.
+          <div className="mx-auto flex w-full max-w-7xl flex-col gap-8 p-4 sm:p-6 lg:p-8">
+            <section aria-labelledby="overview-heading">
+              <h2 id="overview-heading" className="text-2xl font-semibold tracking-tight">
+                {currentUser?.name ? `Welcome back, Dr. ${currentUser.name}` : 'Overview'}
+              </h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                A summary of your classes and student records.
               </p>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <div className="p-6 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl border-0 text-white shadow-lg hover:shadow-xl transition-shadow">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="p-2 bg-white/20 rounded-lg">
-                    <Users className="w-5 h-5 text-white" />
-                  </div>
-                  <h3 className="text-white/90">Total Students</h3>
-                </div>
-                <p className="text-3xl font-bold">{allStudents.length}</p>
-                {registeredStudents.length > 0 && (
-                  <p className="text-xs text-white/70 mt-1">
-                    {registeredStudents.length} registered via portal
-                  </p>
-                )}
-              </div>
-              <div className="p-6 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl border-0 text-white shadow-lg hover:shadow-xl transition-shadow">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="p-2 bg-white/20 rounded-lg">
-                    <School className="w-5 h-5 text-white" />
-                  </div>
-                  <h3 className="text-white/90">Total Classes</h3>
-                </div>
-                <p className="text-3xl font-bold">{classes.length}</p>
-              </div>
-              <div className="p-6 bg-gradient-to-br from-orange-500 to-red-600 rounded-xl border-0 text-white shadow-lg hover:shadow-xl transition-shadow">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="p-2 bg-white/20 rounded-lg">
-                    <BookOpen className="w-5 h-5 text-white" />
-                  </div>
-                  <h3 className="text-white/90">Active Students</h3>
-                </div>
-                <p className="text-3xl font-bold">{allStudents.filter(s => s.status === 'active').length}</p>
-              </div>
-              <div className="p-6 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl border-0 text-white shadow-lg hover:shadow-xl transition-shadow">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="p-2 bg-white/20 rounded-lg">
-                    <GraduationCap className="w-5 h-5 text-white" />
-                  </div>
-                  <h3 className="text-white/90">Average Progress</h3>
-                </div>
-                <p className="text-3xl font-bold">
-                  {allStudents.length > 0 
-                    ? Math.round(allStudents.reduce((acc, s) => acc + s.gameProgress, 0) / allStudents.length)
-                    : 0
-                  }%
-                </p>
-              </div>
-            </div>
-            
-            <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div className="p-6 bg-gradient-to-br from-white to-gray-50 rounded-xl border shadow-lg">
-                <h3 className="text-lg font-medium mb-4 flex items-center gap-2">
-                  <School className="w-5 h-5 text-blue-600" />
-                  Quick Actions
-                </h3>
-                <div className="space-y-3">
-                  <Button 
-                    onClick={() => setActiveView('students')}
-                    className="w-full justify-start bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white border-0"
-                  >
-                    <Users className="w-4 h-4 mr-2" />
-                    View All Students
+            </section>
+
+            <section aria-label="Workspace totals" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              {[
+                { label: 'Students', value: allStudents.length, icon: Users },
+                { label: 'Portal accounts', value: registeredStudents.length, icon: GraduationCap },
+                { label: 'Classes', value: classes.length, icon: School },
+                { label: 'Tasks and quizzes', value: tasks.length, icon: BookOpen },
+              ].map(({ label, value, icon: Icon }) => (
+                <Card key={label} className="shadow-none">
+                  <CardContent className="flex items-center justify-between gap-4 p-5">
+                    <div>
+                      <p className="text-sm text-muted-foreground">{label}</p>
+                      <p className="mt-2 text-3xl font-semibold tabular-nums">{value}</p>
+                    </div>
+                    <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
+                      <Icon aria-hidden="true" className="size-5" />
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </section>
+
+            <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,0.72fr)]">
+              <Card className="shadow-none">
+                <CardHeader>
+                  <CardTitle className="text-base">Students on record</CardTitle>
+                  <CardDescription>
+                    {allStudents.length
+                      ? 'A sample of student records from your workspace.'
+                      : 'Students you add or assign will appear here.'}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {allStudents.length ? (
+                    <ul className="divide-y">
+                      {allStudents.slice(0, 5).map(student => (
+                        <li key={student.email || student.id}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedStudent(student);
+                              setActiveView(
+                                student.isRegistered ? 'assign-student' : 'profile',
+                                student.email || student.id,
+                              );
+                            }}
+                            className="flex min-h-14 w-full items-center gap-3 rounded-lg px-3 py-3 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          >
+                            <RoleAvatar
+                              role="student"
+                              identifier={student.id || student.email}
+                              name={student.name || 'Student'}
+                              className="size-9"
+                            />
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-sm font-medium">{student.name || 'Unnamed student'}</span>
+                              <span className="block truncate text-xs text-muted-foreground">{student.email}</span>
+                            </span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="rounded-lg bg-muted/50 px-4 py-6 text-sm text-muted-foreground">
+                      No student records yet. Add a student or invite an existing portal account.
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card className="shadow-none">
+                <CardHeader>
+                  <CardTitle className="text-base">Quick actions</CardTitle>
+                  <CardDescription>Add a roster student. Other destinations are in the sidebar.</CardDescription>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-2">
+                  <Button className="justify-start" onClick={() => setActiveView('add-student')}>
+                    <Users aria-hidden="true" />
+                    Add a student
                   </Button>
-                  <Button 
-                    onClick={() => setActiveView('add-class')}
-                    className="w-full justify-start bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white border-0"
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Create New Class
-                  </Button>
-                  <Button 
-                    onClick={() => setActiveView('marks')}
-                    className="w-full justify-start bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white border-0"
-                  >
-                    <BookOpen className="w-4 h-4 mr-2" />
-                    Manage Marks
-                  </Button>
-                  <Button 
-                    onClick={() => setActiveView("add-task")}
-                    className="w-full justify-start bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white border-0"
-                  >
-                    <Sparkles className="w-4 h-4 mr-2" />
-                    Assign Task
-                  </Button>
-                </div>
-              </div>
-              
-              <div className="p-6 bg-gradient-to-br from-white to-gray-50 rounded-xl border shadow-lg">
-                <h3 className="text-lg font-medium mb-4 flex items-center gap-2">
-                  <Users className="w-5 h-5 text-purple-600" />
-                  Recent Activity
-                </h3>
-                <div className="space-y-3">
-                  {allStudents
-                    .filter(s => s.status === 'active')
-                    .slice(0, 3)
-                    .map(student => (
-                      <div key={student.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-100">
-                        <div className="w-8 h-8 bg-gradient-to-br from-purple-400 to-blue-500 rounded-full flex items-center justify-center text-white text-sm font-medium">
-                          {student.avatar}
-                        </div>
-                        <div className="flex-1">
-                          <p className="text-sm font-medium">{student.name}</p>
-                          <p className="text-xs text-muted-foreground">{student.lastActive}</p>
-                        </div>
-                      </div>
-                    ))
-                  }
-                </div>
-              </div>
+                </CardContent>
+              </Card>
             </div>
           </div>
         );
@@ -886,9 +834,9 @@ export function AdminDashboard({ currentUser: initialUser, onLogout, accessToken
 
   if (isLoadingData) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
+      <div className="flex min-h-full items-center justify-center bg-background p-6">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <div className="mx-auto mb-4 size-9 animate-spin rounded-full border-4 border-primary border-t-transparent" />
           <p className="text-muted-foreground">Loading your data...</p>
         </div>
       </div>

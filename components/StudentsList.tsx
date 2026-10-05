@@ -1,397 +1,405 @@
 "use client";
-import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-import { Button } from './ui/button';
-import { Input } from './ui/input';
-import { Badge } from './ui/badge';
-import { Avatar, AvatarFallback } from './ui/avatar';
-import { Search, Trophy, Calendar, Eye, Users, RefreshCw, Flame, CheckCircle2, ListTodo } from 'lucide-react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { projectId } from './utils/supabase/info';
 
-interface StudentsListProps {
-  students: any[];
-  accessToken: string;
-  onSelectStudent: (student: any) => void;
-  classes: any[];
-  onRefresh?: () => void;
+import React, { useEffect, useMemo, useState } from 'react';
+import { CheckCircle2, Eye, Flame, Plus, RefreshCw, Search, Trophy, Users } from 'lucide-react';
+import { RoleAvatar } from './RoleAvatar';
+import { Badge } from './ui/badge';
+import { Button } from './ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { Input } from './ui/input';
+import { Label } from './ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { AddStudent } from './AddStudent';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
+
+type RegistrationFilter = 'all' | 'portal' | 'roster';
+type AssignmentFilter = 'all' | 'assigned' | 'unassigned';
+
+interface StudentRecord {
+  id?: string | number;
+  name?: string;
+  email?: string;
+  avatar?: string;
+  rollNumber?: string | number;
+  batch?: string;
+  classId?: string | number | null;
+  className?: string | null;
+  class?: string | null;
+  isRegistered?: boolean;
+  isAssigned?: boolean;
+  currentLevel?: number;
+  totalPoints?: number;
+  gameProgress?: number;
+  averageGrade?: number;
+  registeredAt?: string;
+  streakData?: { currentStreak?: number; longestStreak?: number; dates?: string[] };
+  taskData?: { completedCount?: number; totalCount?: number };
+  [key: string]: unknown;
 }
 
-export function StudentsList({ students, accessToken, onSelectStudent, classes, onRefresh }: StudentsListProps) {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [activeTab, setActiveTab] = useState('all');
-  const [studentsWithData, setStudentsWithData] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+interface StudentActivity {
+  streakData?: StudentRecord['streakData'];
+  streak?: StudentRecord['streakData'];
+  taskData?: StudentRecord['taskData'];
+}
 
-  // Fetch streak and task data for all students
+interface StudentsListProps {
+  students: StudentRecord[];
+  accessToken: string;
+  onSelectStudent: (student: StudentRecord) => void;
+  classes: Array<{ id?: string | number; name?: string; className?: string; subject?: string }>;
+  onRefresh?: () => void;
+  onAddStudent: (student: StudentRecord) => Promise<void>;
+  initialRegistrationFilter?: RegistrationFilter;
+}
+
+const emptyStreak = { currentStreak: 0, longestStreak: 0, dates: [] };
+const emptyTasks = { completedCount: 0, totalCount: 0 };
+
+function isAssigned(student: StudentRecord) {
+  return typeof student.isAssigned === 'boolean'
+    ? student.isAssigned
+    : Boolean(student.classId || student.className || student.class);
+}
+
+export function StudentsList({
+  students,
+  accessToken,
+  onSelectStudent,
+  classes,
+  onRefresh,
+  onAddStudent,
+  initialRegistrationFilter = 'all',
+}: StudentsListProps) {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [batchFilter, setBatchFilter] = useState('all');
+  const [classFilter, setClassFilter] = useState('all');
+  const [registrationFilter, setRegistrationFilter] = useState<RegistrationFilter>(initialRegistrationFilter);
+  const [assignmentFilter, setAssignmentFilter] = useState<AssignmentFilter>('all');
+  const [activityByEmail, setActivityByEmail] = useState<Record<string, StudentActivity>>({});
+  const [isLoadingActivity, setIsLoadingActivity] = useState(false);
+  const [isAddStudentOpen, setIsAddStudentOpen] = useState(false);
+
   useEffect(() => {
+    let isActive = true;
     const fetchStudentData = async () => {
-      setIsLoading(true);
-      if (!accessToken) {
-        setStudentsWithData(students);
-        setIsLoading(false);
+      if (!students.length || !accessToken) {
+        setIsLoadingActivity(false);
         return;
       }
 
+      setIsLoadingActivity(true);
       try {
-        // Fetch all student tasks in a single batch request if possible, 
-        // but since we have a per-student endpoint, we'll keep the logic but optimize
-        const studentsWithEnhancedData = await Promise.all(
-          students.map(async (student: any) => {
-            try {
-              // Parallelize per-student fetches
-              const [streakResponse, tasksResponse] = await Promise.all([
-                fetch(
-                  `/api/teacher/student-streak/${student.email}`,
-                  { headers: { 'Authorization': `Bearer ${accessToken}` } }
-                ),
-                fetch(
-                  `/api/teacher/student-tasks/${student.email}`,
-                  { headers: { 'Authorization': `Bearer ${accessToken}` } }
-                )
-              ]);
+        const response = await fetch('/api/teacher/students-batch-data', {
+          method: 'POST',
+          headers: {
+            Authorization: ['Bearer', accessToken].join(' '),
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ emails: students.map(student => student.email).filter(Boolean) }),
+        });
 
-              let streakData = { currentStreak: 0, longestStreak: 0, dates: [] };
-              if (streakResponse.ok) {
-                const result = await streakResponse.json();
-                streakData = result.streakData || streakData;
-              }
+        if (!response.ok) throw new Error(`Student activity request failed (${response.status})`);
+        const result = await response.json() as {
+          students?: Record<string, StudentActivity>;
+          studentsData?: Record<string, StudentActivity>;
+        };
+        const responseData = result.students || result.studentsData || {};
+        const studentsDataByEmail = Object.fromEntries(
+          Object.entries(responseData).map(([email, data]) => [email.toLowerCase(), data]),
+        ) as Record<string, StudentActivity>;
 
-              let taskData = { completedCount: 0, totalCount: 0 };
-              if (tasksResponse.ok) {
-                const result = await tasksResponse.json();
-                const tasks = result.tasks || [];
-                taskData = {
-                  completedCount: tasks.filter((t: any) => t.completed || t.grade != null).length,
-                  totalCount: tasks.length
-                };
-              }
-
-              return { ...student, streakData, taskData };
-            } catch (error) {
-              return {
-                ...student,
-                streakData: { currentStreak: 0, longestStreak: 0, dates: [] },
-                taskData: { completedCount: 0, totalCount: 0 }
-              };
-            }
-          })
-        );
-
-        setStudentsWithData(studentsWithEnhancedData);
+        if (isActive) setActivityByEmail(studentsDataByEmail);
       } catch (error) {
-        setStudentsWithData(students);
+        console.error('Error fetching batch student activity:', error);
+        if (isActive) setActivityByEmail({});
       } finally {
-        setIsLoading(false);
+        if (isActive) setIsLoadingActivity(false);
       }
     };
 
-    if (students && students.length > 0) {
-      fetchStudentData();
-    } else {
-      setStudentsWithData([]);
-    }
+    void fetchStudentData();
+    return () => { isActive = false; };
   }, [students, accessToken]);
 
-  const filteredStudents = studentsWithData.filter((student: any) =>
-    student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    student.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (student.className && student.className.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    (student.rollNumber && student.rollNumber.toString().includes(searchTerm))
-  );
+  const studentsWithData = useMemo(() => students.map(student => {
+    const activity = activityByEmail[String(student.email || '').toLowerCase()] || {};
+    return {
+      ...student,
+      streakData: activity.streakData || activity.streak || student.streakData || emptyStreak,
+      taskData: activity.taskData || student.taskData || emptyTasks,
+    };
+  }), [students, activityByEmail]);
 
-  // Separate portal students from manually added
-  const portalStudents = filteredStudents.filter((s: any) => s.isRegistered);
-  const manualStudents = filteredStudents.filter((s: any) => !s.isRegistered);
+  const batches = useMemo(() => {
+    const values = new Set(['I BDS', 'II BDS', 'III BDS', 'IV BDS']);
+    students.forEach(student => {
+      if (student.batch) values.add(String(student.batch).trim());
+    });
+    return [...values].filter(Boolean).sort((a, b) => a.localeCompare(b));
+  }, [students]);
 
-  // Group students by class
-  const studentsByClass = filteredStudents.reduce((acc: any, student: any) => {
-    const className = student.className || 'Not Assigned';
-    if (!acc[className]) {
-      acc[className] = [];
-    }
-    acc[className].push(student);
-    return acc;
-  }, {});
+  const classNames = useMemo(() => {
+    const values = new Set<string>();
+    classes.forEach(classItem => {
+      const name = classItem.name || classItem.className;
+      if (name) values.add(String(name).trim());
+    });
+    students.forEach(student => {
+      const name = student.className || student.class;
+      if (name) values.add(String(name).trim());
+    });
+    return [...values].filter(Boolean).sort((a, b) => a.localeCompare(b));
+  }, [classes, students]);
 
-  const classNames = Object.keys(studentsByClass).sort();
+  const filteredStudents = useMemo(() => {
+    const query = searchTerm.trim().toLowerCase();
+    return studentsWithData.filter(student => {
+      const className = student.className || student.class || '';
+      const matchesSearch = !query || [
+        student.name,
+        student.email,
+        className,
+        student.rollNumber,
+      ].some(value => String(value || '').toLowerCase().includes(query));
+      const matchesBatch = batchFilter === 'all' || String(student.batch || '').trim() === batchFilter;
+      const matchesClass = classFilter === 'all' || String(className).trim() === classFilter;
+      const matchesRegistration = registrationFilter === 'all'
+        || (registrationFilter === 'portal' ? Boolean(student.isRegistered) : !student.isRegistered);
+      const assigned = isAssigned(student);
+      const matchesAssignment = assignmentFilter === 'all'
+        || (assignmentFilter === 'assigned' ? assigned : !assigned);
+      return matchesSearch && matchesBatch && matchesClass && matchesRegistration && matchesAssignment;
+    });
+  }, [studentsWithData, searchTerm, batchFilter, classFilter, registrationFilter, assignmentFilter]);
 
-  const getStatusColor = (status: string) => {
-    return status === 'active' ? 'bg-green-500' : 'bg-gray-400';
-  };
-
-  const getProgressColor = (progress: number) => {
-    if (progress >= 80) return 'text-green-500';
-    if (progress >= 60) return 'text-yellow-500';
-    return 'text-red-500';
-  };
-
-  const renderStudentGrid = (studentsToRender: any[]) => (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      {studentsToRender.map((student: any) => (
-        <Card key={student.id} className="hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border-0 shadow-lg bg-gradient-to-br from-white to-purple-50">
-          <CardHeader className="pb-3">
-            <div className="flex items-start justify-between">
-              <div className="flex items-center gap-3">
-                <div className="relative">
-                  <Avatar className="ring-2 ring-purple-200">
-                    <AvatarFallback className="bg-gradient-to-br from-purple-400 to-blue-500 text-white">
-                      {student.avatar}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div 
-                    className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-white ${getStatusColor(student.status)} shadow-sm`}
-                  />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <CardTitle className="text-base truncate">{student.name}</CardTitle>
-                  </div>
-                  <p className="text-xs text-muted-foreground truncate">{student.email}</p>
-                  {student.rollNumber && (
-                    <p className="text-xs text-muted-foreground">Roll #: {student.rollNumber}</p>
-                  )}
-                </div>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {/* Streak and Task Stats */}
-            <div className="grid grid-cols-2 gap-2 p-2 bg-gradient-to-br from-gray-50 to-white rounded-lg border">
-              <div className="text-center">
-                <div className="flex items-center justify-center gap-1 mb-1">
-                  <Flame className="w-3 h-3 text-orange-500" />
-                  <span className="text-xs text-muted-foreground">Streak</span>
-                </div>
-                <p className="text-lg font-bold text-orange-600">
-                  {student.streakData?.currentStreak || 0}
-                </p>
-              </div>
-              <div className="text-center">
-                <div className="flex items-center justify-center gap-1 mb-1">
-                  <CheckCircle2 className="w-3 h-3 text-green-500" />
-                  <span className="text-xs text-muted-foreground">Tasks</span>
-                </div>
-                <p className="text-lg font-bold text-green-600">
-                  {student.taskData?.completedCount || 0}/{student.taskData?.totalCount || 0}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex justify-between items-center">
-              <div className="flex items-center gap-2">
-                <div className="p-1 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full">
-                  <Trophy className="w-3 h-3 text-white" />
-                </div>
-                <span className="text-sm font-medium">Level {student.currentLevel}</span>
-              </div>
-              <Badge className="bg-gradient-to-r from-purple-500 to-pink-500 text-white border-0 text-xs">
-                {student.totalPoints} EXP
-              </Badge>
-            </div>
-
-            <div>
-              <div className="flex justify-between text-xs mb-1">
-                <span>Progress</span>
-                <span className={getProgressColor(student.gameProgress)}>
-                  {student.gameProgress}%
-                </span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div 
-                  className={`h-2 rounded-full ${
-                    student.gameProgress >= 80 ? 'bg-gradient-to-r from-green-400 to-emerald-500' :
-                    student.gameProgress >= 60 ? 'bg-gradient-to-r from-yellow-400 to-orange-500' : 
-                    'bg-gradient-to-r from-red-400 to-pink-500'
-                  }`}
-                  style={{ width: `${student.gameProgress}%` }}
-                />
-              </div>
-            </div>
-
-            <div className="flex justify-between text-xs">
-              <span className="text-muted-foreground">Average Grade</span>
-              <span className="font-semibold">{student.averageGrade}%</span>
-            </div>
-
-            <div className="pt-2 border-t">
-              {student.isRegistered ? (
-                <div className="flex items-center justify-between mb-2">
-                  <Badge className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white border-0 text-xs">
-                    Portal Student
-                  </Badge>
-                  {student.isAssigned ? (
-                    <Badge variant="outline" className="text-xs">
-                      {student.className}
-                    </Badge>
-                  ) : (
-                    <Badge variant="outline" className="border-orange-300 text-orange-600 text-xs">
-                      Not Assigned
-                    </Badge>
-                  )}
-                </div>
-              ) : (
-                <Badge variant="outline" className="text-xs mb-2">
-                  {student.className}
-                </Badge>
-              )}
-              {student.registeredAt && (
-                <div className="flex items-center gap-1 text-xs text-muted-foreground mb-2">
-                  <Calendar className="w-3 h-3" />
-                  <span>Joined {new Date(student.registeredAt).toLocaleDateString()}</span>
-                </div>
-              )}
-            </div>
-
-            <Button 
-              onClick={() => onSelectStudent(student)}
-              className="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white border-0 shadow-md hover:shadow-lg transition-all"
-            >
-              <Eye className="w-4 h-4 mr-2" />
-              {student.isRegistered && !student.isAssigned ? 'Assign to Class' : 'View Profile'}
-            </Button>
-          </CardContent>
-        </Card>
-      ))}
-    </div>
-  );
-
-  return (
-    <div className="p-6">
-      <div className="mb-6">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-          <div>
-            <h2 className="text-2xl font-bold mb-2">Students</h2>
-            <p className="text-muted-foreground">
-              Manage registered and assigned students
-            </p>
-          </div>
-          <div className="flex items-center gap-4">
-            {onRefresh && (
-              <Button
-                onClick={onRefresh}
-                variant="outline"
-                className="flex items-center gap-2"
-              >
-                <RefreshCw className="w-4 h-4" />
-                Refresh
-              </Button>
-            )}
-            <div className="text-right">
-              <div className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
-                {students.length}
-              </div>
-              <div className="text-xs text-muted-foreground">Total Students</div>
-            </div>
-          </div>
-        </div>
-        
-        <div className="relative max-w-md mb-6">
-          <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search by name, email, or class..."
-            value={searchTerm}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
-        </div>
-
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <Card className="border-0 shadow-lg bg-gradient-to-br from-blue-50 to-white">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground mb-1">Total Students</p>
-                  <p className="text-2xl font-bold text-blue-600">{filteredStudents.length}</p>
-                </div>
-                <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
-                  <Users className="w-6 h-6 text-blue-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-0 shadow-lg bg-gradient-to-br from-green-50 to-white">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground mb-1">Assigned</p>
-                  <p className="text-2xl font-bold text-green-600">
-                    {filteredStudents.filter(s => s.isAssigned).length}
-                  </p>
-                </div>
-                <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center">
-                  <Trophy className="w-6 h-6 text-green-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-0 shadow-lg bg-gradient-to-br from-orange-50 to-white">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground mb-1">Not Assigned</p>
-                  <p className="text-2xl font-bold text-orange-600">
-                    {filteredStudents.filter(s => !s.isAssigned).length}
-                  </p>
-                </div>
-                <div className="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center">
-                  <Users className="w-6 h-6 text-orange-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full mb-6" style={{ gridTemplateColumns: `repeat(${Math.min(classNames.length + 1, 5)}, 1fr)` }}>
-          <TabsTrigger value="all" onClick={(e: any) => setActiveTab('all')} className="flex items-center gap-2">
-            <Users className="w-4 h-4" />
-            All ({filteredStudents.length})
-          </TabsTrigger>
-          {classNames.slice(0, 4).map((className: string) => (
-            <TabsTrigger key={className} value={className} className="flex items-center gap-1 text-xs">
-              {className.length > 20 ? className.substring(0, 17) + '...' : className} ({studentsByClass[className].length})
-            </TabsTrigger>
-          ))}
-        </TabsList>
-
-        <TabsContent value="all">
-          {filteredStudents.length === 0 ? (
-            <Card className="border-0 shadow-lg">
-              <CardContent className="p-12 text-center">
-                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-purple-100 to-blue-100 flex items-center justify-center">
-                  <Users className="w-8 h-8 text-purple-600" />
-                </div>
-                <h3 className="text-xl font-semibold mb-2">No Students Found</h3>
-                <p className="text-muted-foreground mb-4">
-                  {students.length === 0 
-                    ? "Students who register through the student portal will appear here."
-                    : "No students match your search criteria"
-                  }
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            renderStudentGrid(filteredStudents)
-          )}
-        </TabsContent>
-
-        {classNames.map((className: string) => (
-          <TabsContent key={className} value={className}>
-            <div className="mb-4">
-              <h3 className="text-lg font-semibold">{className}</h3>
-              <p className="text-sm text-muted-foreground">
-                {studentsByClass[className].length} student{studentsByClass[className].length !== 1 ? 's' : ''} in this class
+  const renderStudentCard = (student: StudentRecord) => {
+    const assigned = isAssigned(student);
+    const className = student.className || student.class;
+    const progress = Number(student.gameProgress) || 0;
+    return (
+      <Card key={student.id || student.email} className="h-full shadow-none">
+        <CardHeader className="pb-3">
+          <div className="flex items-center gap-3">
+            <RoleAvatar
+              role="student"
+              identifier={student.id || student.email}
+              name={student.name || 'Student'}
+              className="size-10"
+            />
+            <div className="min-w-0 flex-1">
+              <CardTitle className="truncate text-sm">{student.name || 'Unnamed student'}</CardTitle>
+              <p className="mt-1 truncate text-xs text-muted-foreground">
+                {student.email}{student.rollNumber ? ` · Roll no. ${student.rollNumber}` : ''}
               </p>
             </div>
-            {renderStudentGrid(studentsByClass[className])}
-          </TabsContent>
-        ))}
-      </Tabs>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <Button
+                      variant="outline"
+                      size="icon-sm"
+                      className="shrink-0 rounded-full"
+                      aria-label="View in detail"
+                      onClick={() => onSelectStudent(student)}
+                    />
+                  }
+                >
+                  <Eye aria-hidden="true" />
+                </TooltipTrigger>
+                <TooltipContent>View in detail</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+        </CardHeader>
+        <CardContent className="flex flex-1 flex-col gap-3">
+          <div className="grid grid-cols-2 divide-x rounded-lg bg-muted/50 py-2">
+            <div className="px-3 text-center">
+              <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
+                <Flame aria-hidden="true" className="size-3.5" />
+                <span>Streak</span>
+              </div>
+              <p className="mt-1 text-base font-semibold tabular-nums">{student.streakData?.currentStreak || 0}</p>
+            </div>
+            <div className="px-3 text-center">
+              <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
+                <CheckCircle2 aria-hidden="true" className="size-3.5" />
+                <span>Tasks</span>
+              </div>
+              <p className="mt-1 text-base font-semibold tabular-nums">
+                {student.taskData?.completedCount || 0}/{student.taskData?.totalCount || 0}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between text-xs">
+            <span className="flex items-center gap-1.5 text-muted-foreground">
+              <Trophy aria-hidden="true" className="size-3.5" />
+              Level {student.currentLevel ?? 1}
+            </span>
+            <span className="font-medium tabular-nums">{student.totalPoints || 0} EXP</span>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <div
+              className="h-1.5 overflow-hidden rounded-full bg-muted"
+              role="progressbar"
+              aria-label={`${student.name || 'Student'} game progress`}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={Math.min(100, Math.max(0, progress))}
+            >
+              <div className="h-full rounded-full bg-primary" style={{ width: `${Math.min(100, Math.max(0, progress))}%` }} />
+            </div>
+            <div className="flex justify-between text-xs">
+              <span className="text-muted-foreground">Progress</span>
+              <span className="font-medium tabular-nums">{progress}%</span>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between gap-2 border-t pt-3 text-xs">
+            <span className="min-w-0 truncate text-muted-foreground">
+              {assigned ? className || 'Assigned to a class' : 'Not assigned'}
+            </span>
+            <span className="shrink-0 font-medium tabular-nums">{student.averageGrade ?? 0}% avg.</span>
+          </div>
+
+        </CardContent>
+      </Card>
+    );
+  };
+
+  return (
+    <div className="mx-auto w-full max-w-7xl space-y-5 p-4 sm:p-6">
+      <div className="flex items-center justify-between gap-3">
+        <Button onClick={() => setIsAddStudentOpen(true)}>
+          <Plus data-icon="inline-start" />
+          Add student
+        </Button>
+        {onRefresh && (
+          <Button onClick={onRefresh} variant="outline" className="shrink-0">
+            <RefreshCw aria-hidden="true" />
+            Refresh
+          </Button>
+        )}
+      </div>
+
+      <Dialog open={isAddStudentOpen} onOpenChange={setIsAddStudentOpen}>
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Add a student</DialogTitle>
+            <DialogDescription>
+              Add a roster record and assign it to one of your classes.
+            </DialogDescription>
+          </DialogHeader>
+          <AddStudent
+            classes={classes.filter((classItem): classItem is typeof classItem & { id: string | number; name: string } =>
+              classItem.id !== undefined && Boolean(classItem.name)
+            )}
+            onAddStudent={onAddStudent}
+            onBack={() => setIsAddStudentOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
+
+      <section aria-label="Student filters" className="rounded-2xl border bg-card p-4">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          <div className="space-y-1.5 sm:col-span-2 xl:col-span-1">
+            <Label htmlFor="student-search">Search</Label>
+            <div className="relative">
+              <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                id="student-search"
+                placeholder="Name, email, roll no."
+                value={searchTerm}
+                onChange={event => setSearchTerm(event.target.value)}
+                className="pl-9"
+              />
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="student-batch">BDS batch</Label>
+            <Select value={batchFilter} onValueChange={value => setBatchFilter(value ?? 'all')}>
+              <SelectTrigger id="student-batch" className="w-full">
+                <SelectValue placeholder="All batches" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All batches</SelectItem>
+                {batches.map(batch => <SelectItem key={batch} value={batch}>{batch}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="student-class">Class</Label>
+            <Select value={classFilter} onValueChange={value => setClassFilter(value ?? 'all')}>
+              <SelectTrigger id="student-class" className="w-full">
+                <SelectValue placeholder="All classes" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All classes</SelectItem>
+                {classNames.map(className => <SelectItem key={className} value={className}>{className}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="student-registration">Registration</Label>
+            <Select
+              value={registrationFilter}
+              onValueChange={value => setRegistrationFilter((value ?? 'all') as RegistrationFilter)}
+            >
+              <SelectTrigger id="student-registration" className="w-full">
+                <SelectValue placeholder="Any type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All types</SelectItem>
+                <SelectItem value="portal">Portal accounts</SelectItem>
+                <SelectItem value="roster">Roster entries</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="student-assignment">Class assignment</Label>
+            <Select
+              value={assignmentFilter}
+              onValueChange={value => setAssignmentFilter((value ?? 'all') as AssignmentFilter)}
+            >
+              <SelectTrigger id="student-assignment" className="w-full">
+                <SelectValue placeholder="Any assignment" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All students</SelectItem>
+                <SelectItem value="assigned">Assigned</SelectItem>
+                <SelectItem value="unassigned">Unassigned</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      </section>
+
+      {isLoadingActivity && <p className="text-sm text-muted-foreground" role="status">Loading student activity…</p>}
+
+      {filteredStudents.length ? (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {filteredStudents.map(renderStudentCard)}
+        </div>
+      ) : (
+        <Card className="shadow-none">
+          <CardContent className="flex flex-col items-center px-6 py-12 text-center">
+            <div className="mb-4 flex size-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
+              <Users aria-hidden="true" className="size-6" />
+            </div>
+            <h3 className="font-semibold">
+              {students.length ? 'No students match these filters' : 'No student records yet'}
+            </h3>
+            <p className="mt-1 max-w-md text-sm text-muted-foreground">
+              {students.length
+                ? 'Try changing your search or filter selections.'
+                : 'Students you add to the roster or who register through the portal will appear here.'}
+            </p>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

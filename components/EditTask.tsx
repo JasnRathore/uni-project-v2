@@ -117,13 +117,13 @@ export function EditTask({ task, onBack, onSave }: EditTaskProps) {
         Back
       </Button>
 
-      <Card className="border-0 shadow-xl bg-gradient-to-br from-white to-gray-50">
-        <CardHeader className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-t-lg">
+      <Card>
+        <CardHeader className="border-b">
           <CardTitle className="flex items-center gap-2">
             <Save className="w-5 h-5" />
             Edit {isQuiz ? 'Quiz' : 'Task'}: {task.title}
           </CardTitle>
-          <p className="text-sm text-white/90 mt-2">
+          <p className="mt-2 text-sm text-muted-foreground">
             Update the details of this {isQuiz ? 'quiz' : 'task'}
           </p>
         </CardHeader>
@@ -247,7 +247,6 @@ export function EditTask({ task, onBack, onSave }: EditTaskProps) {
                   <Button
                     type="button"
                     onClick={handleAddQuestion}
-                    className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white"
                   >
                     <Plus className="w-4 h-4 mr-2" />
                     Add Question
@@ -256,17 +255,16 @@ export function EditTask({ task, onBack, onSave }: EditTaskProps) {
 
                 <div className="space-y-6">
                   {questions.map((question: any, qIndex: any) => (
-                    <Card key={question.id} className="border-2 border-gray-200">
-                      <CardHeader className="bg-gray-50 pb-3">
+                    <Card key={question.id}>
+                      <CardHeader className="border-b pb-3">
                         <div className="flex items-center justify-between">
                           <CardTitle className="text-base">Question {qIndex + 1}</CardTitle>
                           {questions.length > 1 && (
                             <Button
                               type="button"
-                              variant="ghost"
                               size="sm"
                               onClick={() => handleRemoveQuestion(question.id)}
-                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                              variant="destructive"
                             >
                               <Trash2 className="w-4 h-4" />
                             </Button>
@@ -289,14 +287,14 @@ export function EditTask({ task, onBack, onSave }: EditTaskProps) {
                           <div className="space-y-2 mt-2">
                             {question.options.map((option: any, optIndex: any) => (
                               <div key={optIndex} className="flex items-center gap-2">
-                                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 text-white font-semibold text-sm">
+                                <div className="flex size-8 items-center justify-center rounded-full bg-muted text-sm font-semibold text-muted-foreground">
                                   {String.fromCharCode(65 + optIndex)}
                                 </div>
                                 <Input
                                   placeholder={`Option ${String.fromCharCode(65 + optIndex)}`}
                                   value={option}
                                   onChange={(e) => handleOptionChange(question.id, optIndex, e.target.value)}
-                                  className={question.correctAnswer === optIndex ? 'border-green-500 border-2' : ''}
+                                  className={question.correctAnswer === optIndex ? 'border-primary' : ''}
                                 />
                               </div>
                             ))}
@@ -329,12 +327,12 @@ export function EditTask({ task, onBack, onSave }: EditTaskProps) {
             )}
 
             {/* Info Box */}
-            <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+            <div className="rounded-lg border bg-muted/50 p-4">
               <div className="flex items-start gap-3">
-                <Clock className="w-5 h-5 text-blue-600 mt-0.5" />
+                <Clock className="mt-0.5 size-5 text-muted-foreground" />
                 <div>
-                  <h4 className="font-medium text-blue-900">Update Information</h4>
-                  <p className="text-sm text-blue-700 mt-1">
+                  <h4 className="font-medium text-foreground">Update Information</h4>
+                  <p className="mt-1 text-sm text-muted-foreground">
                     Changes will be immediately reflected for all students. Students who have already submitted will not be affected.
                   </p>
                 </div>
@@ -345,7 +343,7 @@ export function EditTask({ task, onBack, onSave }: EditTaskProps) {
             <div className="flex gap-3 pt-4">
               <Button
                 type="submit"
-                className="flex-1 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white border-0 shadow-md"
+                className="flex-1"
               >
                 <Save className="w-4 h-4 mr-2" />
                 Save Changes

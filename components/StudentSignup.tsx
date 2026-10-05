@@ -9,9 +9,19 @@ import { GraduationCap, Mail, Lock, User, ArrowLeft, UserPlus, Hash, Calendar, S
 import { toast } from 'sonner';
 
 interface StudentSignupProps {
-  onSignup: (credentials: any) => void;
+  onSignup: (credentials: StudentSignupCredentials) => void | Promise<void>;
   onSwitchToLogin: () => void;
   onBack: () => void;
+}
+
+interface StudentSignupCredentials {
+  name: string;
+  username: string;
+  email: string;
+  rollNumber: string;
+  batch: string;
+  class: string;
+  password: string;
 }
 
 export function StudentSignup({ onSignup, onSwitchToLogin, onBack }: StudentSignupProps) {
@@ -91,26 +101,26 @@ export function StudentSignup({ onSignup, onSwitchToLogin, onBack }: StudentSign
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center p-4">
+    <main className="flex min-h-dvh items-center justify-center bg-muted/40 p-4">
       <div className="w-full max-w-md">
         {onBack && (
           <button
             onClick={onBack}
-            className="flex items-center gap-2 text-sm text-white/80 hover:text-white transition-colors mb-6 group"
+            className="group mb-6 flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
           >
             <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
             Back to Portal Selection
           </button>
         )}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-20 h-20 bg-white/20 backdrop-blur-lg rounded-full mb-4 shadow-2xl">
-            <GraduationCap className="w-10 h-10 text-white" />
+          <div className="mb-4 inline-flex size-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+            <GraduationCap className="size-7" />
           </div>
-          <h1 className="text-4xl font-bold text-white mb-2">Student Portal</h1>
-          <p className="text-white/90">Create your account to get started</p>
+          <h1 className="mb-2 text-3xl font-semibold tracking-tight text-foreground">Student Portal</h1>
+          <p className="text-muted-foreground">Create your account to get started</p>
         </div>
 
-        <Card className="border-0 shadow-2xl bg-white/95 backdrop-blur-lg">
+        <Card className="border-border/80 shadow-sm">
           <CardHeader className="space-y-2 pb-6">
             <CardTitle className="text-2xl text-center">Create Account</CardTitle>
             <CardDescription className="text-center">
@@ -191,7 +201,7 @@ export function StudentSignup({ onSignup, onSwitchToLogin, onBack }: StudentSign
                   </Label>
                   <Select
                     value={formData.batch}
-                    onValueChange={(value) => setFormData({...formData, batch: value})}
+                    onValueChange={(value) => setFormData({...formData, batch: value ?? ''})}
                   >
                     <SelectTrigger id="batch" className="h-11">
                       <SelectValue placeholder="Batch" />
@@ -212,7 +222,7 @@ export function StudentSignup({ onSignup, onSwitchToLogin, onBack }: StudentSign
                   </Label>
                   <Select
                     value={formData.class}
-                    onValueChange={(value) => setFormData({...formData, class: value})}
+                    onValueChange={(value) => setFormData({...formData, class: value ?? ''})}
                   >
                     <SelectTrigger id="class" className="h-11">
                       <SelectValue placeholder="Class" />
@@ -269,7 +279,7 @@ export function StudentSignup({ onSignup, onSwitchToLogin, onBack }: StudentSign
               <Button
                 type="submit"
                 disabled={isLoading}
-                className="w-full h-11 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white border-0 shadow-lg"
+                className="h-11 w-full"
               >
                 {isLoading ? (
                   <div className="flex items-center gap-2">
@@ -291,7 +301,7 @@ export function StudentSignup({ onSignup, onSwitchToLogin, onBack }: StudentSign
                   <span className="w-full border-t" />
                 </div>
                 <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-white px-2 text-muted-foreground">
+                  <span className="bg-card px-2 text-muted-foreground">
                     Already have an account?
                   </span>
                 </div>
@@ -310,6 +320,6 @@ export function StudentSignup({ onSignup, onSwitchToLogin, onBack }: StudentSign
           </CardContent>
         </Card>
       </div>
-    </div>
+    </main>
   );
 }

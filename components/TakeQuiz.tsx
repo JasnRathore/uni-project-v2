@@ -43,10 +43,35 @@ export function TakeQuiz({ quiz, onBack, onSubmit }: TakeQuizProps) {
   };
 
   const handleAnswerSelect = (questionId: any, optionIndex: any) => {
-    setAnswers({
-      ...answers,
-      [questionId]: optionIndex
-    });
+    const question = quiz.questions.find((item: any) => item.id === questionId);
+    if (question?.type === 'multiple-choice') {
+      const selected = Array.isArray(answers[questionId]) ? answers[questionId] : [];
+      setAnswers({
+        ...answers,
+        [questionId]: selected.includes(optionIndex)
+          ? selected.filter((index: number) => index !== optionIndex)
+          : [...selected, optionIndex],
+      });
+      return;
+    }
+    setAnswers({ ...answers, [questionId]: optionIndex });
+  };
+
+  const handleTypedAnswer = (questionId: any, value: string) => {
+    setAnswers({ ...answers, [questionId]: value });
+  };
+
+  const isAnswerCorrect = (question: any) => {
+    const answer = answers[question.id];
+    if (question.type === 'short-answer') {
+      return String(answer || '').trim().toLowerCase() === String(question.correctAnswer || '').trim().toLowerCase();
+    }
+    if (question.type === 'multiple-choice') {
+      const submitted = Array.isArray(answer) ? [...answer].sort() : [];
+      const correct = Array.isArray(question.correctAnswer) ? [...question.correctAnswer].sort() : [];
+      return submitted.length === correct.length && submitted.every((value, index) => value === correct[index]);
+    }
+    return answer === question.correctAnswer;
   };
 
   const handleSubmit = async () => {
@@ -57,7 +82,7 @@ export function TakeQuiz({ quiz, onBack, onSubmit }: TakeQuizProps) {
     // Calculate score
     let correctAnswers = 0;
     quiz.questions.forEach((question: any) => {
-      if (answers[question.id] === question.correctAnswer) {
+      if (isAnswerCorrect(question)) {
         correctAnswers++;
       }
     });
@@ -159,7 +184,7 @@ export function TakeQuiz({ quiz, onBack, onSubmit }: TakeQuizProps) {
               <h3 className="font-semibold text-yellow-900 mb-2">Important Instructions:</h3>
               <ul className="space-y-2 text-sm text-yellow-800">
                 <li>• Once you start, the timer will begin and cannot be paused</li>
-                <li>• All questions are multiple choice</li>
+                <li>• Questions may use single choice, multiple choice, or typed answers</li>
                 <li>• You can change your answers before submitting</li>
                 <li>• The quiz will auto-submit when time runs out</li>
                 <li>• Make sure you have a stable internet connection</li>
@@ -220,9 +245,20 @@ export function TakeQuiz({ quiz, onBack, onSubmit }: TakeQuizProps) {
               </div>
             </CardHeader>
             <CardContent className="pt-4">
+              {question.type === 'short-answer' ? (
+                <input
+                  type="text"
+                  value={answers[question.id] || ''}
+                  onChange={(event) => handleTypedAnswer(question.id, event.target.value)}
+                  placeholder="Type your answer"
+                  aria-label={`Answer for question ${qIndex + 1}`}
+                  className="w-full rounded-lg border-2 border-gray-200 bg-background p-4 outline-none transition focus:border-indigo-500"
+                />
+              ) : (
               <div className="space-y-3">
                   {question.options.map((option: any, optIndex: any) => {
-                  const isSelected = answers[question.id] === optIndex;
+                  const selectedAnswers = Array.isArray(answers[question.id]) ? answers[question.id] : [answers[question.id]];
+                  const isSelected = selectedAnswers.includes(optIndex);
                   return (
                     <button
                       key={optIndex}
@@ -239,7 +275,7 @@ export function TakeQuiz({ quiz, onBack, onSubmit }: TakeQuizProps) {
                             ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white'
                             : 'bg-gray-200 text-gray-700'
                         }`}>
-                          {String.fromCharCode(65 + optIndex)}
+                          {question.type === 'multiple-choice' ? (isSelected ? '✓' : '') : String.fromCharCode(65 + optIndex)}
                         </div>
                         <span className={isSelected ? 'font-medium' : ''}>{option}</span>
                       </div>
@@ -247,6 +283,7 @@ export function TakeQuiz({ quiz, onBack, onSubmit }: TakeQuizProps) {
                   );
                 })}
               </div>
+              )}
             </CardContent>
           </Card>
         ))}

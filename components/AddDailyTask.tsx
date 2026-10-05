@@ -131,35 +131,30 @@ export function AddDailyTask({ selectedClass, classes = [], students = [], onBac
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6">
+    <div className="min-h-screen bg-background p-6">
       <div className="max-w-3xl mx-auto">
         <div className="mb-6">
-          <Button onClick={onBack} variant="ghost" className="gap-2 text-slate-600 hover:text-slate-900">
+          <Button onClick={onBack} variant="ghost" className="gap-2">
             <ArrowLeft className="w-4 h-4" />
             Back
           </Button>
         </div>
 
-        <h1 className="text-3xl font-bold text-slate-900 mb-6 flex items-center gap-2">
-          <Sparkles className="w-8 h-8 text-amber-500" />
-          Add Task {activeClass && `— ${activeClass.name}`}
-        </h1>
-
-        <Alert className="mb-6 border-0 bg-gradient-to-r from-amber-50 to-pink-50 shadow-sm">
-          <AlertCircle className="h-4 w-4 text-amber-600" />
-          <AlertDescription className="text-amber-900 ml-2">
+        <Alert className="mb-6">
+          <AlertCircle className="h-4 w-4 text-primary" />
+          <AlertDescription className="ml-2 text-foreground">
             {activeClass
               ? `This task will be automatically assigned to all students enrolled in ${activeClass.name}.`
               : 'This task will be assigned to all registered students.'}
           </AlertDescription>
         </Alert>
 
-        <Card className="border-0 shadow-lg">
+        <Card>
           <form onSubmit={handleSubmit}>
             <CardContent className="p-6 space-y-6">
               <div className="space-y-2">
                 <Label htmlFor="title" className="text-base font-semibold">
-                  Task Title <span className="text-red-500">*</span>
+                  Task Title <span className="text-destructive">*</span>
                 </Label>
                 <Input
                   id="title"
@@ -172,7 +167,7 @@ export function AddDailyTask({ selectedClass, classes = [], students = [], onBac
 
               <div className="space-y-2">
                 <Label htmlFor="description" className="text-base font-semibold">
-                  Task Description <span className="text-red-500">*</span>
+                  Task Description <span className="text-destructive">*</span>
                 </Label>
                 <Textarea
                   id="description"
@@ -188,7 +183,7 @@ export function AddDailyTask({ selectedClass, classes = [], students = [], onBac
                 <div className="space-y-2">
                   <Label className="text-base font-semibold">Class / Subject</Label>
                   {selectedClass ? (
-                    <Input value={selectedClass.name} disabled className="text-base bg-slate-50" />
+                    <Input value={selectedClass.name} disabled className="text-base" />
                   ) : (
                     <Select value={selectedClassId} onValueChange={setSelectedClassId}>
                       <SelectTrigger className="text-base">
@@ -208,7 +203,7 @@ export function AddDailyTask({ selectedClass, classes = [], students = [], onBac
 
                 <div className="space-y-2">
                   <Label htmlFor="dueDate" className="text-base font-semibold">
-                    Due Date <span className="text-red-500">*</span>
+                    Due Date                     <span className="text-destructive">*</span>
                   </Label>
                   <Input
                     id="dueDate"
@@ -235,7 +230,7 @@ export function AddDailyTask({ selectedClass, classes = [], students = [], onBac
 
                 <div className="space-y-2">
                   <Label htmlFor="points" className="text-base font-semibold">
-                    Reward Points <span className="text-red-500">*</span>
+                    Reward Points                     <span className="text-destructive">*</span>
                   </Label>
                   <Input
                     id="points"
@@ -255,7 +250,6 @@ export function AddDailyTask({ selectedClass, classes = [], students = [], onBac
                 </Button>
                 <Button
                   type="submit"
-                  className="bg-gradient-to-r from-amber-500 to-pink-500 hover:from-amber-600 hover:to-pink-600 text-white border-0"
                   disabled={loading}
                 >
                   {loading ? (

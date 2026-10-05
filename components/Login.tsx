@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { Mail, Lock, Eye, EyeOff, GraduationCap, Loader2, AlertCircle, ArrowLeft } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, GraduationCap, Loader2, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import { ConnectionTest } from './ConnectionTest';
 
@@ -33,11 +33,11 @@ export function Login({ onLogin, onSwitchToSignup, onBack }: LoginProps) {
     
     try {
       await onLogin(email, password);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Login error:', error);
       setIsLoading(false);
       // Show connection test option if there's a network error
-      if (error?.message && error.message.includes('fetch')) {
+      if (error instanceof Error && error.message.includes('fetch')) {
         setShowConnectionTest(true);
       }
     }
@@ -45,7 +45,7 @@ export function Login({ onLogin, onSwitchToSignup, onBack }: LoginProps) {
 
   if (showConnectionTest) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-4">
+      <div className="flex min-h-dvh items-center justify-center bg-muted/40 p-4">
         <div className="w-full max-w-2xl">
           <Button 
             variant="outline" 
@@ -61,12 +61,12 @@ export function Login({ onLogin, onSwitchToSignup, onBack }: LoginProps) {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-4">
+    <main className="flex min-h-dvh items-center justify-center bg-muted/40 p-4">
       <div className="w-full max-w-md">
         {onBack && (
           <button
             onClick={onBack}
-            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-blue-600 transition-colors mb-6 group"
+            className="group mb-6 flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
           >
             <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
             Back to Portal Selection
@@ -74,16 +74,10 @@ export function Login({ onLogin, onSwitchToSignup, onBack }: LoginProps) {
         )}
         {/* Logo/Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl mb-4 shadow-lg">
-            <GraduationCap className="w-10 h-10 text-white" />
-          </div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-            Dental College Portal
-          </h1>
-          <p className="text-muted-foreground mt-2">Teacher's Admin Panel</p>
+          <p className="text-muted-foreground mt-2">Admin Panel</p>
         </div>
 
-        <Card className="border-0 shadow-2xl">
+        <Card className="border-border/80 shadow-sm">
           <CardHeader className="space-y-1 pb-4">
             <CardTitle className="text-2xl text-center">Welcome Back!</CardTitle>
             <CardDescription className="text-center">
@@ -136,7 +130,7 @@ export function Login({ onLogin, onSwitchToSignup, onBack }: LoginProps) {
 
               <Button
                 type="submit"
-                className="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white border-0"
+                className="w-full"
                 disabled={isLoading}
               >
                 {isLoading ? (
@@ -152,11 +146,11 @@ export function Login({ onLogin, onSwitchToSignup, onBack }: LoginProps) {
 
             <div className="mt-6 text-center">
               <p className="text-sm text-muted-foreground">
-                Don't have an account?{' '}
+                Don&apos;t have an account?{' '}
                 <button
                   type="button"
                   onClick={onSwitchToSignup}
-                  className="text-blue-600 hover:text-blue-700 font-medium hover:underline"
+                  className="font-medium text-primary hover:underline"
                   disabled={isLoading}
                 >
                   Sign up here
@@ -165,17 +159,7 @@ export function Login({ onLogin, onSwitchToSignup, onBack }: LoginProps) {
             </div>
           </CardContent>
         </Card>
-
-        {/* Demo Credentials */}
-        <div className="mt-6 p-4 bg-white rounded-lg shadow-md border border-blue-100">
-          <p className="text-xs text-muted-foreground text-center mb-2">Demo Credentials:</p>
-          <p className="text-xs text-center">
-            <span className="font-mono bg-blue-50 px-2 py-1 rounded">demo@dentalcollege.edu</span>
-            {' / '}
-            <span className="font-mono bg-blue-50 px-2 py-1 rounded">demo123</span>
-          </p>
-        </div>
       </div>
-    </div>
+    </main>
   );
 }

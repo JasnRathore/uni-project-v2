@@ -1,12 +1,13 @@
 "use client";
 import React, { useState } from 'react';
+import { useTheme } from 'next-themes';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Switch } from './ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
+import { RoleAvatar } from './RoleAvatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Textarea } from './ui/textarea';
 import { 
@@ -23,9 +24,7 @@ import {
   Eye,
   EyeOff,
   Save,
-  Camera,
   BookOpen,
-  Settings as SettingsIcon
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from './utils/supabase/client';
@@ -37,7 +36,18 @@ interface SettingsProps {
   onLogout: () => void;
 }
 
+interface UserPreferences {
+  theme: string;
+  language: string;
+  dateFormat: string;
+  timeFormat: string;
+  academicYear: string;
+  gradingSystem: string;
+  [key: string]: unknown;
+}
+
 export function Settings({ currentUser, accessToken, onUpdateProfile, onLogout }: SettingsProps) {
+  const { theme, setTheme } = useTheme();
   const [profileData, setProfileData] = useState({
     name: currentUser.name || '',
     email: currentUser.email || '',
@@ -61,13 +71,14 @@ export function Settings({ currentUser, accessToken, onUpdateProfile, onLogout }
     marketingEmails: false
   });
 
-  const [preferences, setPreferences] = useState(currentUser.preferences || {
+  const [preferences, setPreferences] = useState<UserPreferences>({
     theme: 'light',
     language: 'english',
     dateFormat: 'DD/MM/YYYY',
     timeFormat: '12-hour',
     academicYear: '2024-2025',
-    gradingSystem: 'percentage'
+    gradingSystem: 'percentage',
+    ...currentUser.preferences,
   });
 
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
@@ -100,7 +111,7 @@ export function Settings({ currentUser, accessToken, onUpdateProfile, onLogout }
 
   const handlePreferencesUpdate = async () => {
     try {
-      await onUpdateProfile({ preferences });
+      await onUpdateProfile({ preferences: { ...preferences, theme: theme || preferences.theme } });
       toast.success('Preferences updated successfully!');
     } catch (error: any) {
       toast.error(error.message || 'Failed to save preferences');
@@ -168,19 +179,6 @@ export function Settings({ currentUser, accessToken, onUpdateProfile, onLogout }
 
   return (
     <div className="p-6">
-      {/* Header */}
-      <div className="mb-6 p-6 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl text-white shadow-xl">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="p-3 bg-white/20 rounded-lg">
-            <SettingsIcon className="w-8 h-8 text-white" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-medium">Settings</h1>
-            <p className="text-white/90 text-sm mt-1">Manage your account and preferences</p>
-          </div>
-        </div>
-      </div>
-
       <Tabs defaultValue="profile" className="space-y-6">
         <TabsList className="grid w-full grid-cols-4 max-w-2xl">
           <TabsTrigger value="profile" className="flex items-center gap-2">
@@ -203,7 +201,7 @@ export function Settings({ currentUser, accessToken, onUpdateProfile, onLogout }
 
         {/* Profile Tab */}
         <TabsContent value="profile" className="space-y-6">
-          <Card className="border-0 shadow-lg">
+          <Card className="shadow-none">
             <CardHeader>
               <CardTitle>Profile Information</CardTitle>
               <CardDescription>Update your personal and professional details</CardDescription>
@@ -212,23 +210,16 @@ export function Settings({ currentUser, accessToken, onUpdateProfile, onLogout }
               {/* Avatar Section */}
               <div className="flex items-center gap-6">
                 <div className="relative">
-                  <Avatar className="w-24 h-24">
-                    <AvatarImage src="" />
-                    <AvatarFallback className="text-2xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white">
-                      {profileData.name.split(' ').map((n: any) => n[0]).join('')}
-                    </AvatarFallback>
-                  </Avatar>
-                  <Button
-                    size="sm"
-                    className="absolute -bottom-2 -right-2 rounded-full w-8 h-8 p-0 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700"
-                  >
-                    <Camera className="w-4 h-4" />
-                  </Button>
+                  <RoleAvatar
+                    role="professor"
+                    identifier={currentUser.id || currentUser.email}
+                    name={profileData.name}
+                    className="size-24"
+                  />
                 </div>
                 <div>
                   <h3 className="font-medium mb-1">{profileData.name}</h3>
                   <p className="text-sm text-muted-foreground mb-2">{profileData.department}</p>
-                  <Button variant="outline" size="sm">Change Photo</Button>
                 </div>
               </div>
 
@@ -256,7 +247,7 @@ export function Settings({ currentUser, accessToken, onUpdateProfile, onLogout }
                       type="email"
                       value={profileData.email}
                       disabled
-                      className="pl-10 bg-gray-100"
+                      className="bg-muted pl-10"
                     />
                   </div>
                 </div>
@@ -358,7 +349,6 @@ export function Settings({ currentUser, accessToken, onUpdateProfile, onLogout }
 
               <Button
                 onClick={handleProfileUpdate}
-                className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white border-0"
               >
                 <Save className="w-4 h-4 mr-2" />
                 Save Changes
@@ -369,14 +359,14 @@ export function Settings({ currentUser, accessToken, onUpdateProfile, onLogout }
 
         {/* Notifications Tab */}
         <TabsContent value="notifications" className="space-y-6">
-          <Card className="border-0 shadow-lg">
+          <Card className="shadow-none">
             <CardHeader>
               <CardTitle>Notification Preferences</CardTitle>
               <CardDescription>Manage how you receive notifications</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="space-y-4">
-                <div className="flex items-center justify-between p-4 rounded-lg bg-gradient-to-br from-blue-50 to-white border border-blue-100">
+                <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 p-4">
                   <div className="space-y-0.5">
                     <Label className="text-base">Email Notifications</Label>
                     <p className="text-sm text-muted-foreground">
@@ -391,7 +381,7 @@ export function Settings({ currentUser, accessToken, onUpdateProfile, onLogout }
                   />
                 </div>
 
-                <div className="flex items-center justify-between p-4 rounded-lg bg-gradient-to-br from-green-50 to-white border border-green-100">
+                <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 p-4">
                   <div className="space-y-0.5">
                     <Label className="text-base">Push Notifications</Label>
                     <p className="text-sm text-muted-foreground">
@@ -406,7 +396,7 @@ export function Settings({ currentUser, accessToken, onUpdateProfile, onLogout }
                   />
                 </div>
 
-                <div className="flex items-center justify-between p-4 rounded-lg bg-gradient-to-br from-purple-50 to-white border border-purple-100">
+                <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 p-4">
                   <div className="space-y-0.5">
                     <Label className="text-base">Student Updates</Label>
                     <p className="text-sm text-muted-foreground">
@@ -421,7 +411,7 @@ export function Settings({ currentUser, accessToken, onUpdateProfile, onLogout }
                   />
                 </div>
 
-                <div className="flex items-center justify-between p-4 rounded-lg bg-gradient-to-br from-yellow-50 to-white border border-yellow-100">
+                <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 p-4">
                   <div className="space-y-0.5">
                     <Label className="text-base">Grade Alerts</Label>
                     <p className="text-sm text-muted-foreground">
@@ -436,7 +426,7 @@ export function Settings({ currentUser, accessToken, onUpdateProfile, onLogout }
                   />
                 </div>
 
-                <div className="flex items-center justify-between p-4 rounded-lg bg-gradient-to-br from-pink-50 to-white border border-pink-100">
+                <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 p-4">
                   <div className="space-y-0.5">
                     <Label className="text-base">Task Reminders</Label>
                     <p className="text-sm text-muted-foreground">
@@ -451,7 +441,7 @@ export function Settings({ currentUser, accessToken, onUpdateProfile, onLogout }
                   />
                 </div>
 
-                <div className="flex items-center justify-between p-4 rounded-lg bg-gradient-to-br from-indigo-50 to-white border border-indigo-100">
+                <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 p-4">
                   <div className="space-y-0.5">
                     <Label className="text-base">Weekly Reports</Label>
                     <p className="text-sm text-muted-foreground">
@@ -466,7 +456,7 @@ export function Settings({ currentUser, accessToken, onUpdateProfile, onLogout }
                   />
                 </div>
 
-                <div className="flex items-center justify-between p-4 rounded-lg bg-gradient-to-br from-gray-50 to-white border border-gray-200">
+                <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 p-4">
                   <div className="space-y-0.5">
                     <Label className="text-base">Marketing Emails</Label>
                     <p className="text-sm text-muted-foreground">
@@ -484,7 +474,6 @@ export function Settings({ currentUser, accessToken, onUpdateProfile, onLogout }
 
               <Button
                 onClick={handleNotificationUpdate}
-                className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white border-0"
               >
                 <Save className="w-4 h-4 mr-2" />
                 Save Preferences
@@ -495,7 +484,7 @@ export function Settings({ currentUser, accessToken, onUpdateProfile, onLogout }
 
         {/* Preferences Tab */}
         <TabsContent value="preferences" className="space-y-6">
-          <Card className="border-0 shadow-lg">
+          <Card className="shadow-none">
             <CardHeader>
               <CardTitle>Application Preferences</CardTitle>
               <CardDescription>Customize your application experience</CardDescription>
@@ -504,7 +493,11 @@ export function Settings({ currentUser, accessToken, onUpdateProfile, onLogout }
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <Label htmlFor="theme">Theme</Label>
-                  <Select value={preferences.theme} onValueChange={(value) => setPreferences({ ...preferences, theme: value })}>
+                  <Select value={theme || preferences.theme} onValueChange={(value) => {
+                    const nextTheme = value || 'light';
+                    setTheme(nextTheme);
+                    setPreferences({ ...preferences, theme: nextTheme });
+                  }}>
                     <SelectTrigger id="theme">
                       <SelectValue />
                     </SelectTrigger>
@@ -518,7 +511,7 @@ export function Settings({ currentUser, accessToken, onUpdateProfile, onLogout }
 
                 <div className="space-y-2">
                   <Label htmlFor="language">Language</Label>
-                  <Select value={preferences.language} onValueChange={(value) => setPreferences({ ...preferences, language: value })}>
+                  <Select value={preferences.language} onValueChange={(value) => setPreferences({ ...preferences, language: value ?? 'english' })}>
                     <SelectTrigger id="language">
                       <SelectValue />
                     </SelectTrigger>
@@ -533,7 +526,7 @@ export function Settings({ currentUser, accessToken, onUpdateProfile, onLogout }
 
                 <div className="space-y-2">
                   <Label htmlFor="dateFormat">Date Format</Label>
-                  <Select value={preferences.dateFormat} onValueChange={(value) => setPreferences({ ...preferences, dateFormat: value })}>
+                  <Select value={preferences.dateFormat} onValueChange={(value) => setPreferences({ ...preferences, dateFormat: value ?? 'DD/MM/YYYY' })}>
                     <SelectTrigger id="dateFormat">
                       <SelectValue />
                     </SelectTrigger>
@@ -547,7 +540,7 @@ export function Settings({ currentUser, accessToken, onUpdateProfile, onLogout }
 
                 <div className="space-y-2">
                   <Label htmlFor="timeFormat">Time Format</Label>
-                  <Select value={preferences.timeFormat} onValueChange={(value) => setPreferences({ ...preferences, timeFormat: value })}>
+                  <Select value={preferences.timeFormat} onValueChange={(value) => setPreferences({ ...preferences, timeFormat: value ?? '12-hour' })}>
                     <SelectTrigger id="timeFormat">
                       <SelectValue />
                     </SelectTrigger>
@@ -560,7 +553,7 @@ export function Settings({ currentUser, accessToken, onUpdateProfile, onLogout }
 
                 <div className="space-y-2">
                   <Label htmlFor="academicYear">Academic Year</Label>
-                  <Select value={preferences.academicYear} onValueChange={(value) => setPreferences({ ...preferences, academicYear: value })}>
+                  <Select value={preferences.academicYear} onValueChange={(value) => setPreferences({ ...preferences, academicYear: value ?? '2024-2025' })}>
                     <SelectTrigger id="academicYear">
                       <SelectValue />
                     </SelectTrigger>
@@ -574,7 +567,7 @@ export function Settings({ currentUser, accessToken, onUpdateProfile, onLogout }
 
                 <div className="space-y-2">
                   <Label htmlFor="gradingSystem">Grading System</Label>
-                  <Select value={preferences.gradingSystem} onValueChange={(value) => setPreferences({ ...preferences, gradingSystem: value })}>
+                  <Select value={preferences.gradingSystem} onValueChange={(value) => setPreferences({ ...preferences, gradingSystem: value ?? 'percentage' })}>
                     <SelectTrigger id="gradingSystem">
                       <SelectValue />
                     </SelectTrigger>
@@ -590,7 +583,6 @@ export function Settings({ currentUser, accessToken, onUpdateProfile, onLogout }
 
               <Button
                 onClick={handlePreferencesUpdate}
-                className="bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white border-0"
               >
                 <Save className="w-4 h-4 mr-2" />
                 Save Preferences
@@ -601,7 +593,7 @@ export function Settings({ currentUser, accessToken, onUpdateProfile, onLogout }
 
         {/* Security Tab */}
         <TabsContent value="security" className="space-y-6">
-          <Card className="border-0 shadow-lg">
+          <Card className="shadow-none">
             <CardHeader>
               <CardTitle>Change Password</CardTitle>
               <CardDescription>Update your password to keep your account secure</CardDescription>
@@ -677,7 +669,7 @@ export function Settings({ currentUser, accessToken, onUpdateProfile, onLogout }
                   </div>
                 </div>
 
-                <div className="p-4 bg-gradient-to-br from-yellow-50 to-white border border-yellow-200 rounded-lg">
+                <div className="rounded-lg border border-border bg-muted/40 p-4">
                   <h4 className="font-medium text-sm mb-2">Password Requirements:</h4>
                   <ul className="text-sm text-muted-foreground space-y-1">
                     <li>• At least 8 characters long</li>
@@ -690,7 +682,6 @@ export function Settings({ currentUser, accessToken, onUpdateProfile, onLogout }
 
               <Button
                 onClick={handlePasswordChange}
-                className="bg-gradient-to-r from-red-500 to-orange-600 hover:from-red-600 hover:to-orange-700 text-white border-0"
               >
                 <Lock className="w-4 h-4 mr-2" />
                 Update Password
@@ -698,32 +689,32 @@ export function Settings({ currentUser, accessToken, onUpdateProfile, onLogout }
             </CardContent>
           </Card>
 
-          <Card className="border-0 shadow-lg bg-gradient-to-br from-red-50 to-white border-red-100">
+          <Card className="border-destructive/30 shadow-none">
             <CardHeader>
-              <CardTitle className="text-red-600">Danger Zone</CardTitle>
+              <CardTitle className="text-destructive">Danger Zone</CardTitle>
               <CardDescription>Irreversible and destructive actions</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-start justify-between p-4 border border-red-200 rounded-lg">
+              <div className="flex items-start justify-between rounded-lg border border-destructive/20 p-4">
                 <div>
                   <h4 className="font-medium mb-1">Deactivate Account</h4>
                   <p className="text-sm text-muted-foreground">
                     Temporarily disable your account. You can reactivate it later.
                   </p>
                 </div>
-                <Button onClick={handleDeactivateAccount} variant="outline" className="border-red-300 text-red-600 hover:bg-red-50">
+                <Button onClick={handleDeactivateAccount} variant="outline" className="border-destructive/30 text-destructive hover:bg-destructive/10">
                   Deactivate
                 </Button>
               </div>
 
-              <div className="flex items-start justify-between p-4 border border-red-300 rounded-lg bg-red-50/50">
+              <div className="flex items-start justify-between rounded-lg border border-destructive/30 bg-destructive/5 p-4">
                 <div>
-                  <h4 className="font-medium mb-1 text-red-600">Delete Account</h4>
+                  <h4 className="mb-1 font-medium text-destructive">Delete Account</h4>
                   <p className="text-sm text-muted-foreground">
                     Permanently delete your account and all associated data.
                   </p>
                 </div>
-                <Button onClick={handleDeleteAccount} variant="destructive" className="bg-red-600 hover:bg-red-700">
+                <Button onClick={handleDeleteAccount} variant="destructive">
                   Delete
                 </Button>
               </div>

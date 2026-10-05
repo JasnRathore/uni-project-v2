@@ -10,6 +10,7 @@ import { Badge } from './ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Textarea } from './ui/textarea';
 import { toast } from 'sonner';
+import { KpiCard } from './ui/kpi-card';
 import { 
   Plus, 
   Edit, 
@@ -40,17 +41,17 @@ const dentalSubjects = [
 
 // Letter grades with descriptions
 const letterGrades = [
-  { value: 'A+', label: 'A+', percentage: 97, description: 'Outstanding', color: 'bg-gradient-to-r from-green-500 to-emerald-600' },
-  { value: 'A', label: 'A', percentage: 93, description: 'Excellent', color: 'bg-gradient-to-r from-green-500 to-emerald-600' },
-  { value: 'A-', label: 'A-', percentage: 90, description: 'Very Good', color: 'bg-gradient-to-r from-green-500 to-emerald-600' },
-  { value: 'B+', label: 'B+', percentage: 87, description: 'Good', color: 'bg-gradient-to-r from-blue-500 to-blue-600' },
-  { value: 'B', label: 'B', percentage: 83, description: 'Above Average', color: 'bg-gradient-to-r from-blue-500 to-blue-600' },
-  { value: 'B-', label: 'B-', percentage: 80, description: 'Average', color: 'bg-gradient-to-r from-blue-500 to-blue-600' },
-  { value: 'C+', label: 'C+', percentage: 77, description: 'Below Average', color: 'bg-gradient-to-r from-yellow-500 to-orange-500' },
-  { value: 'C', label: 'C', percentage: 73, description: 'Fair', color: 'bg-gradient-to-r from-yellow-500 to-orange-500' },
-  { value: 'C-', label: 'C-', percentage: 70, description: 'Pass', color: 'bg-gradient-to-r from-yellow-500 to-orange-500' },
-  { value: 'D', label: 'D', percentage: 65, description: 'Minimum Pass', color: 'bg-gradient-to-r from-orange-500 to-red-500' },
-  { value: 'F', label: 'F', percentage: 0, description: 'Fail', color: 'bg-gradient-to-r from-red-500 to-red-600' }
+  { value: 'A+', label: 'A+', percentage: 97, description: 'Outstanding' },
+  { value: 'A', label: 'A', percentage: 93, description: 'Excellent' },
+  { value: 'A-', label: 'A-', percentage: 90, description: 'Very Good' },
+  { value: 'B+', label: 'B+', percentage: 87, description: 'Good' },
+  { value: 'B', label: 'B', percentage: 83, description: 'Above Average' },
+  { value: 'B-', label: 'B-', percentage: 80, description: 'Average' },
+  { value: 'C+', label: 'C+', percentage: 77, description: 'Below Average' },
+  { value: 'C', label: 'C', percentage: 73, description: 'Fair' },
+  { value: 'C-', label: 'C-', percentage: 70, description: 'Pass' },
+  { value: 'D', label: 'D', percentage: 65, description: 'Minimum Pass' },
+  { value: 'F', label: 'F', percentage: 0, description: 'Fail' }
 ];
 
 export function MarksManagement({ students, classes, accessToken, projectId }: { students: any[]; classes: any[]; accessToken: string; projectId: string }) {
@@ -212,19 +213,14 @@ export function MarksManagement({ students, classes, accessToken, projectId }: {
 
   const getGradeColor = (score: any, maxScore: any) => {
     const percentage = (score / maxScore) * 100;
-    if (percentage >= 90) return 'text-green-600';
-    if (percentage >= 80) return 'text-yellow-600';
-    if (percentage >= 70) return 'text-orange-600';
-    return 'text-red-600';
+    return percentage < 60 ? 'text-destructive' : 'text-foreground';
   };
 
   const getGradeBadge = (score: any, maxScore: any) => {
     const percentage = (score / maxScore) * 100;
-    if (percentage >= 90) return <Badge className="bg-gradient-to-r from-green-500 to-emerald-600 text-white border-0 shadow-sm">A</Badge>;
-    if (percentage >= 80) return <Badge className="bg-gradient-to-r from-blue-500 to-blue-600 text-white border-0 shadow-sm">B</Badge>;
-    if (percentage >= 70) return <Badge className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white border-0 shadow-sm">C</Badge>;
-    if (percentage >= 60) return <Badge className="bg-gradient-to-r from-orange-500 to-red-500 text-white border-0 shadow-sm">D</Badge>;
-    return <Badge className="bg-gradient-to-r from-red-500 to-red-600 text-white border-0 shadow-sm">F</Badge>;
+    if (percentage >= 90) return <Badge>A</Badge>;
+    if (percentage >= 60) return <Badge variant="secondary">{percentage >= 80 ? 'B' : percentage >= 70 ? 'C' : 'D'}</Badge>;
+    return <Badge variant="destructive">F</Badge>;
   };
 
   const getStudentById = (studentId: any) => {
@@ -246,27 +242,56 @@ export function MarksManagement({ students, classes, accessToken, projectId }: {
     return (totalPercentage / studentGrades.length).toFixed(1);
   };
 
+  const exportGrades = () => {
+    if (filteredGrades.length === 0) {
+      toast.error('No grades match the current filters');
+      return;
+    }
+
+    const escapeCsv = (value: unknown) => {
+      const text = String(value ?? '');
+      const safeText = /^[\s]*[=+\-@]/.test(text) ? `'${text}` : text;
+      return `"${safeText.replace(/"/g, '""')}"`;
+    };
+    const rows = [
+      ['Student', 'Email', 'Class', 'Subject', 'Assignment', 'Score', 'Maximum score', 'Percentage', 'Grade', 'Date', 'Feedback'],
+      ...filteredGrades.map((grade: any) => {
+        const student = getStudentById(grade.studentId);
+        const classData = getClassById(grade.classId);
+        return [
+          student?.name,
+          student?.email,
+          classData?.name,
+          grade.subject,
+          grade.assignment,
+          grade.score,
+          grade.maxScore,
+          grade.maxScore ? `${((grade.score / grade.maxScore) * 100).toFixed(1)}%` : '',
+          grade.grade,
+          grade.date,
+          grade.feedback,
+        ];
+      }),
+    ];
+    const csv = rows.map(row => row.map(escapeCsv).join(',')).join('\r\n');
+    const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `grades-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    toast.success(`Exported ${filteredGrades.length} grade records`);
+  };
+
   // Empty state when no students exist
   if (students.length === 0) {
     return (
       <div className="p-6">
-        <div className="mb-6 p-6 bg-gradient-to-r from-orange-500 to-red-600 rounded-2xl text-white shadow-xl">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="p-3 bg-white/20 rounded-lg">
-              <BookOpen className="w-8 h-8 text-white" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-medium">Marks Management</h1>
-              <p className="text-white/90 text-sm mt-1">Track and manage student grades and performance</p>
-            </div>
-          </div>
-        </div>
-
-        <Card className="border-0 shadow-lg">
+        <Card className="shadow-none">
           <CardContent className="py-12">
             <div className="text-center space-y-4">
-              <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-orange-100 to-red-100 rounded-full mb-4">
-                <UserPlus className="w-10 h-10 text-orange-600" />
+              <div className="mb-4 inline-flex size-20 items-center justify-center rounded-full bg-muted">
+                <UserPlus className="size-10 text-muted-foreground" />
               </div>
               <h3 className="text-xl font-medium">No Students Added Yet</h3>
               <p className="text-muted-foreground max-w-md mx-auto">
@@ -281,31 +306,17 @@ export function MarksManagement({ students, classes, accessToken, projectId }: {
   }
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="mb-6 p-6 bg-gradient-to-r from-orange-500 to-red-600 rounded-2xl text-white shadow-xl">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-white/20 rounded-lg">
-              <BookOpen className="w-8 h-8 text-white" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-medium">Marks Management</h1>
-              <p className="text-white/90 text-sm mt-1">Track and manage student grades and performance</p>
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-              <DialogTrigger asChild>
-                <Button className="bg-white/20 hover:bg-white/30 text-white border-white/30 shadow-md">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Grade
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-md">
-                <DialogHeader>
-                  <DialogTitle>Add New Grade</DialogTitle>
-                </DialogHeader>
+    <div className="space-y-6 p-6">
+      <div className="flex justify-end gap-2">
+        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+          <DialogTrigger render={<Button />}>
+            <Plus className="w-4 h-4 mr-2" />
+            Add Grade
+          </DialogTrigger>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Add New Grade</DialogTitle>
+            </DialogHeader>
                 <div className="space-y-4">
                   <div>
                     <Label htmlFor="classFilter">Class Filter (Optional)</Label>
@@ -314,7 +325,7 @@ export function MarksManagement({ students, classes, accessToken, projectId }: {
                       onValueChange={(value) => {
                         setNewGrade({
                           ...newGrade, 
-                          classId: value,
+                          classId: value ?? '',
                           studentId: '' // Reset student when class changes
                         });
                       }}
@@ -337,7 +348,11 @@ export function MarksManagement({ students, classes, accessToken, projectId }: {
                     <Select 
                       value={newGrade.studentId} 
                       onValueChange={(value) => {
-                        const student = students.find(s => s.id === parseInt(value));
+                        if (!value) {
+                          setNewGrade({ ...newGrade, studentId: '' });
+                          return;
+                        }
+                        const student = students.find(s => String(s.id) === value);
                         setNewGrade({
                           ...newGrade, 
                           studentId: value,
@@ -366,7 +381,7 @@ export function MarksManagement({ students, classes, accessToken, projectId }: {
                             if (classStudents.length === 0) return null;
                             return (
                               <React.Fragment key={cls.id}>
-                                <SelectItem value={`header-${cls.id}`} disabled className="font-semibold text-blue-600">
+                                <SelectItem value={`header-${cls.id}`} disabled className="font-semibold text-foreground">
                                   {cls.name} ({classStudents.length} students)
                                 </SelectItem>
                                 {classStudents.map((student) => (
@@ -381,7 +396,7 @@ export function MarksManagement({ students, classes, accessToken, projectId }: {
                         {/* Show unassigned students */}
                         {students.filter(s => !s.classId).length > 0 && (
                           <React.Fragment>
-                            <SelectItem value="header-unassigned" disabled className="font-semibold text-gray-600">
+                            <SelectItem value="header-unassigned" disabled className="font-semibold text-muted-foreground">
                               Unassigned ({students.filter(s => !s.classId).length} students)
                             </SelectItem>
                             {students
@@ -403,7 +418,7 @@ export function MarksManagement({ students, classes, accessToken, projectId }: {
                   </div>
                   <div>
                     <Label htmlFor="subject">Subject *</Label>
-                    <Select value={newGrade.subject} onValueChange={(value) => setNewGrade({...newGrade, subject: value})}>
+                    <Select value={newGrade.subject} onValueChange={(value) => setNewGrade({...newGrade, subject: value ?? ''})}>
                       <SelectTrigger>
                         <SelectValue placeholder="Select subject" />
                       </SelectTrigger>
@@ -427,7 +442,7 @@ export function MarksManagement({ students, classes, accessToken, projectId }: {
                   </div>
                   <div>
                     <Label htmlFor="grade">Grade *</Label>
-                    <Select value={newGrade.grade} onValueChange={(value) => setNewGrade({...newGrade, grade: value})}>
+                    <Select value={newGrade.grade} onValueChange={(value) => setNewGrade({...newGrade, grade: value ?? ''})}>
                       <SelectTrigger>
                         <SelectValue placeholder="Select grade" />
                       </SelectTrigger>
@@ -464,93 +479,40 @@ export function MarksManagement({ students, classes, accessToken, projectId }: {
                   </div>
                   <Button 
                     onClick={handleAddGrade} 
-                    className="w-full bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white border-0"
+                    className="w-full"
                   >
                     Add Grade
                   </Button>
                 </div>
-              </DialogContent>
-            </Dialog>
-            
-            <Button 
-              className="bg-white/20 hover:bg-white/30 text-white border-white/30 shadow-md"
-              onClick={() => {
-                if (grades.length === 0) {
-                  toast.error('No grades to export');
-                  return;
-                }
-                toast.success('Export feature coming soon!');
-              }}
-            >
-              <FileSpreadsheet className="w-4 h-4 mr-2" />
-              Export CSV
-            </Button>
-          </div>
-        </div>
+          </DialogContent>
+        </Dialog>
+
+        <Button
+          variant="outline"
+          disabled={filteredGrades.length === 0}
+          onClick={exportGrades}
+        >
+            <FileSpreadsheet className="w-4 h-4 mr-2" />
+            Export CSV
+        </Button>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="border-0 shadow-md bg-gradient-to-br from-blue-50 to-white">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <GraduationCap className="w-5 h-5 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Total Students</p>
-                <p className="text-2xl font-bold">{students.length}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-0 shadow-md bg-gradient-to-br from-green-50 to-white">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-green-100 rounded-lg">
-                <BookOpen className="w-5 h-5 text-green-600" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Total Grades</p>
-                <p className="text-2xl font-bold">{grades.length}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-0 shadow-md bg-gradient-to-br from-purple-50 to-white">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-purple-100 rounded-lg">
-                <Filter className="w-5 h-5 text-purple-600" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Classes</p>
-                <p className="text-2xl font-bold">{classes.length}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-0 shadow-md bg-gradient-to-br from-orange-50 to-white">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-orange-100 rounded-lg">
-                <Save className="w-5 h-5 text-orange-600" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Avg. Grade</p>
-                <p className="text-2xl font-bold">
-                  {grades.length > 0 
-                    ? (grades.reduce((acc, g) => acc + (g.score / g.maxScore) * 100, 0) / grades.length).toFixed(0) + '%'
-                    : '0%'
-                  }
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <KpiCard label="Students" value={students.length} icon={<GraduationCap aria-hidden="true" />} />
+        <KpiCard label="Grades recorded" value={grades.length} icon={<BookOpen aria-hidden="true" />} />
+        <KpiCard label="Classes" value={classes.length} icon={<Filter aria-hidden="true" />} />
+        <KpiCard
+          label="Average score"
+          value={grades.length
+            ? grades.reduce((sum, grade) => sum + (grade.maxScore ? grade.score / grade.maxScore : 0), 0) / grades.length
+            : 0}
+          format="percent"
+          icon={<Save aria-hidden="true" />}
+        />
       </div>
 
-      <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-gray-50">
+      <Card className="shadow-none">
         <CardHeader>
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="relative flex-1">
@@ -564,7 +526,7 @@ export function MarksManagement({ students, classes, accessToken, projectId }: {
             </div>
             <div className="flex items-center gap-2">
               <Filter className="w-4 h-4 text-muted-foreground" />
-              <Select value={selectedClass} onValueChange={setSelectedClass}>
+              <Select value={selectedClass} onValueChange={(value) => setSelectedClass(value ?? 'all')}>
                 <SelectTrigger className="w-48">
                   <SelectValue />
                 </SelectTrigger>
@@ -577,7 +539,7 @@ export function MarksManagement({ students, classes, accessToken, projectId }: {
                   ))}
                 </SelectContent>
               </Select>
-              <Select value={selectedSubject} onValueChange={setSelectedSubject}>
+              <Select value={selectedSubject} onValueChange={(value) => setSelectedSubject(value ?? 'all')}>
                 <SelectTrigger className="w-48">
                   <SelectValue />
                 </SelectTrigger>
@@ -596,8 +558,8 @@ export function MarksManagement({ students, classes, accessToken, projectId }: {
         <CardContent>
           {filteredGrades.length === 0 ? (
             <div className="text-center py-12">
-              <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-orange-100 to-red-100 rounded-full mb-4">
-                <BookOpen className="w-8 h-8 text-orange-600" />
+              <div className="mb-4 inline-flex size-16 items-center justify-center rounded-full bg-muted">
+                <BookOpen className="size-8 text-muted-foreground" />
               </div>
               <h3 className="text-lg font-medium mb-2">No Grades Yet</h3>
               <p className="text-muted-foreground mb-4">
@@ -631,12 +593,12 @@ export function MarksManagement({ students, classes, accessToken, projectId }: {
                         {student ? student.name : 'Unknown Student'}
                       </TableCell>
                       <TableCell>
-                        <Badge className="bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-700 border-blue-200">
+                        <Badge variant="secondary">
                           {classData ? classData.name : 'N/A'}
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <Badge className="bg-gradient-to-r from-indigo-100 to-purple-100 text-indigo-700 border-indigo-200">
+                        <Badge variant="outline">
                           {grade.subject}
                         </Badge>
                       </TableCell>
@@ -655,17 +617,19 @@ export function MarksManagement({ students, classes, accessToken, projectId }: {
                           setIsEditDialogOpen(open);
                           if (!open) setEditingGrade(null);
                         }}>
-                          <DialogTrigger asChild>
-                            <Button 
+                          <DialogTrigger
+                            render={
+                              <Button
                               variant="ghost" 
                               size="sm"
                               onClick={() => {
                                 setEditingGrade(grade);
                                 setIsEditDialogOpen(true);
                               }}
-                            >
+                              />
+                            }
+                          >
                               <Edit className="w-4 h-4" />
-                            </Button>
                           </DialogTrigger>
                           <DialogContent className="max-w-md">
                             <DialogHeader>
@@ -709,7 +673,7 @@ export function MarksManagement({ students, classes, accessToken, projectId }: {
                               </div>
                               <Button 
                                 onClick={() => handleUpdateGrade(grade.id, editingGrade || {})}
-                                className="w-full bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white border-0"
+                                className="w-full"
                               >
                                 <Save className="w-4 h-4 mr-2" />
                                 Update Grade

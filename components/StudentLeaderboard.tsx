@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { AlertCircle, Loader2, RefreshCw, Trophy } from "lucide-react";
-import { Avatar, AvatarFallback } from "./ui/avatar";
+import { RoleAvatar } from "./RoleAvatar";
+import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
-import { Card, CardContent } from "./ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 
 interface LeaderboardEntry {
   id: string;
@@ -66,128 +67,116 @@ export function StudentLeaderboard({ accessToken }: { accessToken: string }) {
   }, [accessToken, reloadCount]);
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500 overflow-hidden">
-      <div className="text-center max-w-2xl mx-auto space-y-4">
-        <div className="inline-block p-3 bg-indigo-50 rounded-3xl mb-2">
-          <Trophy className="w-12 h-12 text-indigo-600" />
+    <div className="flex flex-col gap-6">
+      <div>
+        <div className="mb-3 flex size-10 items-center justify-center rounded-xl bg-muted text-muted-foreground">
+          <Trophy aria-hidden="true" className="size-5" />
         </div>
-        <h2 className="text-4xl font-black text-gray-900 tracking-tight">
-          STUDENT LEADERBOARD
-        </h2>
-        <p className="text-gray-500 font-medium">
+        <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
           Rankings are based on experience earned from graded assignments and
           quizzes, and are limited to your BDS year, class, or batch.
         </p>
         {data?.scope && (
-          <p className="inline-flex rounded-full bg-indigo-50 px-4 py-2 text-sm font-bold text-indigo-700">
+          <Badge variant="secondary" className="mt-3">
             {data.scope.label}
-          </p>
+          </Badge>
         )}
       </div>
 
       {isLoading ? (
-        <div className="flex items-center justify-center gap-3 py-16 text-indigo-700">
-          <Loader2 className="h-5 w-5 animate-spin" />
-          <span className="font-semibold">Loading your class leaderboard...</span>
+        <div className="flex items-center gap-3 py-12 text-sm text-muted-foreground" role="status">
+          <Loader2 aria-hidden="true" className="size-4 animate-spin" />
+          <span>Loading leaderboard…</span>
         </div>
       ) : error ? (
-        <Card className="mx-auto max-w-xl border-red-100">
-          <CardContent className="flex flex-col items-center gap-4 p-8 text-center">
-            <AlertCircle className="h-8 w-8 text-red-500" />
-            <p className="font-semibold text-gray-800">{error}</p>
+        <Card className="max-w-xl shadow-none">
+          <CardContent className="flex flex-col items-start gap-4 p-6">
+            <AlertCircle aria-hidden="true" className="size-5 text-destructive" />
+            <p className="text-sm">{error}</p>
             <Button
               variant="outline"
+              size="sm"
               onClick={() => {
                 setIsLoading(true);
                 setError("");
                 setReloadCount((count) => count + 1);
               }}
             >
-              <RefreshCw className="mr-2 h-4 w-4" />
+              <RefreshCw aria-hidden="true" data-icon="inline-start" />
               Try again
             </Button>
           </CardContent>
         </Card>
       ) : !data?.scope ? (
-        <Card className="mx-auto max-w-xl">
-          <CardContent className="p-8 text-center text-gray-600">
+        <Card className="max-w-xl shadow-none">
+          <CardContent className="p-6 text-sm text-muted-foreground">
             {data?.message || "Your BDS year, class, or batch is not set on your profile yet."}
           </CardContent>
         </Card>
       ) : data.leaderboard.length === 0 ? (
-        <Card className="mx-auto max-w-xl">
-          <CardContent className="p-8 text-center text-gray-600">
-            No registered students are in this cohort yet.
+        <Card className="max-w-xl shadow-none">
+          <CardContent className="p-6 text-sm text-muted-foreground">
+            No registered students are in your cohort yet.
           </CardContent>
         </Card>
       ) : (
-        <Card className="mx-auto max-w-4xl overflow-hidden border-0 shadow-xl">
-          <CardContent className="p-0">
-            <div className="flex items-center justify-between border-b bg-slate-50 px-6 py-4">
-              <div>
-                <h3 className="font-black text-gray-900">Cohort rankings</h3>
-                <p className="text-sm text-gray-500">
-                  {data.leaderboard.length} student{data.leaderboard.length === 1 ? "" : "s"}
-                </p>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setIsLoading(true);
-                  setError("");
-                  setReloadCount((count) => count + 1);
-                }}
-                disabled={isLoading}
-              >
-                <RefreshCw className="mr-2 h-4 w-4" />
-                Refresh
-              </Button>
+        <Card className="max-w-4xl shadow-none">
+          <CardHeader className="flex flex-row items-center justify-between gap-4 border-b">
+            <div>
+              <CardTitle className="text-base">Cohort rankings</CardTitle>
+              <CardDescription>
+                {data.leaderboard.length} student{data.leaderboard.length === 1 ? "" : "s"}
+              </CardDescription>
             </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setIsLoading(true);
+                setError("");
+                setReloadCount((count) => count + 1);
+              }}
+              disabled={isLoading}
+            >
+              <RefreshCw aria-hidden="true" data-icon="inline-start" />
+              Refresh
+            </Button>
+          </CardHeader>
+          <CardContent className="p-0">
             <ol className="divide-y">
               {data.leaderboard.map((entry) => (
                 <li
                   key={entry.id}
-                  className={`flex items-center gap-4 px-5 py-4 sm:px-6 ${
-                    entry.isCurrentStudent ? "bg-indigo-50/80" : "bg-white"
+                  className={`flex items-center gap-4 px-4 py-4 sm:px-6 ${
+                    entry.isCurrentStudent ? "bg-accent/50" : ""
                   }`}
                 >
                   <span
-                    className={`w-12 shrink-0 text-center text-lg font-black ${
-                      entry.rank === 1
-                        ? "text-amber-500"
-                        : entry.rank === 2
-                          ? "text-slate-500"
-                          : entry.rank === 3
-                            ? "text-orange-600"
-                            : "text-gray-400"
-                    }`}
+                    className="w-10 shrink-0 text-center text-sm font-semibold tabular-nums text-muted-foreground"
                     aria-label={`Rank ${entry.rank}`}
                   >
                     #{entry.rank}
                   </span>
-                  <Avatar className="h-11 w-11 shrink-0">
-                    <AvatarFallback className="bg-indigo-100 font-bold text-indigo-700">
-                      {entry.avatar || entry.name.slice(0, 2).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
+                  <RoleAvatar
+                    role="student"
+                    identifier={entry.id}
+                    name={entry.name}
+                    className="size-10"
+                    fallbackClassName="text-sm font-medium"
+                  />
                   <div className="min-w-0 flex-1">
-                    <p className="truncate font-bold text-gray-900">
+                    <p className="truncate text-sm font-medium">
                       {entry.name}
-                      {entry.isCurrentStudent && (
-                        <span className="ml-2 text-xs font-bold uppercase tracking-wide text-indigo-600">
-                          You
-                        </span>
-                      )}
                     </p>
-                    <p className="text-xs font-semibold text-gray-500">
+                    <p className="text-xs text-muted-foreground">
                       {entry.rollNumber ? `Roll no. ${entry.rollNumber} · ` : ""}
                       Level {entry.level}
                     </p>
                   </div>
-                  <p className="shrink-0 text-right font-black text-indigo-700">
+                  {entry.isCurrentStudent && <Badge variant="secondary">You</Badge>}
+                  <p className="shrink-0 text-right text-sm font-semibold tabular-nums">
                     {entry.totalExperience.toLocaleString()}
-                    <span className="ml-1 text-xs font-bold text-gray-500">XP</span>
+                    <span className="ml-1 text-xs font-normal text-muted-foreground">XP</span>
                   </p>
                 </li>
               ))}

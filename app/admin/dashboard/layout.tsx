@@ -2,52 +2,185 @@
 
 import React, { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
+import { useTheme } from 'next-themes';
 import {
   BookOpen,
   Database,
-  GraduationCap,
   Home,
   ListTodo,
   LogOut,
+  Moon,
   School,
   Settings as SettingsIcon,
-  UserPlus,
+  Sun,
+  Monitor,
   Users,
+  ChevronsUpDown,
 } from 'lucide-react';
-import { Sidebar, SidebarContent, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupLabel,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+  SidebarTrigger,
+  useSidebar,
+} from '@/components/ui/sidebar';
+import { RoleAvatar } from '@/components/RoleAvatar';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { DASHBOARD_LOGOUT_EVENT } from '@/lib/dashboard-events';
 import { supabase } from '@/components/utils/supabase/client';
 
 const menuItems = [
-  { id: 'dashboard', label: 'Dashboard', icon: Home },
-  { id: 'students', label: 'Students', icon: Users },
-  { id: 'portal-students', label: 'Portal Students', icon: UserPlus },
-  { id: 'classes', label: 'Classes', icon: School },
-  { id: 'tasks-quizzes', label: 'Tasks & Quizzes', icon: ListTodo },
-  { id: 'marks', label: 'Marks Management', icon: BookOpen },
-  { id: 'add-class', label: 'Add Class', icon: GraduationCap },
-  { id: 'debug', label: 'Debug Panel', icon: Database },
-  { id: 'settings', label: 'Settings', icon: SettingsIcon },
+  {
+    label: 'Workspace',
+    items: [
+      { id: 'dashboard', label: 'Overview', icon: Home },
+      { id: 'students', label: 'Students', icon: Users },
+      { id: 'classes', label: 'Classes', icon: School },
+    ],
+  },
+  {
+    label: 'Teaching',
+    items: [
+      { id: 'tasks-quizzes', label: 'Tasks & quizzes', icon: ListTodo },
+      { id: 'grades', label: 'Grades', icon: BookOpen },
+    ],
+  },
 ];
 
 const titles: Record<string, string> = {
   dashboard: 'Dashboard',
   students: 'Students',
-  'portal-students': 'Portal Students',
+  'portal-students': 'Students',
   classes: 'Classes',
+  grades: 'Grades',
+  marks: 'Grades',
   'class-view': 'Class Details',
   'add-student': 'Add Student',
-  'add-class': 'Add Class',
   'add-task': 'Add Daily Task',
   'add-quiz': 'Add Quiz',
   profile: 'Student Profile',
   'assign-student': 'Assign Student',
-  marks: 'Marks Management',
   'tasks-quizzes': 'Tasks & Quizzes',
   'edit-task': 'Edit Task',
   settings: 'Settings',
   debug: 'Debug Panel',
 };
+
+function AccountMenu({
+  displayName,
+  email,
+  onNavigate,
+  onLogout,
+}: {
+  displayName: string;
+  email: string;
+  onNavigate: (path: string) => void;
+  onLogout: () => void;
+}) {
+  const { isMobile } = useSidebar();
+  const { theme, setTheme } = useTheme();
+  return (
+    <SidebarMenu>
+      <SidebarMenuItem>
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={
+              <SidebarMenuButton
+                size="lg"
+                aria-label="Account menu"
+                title="Account menu"
+                className="aria-expanded:bg-sidebar-accent group-data-[collapsible=icon]:justify-center"
+              />
+            }
+          >
+            <RoleAvatar role="professor" identifier={email} name={displayName} />
+            <span className="grid min-w-0 flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
+              <span className="truncate font-medium">{displayName}</span>
+              <span className="truncate text-xs text-muted-foreground">{email}</span>
+            </span>
+            <ChevronsUpDown aria-hidden="true" className="ml-auto group-data-[collapsible=icon]:hidden" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            className="w-64"
+            side={isMobile ? 'bottom' : 'top'}
+            align="start"
+            sideOffset={8}
+          >
+            <DropdownMenuGroup>
+              <DropdownMenuLabel className="p-0 font-normal">
+                <span className="flex items-center gap-3 px-2 py-2">
+                  <RoleAvatar role="professor" identifier={email} name={displayName} />
+                  <span className="grid min-w-0 text-left text-sm leading-tight">
+                    <span className="truncate font-medium text-foreground">{displayName}</span>
+                    <span className="truncate text-xs text-muted-foreground">{email}</span>
+                  </span>
+                </span>
+              </DropdownMenuLabel>
+            </DropdownMenuGroup>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => onNavigate('/admin/dashboard/settings')}>
+              <SettingsIcon aria-hidden="true" />
+              Account settings
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onNavigate('/admin/dashboard/debug')}>
+              <Database aria-hidden="true" />
+              Diagnostics
+            </DropdownMenuItem>
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger>
+                <Sun aria-hidden="true" />
+                Appearance
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent>
+                <DropdownMenuRadioGroup
+                  value={theme || 'light'}
+                  onValueChange={setTheme}
+                >
+                  <DropdownMenuRadioItem value="light">
+                    <Sun aria-hidden="true" />
+                    Light
+                  </DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="dark">
+                    <Moon aria-hidden="true" />
+                    Dark
+                  </DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="system">
+                    <Monitor aria-hidden="true" />
+                    System
+                  </DropdownMenuRadioItem>
+                </DropdownMenuRadioGroup>
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem variant="destructive" onClick={onLogout}>
+              <LogOut aria-hidden="true" />
+              Log out
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </SidebarMenuItem>
+    </SidebarMenu>
+  );
+}
 
 export default function AdminDashboardLayout({
   children,
@@ -56,15 +189,21 @@ export default function AdminDashboardLayout({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const [displayName, setDisplayName] = useState('Admin Portal');
+  const [displayName, setDisplayName] = useState('Administrator');
+  const [email, setEmail] = useState('');
   const activeView = pathname.slice('/admin/dashboard'.length).split('/').filter(Boolean)[0] || 'dashboard';
+  const isItemActive = (itemId: string) => activeView === itemId
+    || (itemId === 'students' && activeView === 'portal-students')
+    || (itemId === 'grades' && activeView === 'marks');
 
   useEffect(() => {
     let active = true;
     void supabase.auth.getSession().then(({ data }) => {
       if (active) {
-        const name = data.session?.user?.user_metadata?.name;
-        if (name) setDisplayName(`Dr. ${name}`);
+        const user = data.session?.user;
+        const name = user?.user_metadata?.name || user?.user_metadata?.full_name;
+        if (name) setDisplayName(name);
+        if (user?.email) setEmail(user.email);
       }
     }).catch(error => {
       console.error('Failed to load admin name:', error);
@@ -78,51 +217,51 @@ export default function AdminDashboardLayout({
 
   return (
     <SidebarProvider>
-      <div className="flex h-screen">
-        <Sidebar>
-          <SidebarHeader>
-            <div className="p-4 flex items-center gap-3">
-              <div className="p-2 bg-primary rounded-lg">
-                <GraduationCap className="w-6 h-6 text-primary-foreground" />
-              </div>
-              <div>
-                <h2 className="font-semibold">Dental College Portal</h2>
-                <p className="text-sm text-muted-foreground">{displayName}</p>
-              </div>
-            </div>
-          </SidebarHeader>
-          <SidebarContent>
-            <SidebarMenu>
-              {menuItems.map(item => (
-                <SidebarMenuItem key={item.id}>
-                  <SidebarMenuButton
-                    onClick={() => router.push(item.id === 'dashboard' ? '/admin/dashboard' : `/admin/dashboard/${item.id}`)}
-                    isActive={activeView === item.id}
-                  >
-                    <item.icon className="w-4 h-4" />
-                    <span>{item.label}</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
+        <div className="flex min-h-svh w-full min-w-0 flex-1">
+          <Sidebar collapsible="icon">
+            <SidebarContent>
+              {menuItems.map(group => (
+                <SidebarGroup key={group.label}>
+                  <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
+                  <SidebarMenu>
+                    {group.items.map(item => (
+                      <SidebarMenuItem key={item.id}>
+                        <SidebarMenuButton
+                          onClick={() => router.push(item.id === 'dashboard' ? '/admin/dashboard' : `/admin/dashboard/${item.id}`)}
+                          isActive={isItemActive(item.id)}
+                          tooltip={item.label}
+                          aria-current={isItemActive(item.id) ? 'page' : undefined}
+                        >
+                          <item.icon aria-hidden="true" />
+                          <span className="group-data-[collapsible=icon]:hidden">{item.label}</span>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    ))}
+                  </SidebarMenu>
+                </SidebarGroup>
               ))}
-              <SidebarMenuItem>
-                <SidebarMenuButton onClick={logout} className="text-destructive">
-                  <LogOut className="w-4 h-4" />
-                  <span>Logout</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarContent>
-        </Sidebar>
-        <div className="flex-1 flex flex-col min-w-0 bg-gradient-to-br from-slate-50 via-blue-50/30 to-purple-50/30">
-          <header className="border-b bg-white/80 backdrop-blur-sm p-4 flex items-center gap-2 shadow-sm">
-            <SidebarTrigger />
-            <h1 className="text-lg font-semibold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
-              {titles[activeView] || 'Dashboard'}
-            </h1>
-          </header>
-          <main className="flex-1 overflow-auto">{children}</main>
+            </SidebarContent>
+            <SidebarFooter className="mt-auto border-t border-sidebar-border pt-3">
+              <AccountMenu
+                displayName={displayName}
+                email={email}
+                onNavigate={path => router.push(path)}
+                onLogout={logout}
+              />
+            </SidebarFooter>
+          </Sidebar>
+          <div className="flex min-w-0 flex-1 flex-col bg-background">
+            <header className="sticky top-0 z-10 flex min-h-14 items-center gap-3 border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+              <SidebarTrigger />
+              <h1 className="truncate text-sm font-semibold">
+                {titles[activeView] || 'Overview'}
+              </h1>
+            </header>
+            <main id="main-content" className="min-h-0 flex-1 overflow-auto">
+              {children}
+            </main>
+          </div>
         </div>
-      </div>
     </SidebarProvider>
   );
 }

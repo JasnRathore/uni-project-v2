@@ -3,7 +3,6 @@ import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
-import { Progress } from "./ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import {
   Dialog,
@@ -30,68 +29,20 @@ import {
   BookOpen,
   Target,
   AlertCircle,
-  TrendingUp,
   FileText,
   Brain,
-  X,
-  Award,
+  Plus,
+  Search,
+  ChevronDown,
 } from "lucide-react";
 import { toast } from "sonner";
-
-// Letter grades with colors
-const letterGrades = [
-  {
-    value: "A+",
-    label: "A+",
-    color: "bg-emerald-100 text-emerald-800 border-emerald-300",
-  },
-  {
-    value: "A",
-    label: "A",
-    color: "bg-green-100 text-green-800 border-green-300",
-  },
-  {
-    value: "A-",
-    label: "A-",
-    color: "bg-green-100 text-green-700 border-green-200",
-  },
-  {
-    value: "B+",
-    label: "B+",
-    color: "bg-blue-100 text-blue-800 border-blue-300",
-  },
-  {
-    value: "B",
-    label: "B",
-    color: "bg-blue-100 text-blue-700 border-blue-200",
-  },
-  {
-    value: "B-",
-    label: "B-",
-    color: "bg-blue-100 text-blue-600 border-blue-200",
-  },
-  {
-    value: "C+",
-    label: "C+",
-    color: "bg-yellow-100 text-yellow-800 border-yellow-300",
-  },
-  {
-    value: "C",
-    label: "C",
-    color: "bg-yellow-100 text-yellow-700 border-yellow-200",
-  },
-  {
-    value: "C-",
-    label: "C-",
-    color: "bg-yellow-100 text-yellow-600 border-yellow-200",
-  },
-  {
-    value: "D",
-    label: "D",
-    color: "bg-orange-100 text-orange-800 border-orange-300",
-  },
-  { value: "F", label: "F", color: "bg-red-100 text-red-800 border-red-300" },
-];
+import { KpiCard } from "./ui/kpi-card";
+import { AddTask } from "./AddTask";
+import { AddQuiz } from "./AddQuiz";
+import { Label } from "./ui/label";
+import { Input } from "./ui/input";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "./ui/collapsible";
 
 interface TasksAndQuizzesManagementProps {
   tasks: any[];
@@ -99,6 +50,8 @@ interface TasksAndQuizzesManagementProps {
   students: any[];
   onEditTask: (task: any) => void;
   onDeleteTask: (taskId: any) => Promise<boolean>;
+  onCreateTask: (task: any) => void;
+  onManageStudents: (task: any) => void;
   accessToken: string;
 }
 
@@ -108,17 +61,40 @@ export function TasksAndQuizzesManagement({
   students,
   onEditTask,
   onDeleteTask,
+  onCreateTask,
+  onManageStudents,
   accessToken,
 }: TasksAndQuizzesManagementProps) {
   const [taskStats, setTaskStats] = useState<any>({});
   const [loading, setLoading] = useState(true);
-  const [selectedTaskForStudents, setSelectedTaskForStudents] = useState<any>(null);
-  const [studentListType, setStudentListType] = useState<any>(null); // 'assigned', 'attempted', 'completed'
-  const [studentsList, setStudentsList] = useState<any[]>([]);
-  const [loadingStudents, setLoadingStudents] = useState(false);
-  const [isStudentDialogOpen, setIsStudentDialogOpen] = useState(false);
-  const [studentGrades, setStudentGrades] = useState({}); // Store grades: { studentEmail: grade }
   const [deletingTaskId, setDeletingTaskId] = useState<any>(null);
+  const [creationType, setCreationType] = useState<"task" | "quiz" | null>(null);
+  const [creationClassId, setCreationClassId] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [classFilter, setClassFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+
+  const creationClass = classes.find(classItem => String(classItem.id) === creationClassId);
+  const selectedCreationClass = creationClass
+    ? {
+        ...creationClass,
+        studentCount: students.filter(student => String(student.classId) === String(creationClass.id)).length,
+      }
+    : null;
+
+  const openCreationDialog = (type: "task" | "quiz") => {
+    if (!classes.length) {
+      toast.error("Add a class before creating a task or quiz.");
+      return;
+    }
+    setCreationClassId("");
+    setCreationType(type);
+  };
+
+  const closeCreationDialog = () => {
+    setCreationType(null);
+    setCreationClassId("");
+  };
 
   const handleDeleteTask = async (taskId: any) => {
     setDeletingTaskId(taskId);
@@ -183,20 +159,20 @@ export function TasksAndQuizzesManagement({
   const getPriorityColor = (priority: any) => {
     switch (priority?.toLowerCase()) {
       case "high":
-        return "bg-red-100 text-red-800 border-red-200";
+        return "border-destructive/30 bg-destructive/10 text-destructive";
       case "medium":
-        return "bg-yellow-100 text-yellow-800 border-yellow-200";
+        return "border-border bg-muted text-muted-foreground";
       case "low":
-        return "bg-green-100 text-green-800 border-green-200";
+        return "border-border bg-muted text-muted-foreground";
       default:
-        return "bg-gray-100 text-gray-800 border-gray-200";
+        return "bg-muted text-muted-foreground";
     }
   };
 
   const getStatusColor = (completionRate: any) => {
-    if (completionRate >= 80) return "text-green-600 bg-green-50";
-    if (completionRate >= 50) return "text-yellow-600 bg-yellow-50";
-    return "text-red-600 bg-red-50";
+    if (completionRate >= 80) return "text-foreground bg-muted";
+    if (completionRate >= 50) return "text-muted-foreground bg-muted";
+    return "text-destructive bg-destructive/10";
   };
 
   const isOverdue = (dueDate: any) => {
@@ -211,55 +187,63 @@ export function TasksAndQuizzesManagement({
   });
   const regularTasks = allTasks.filter((t) => t.type !== "quiz");
   const quizzes = allTasks.filter((t) => t.type === "quiz");
+  const selectedClassName = classes.find(classItem => String(classItem.id) === classFilter)?.name;
+  const filteredTasks = allTasks.filter(task => {
+    const query = searchTerm.trim().toLowerCase();
+    const matchesSearch = !query || [
+      task.title,
+      task.description,
+      task.className,
+      task.subject,
+    ].some(value => String(value || "").toLowerCase().includes(query));
+    const matchesClass = classFilter === "all"
+      || String(task.classId || "") === classFilter
+      || (Boolean(selectedClassName) && task.className === selectedClassName);
+    const overdue = isOverdue(task.dueDate);
+    const matchesStatus = statusFilter === "all"
+      || (statusFilter === "active" && task.status === "active" && !overdue)
+      || (statusFilter === "inactive" && task.status !== "active")
+      || (statusFilter === "overdue" && task.status === "active" && overdue);
+    return matchesSearch && matchesClass && matchesStatus;
+  });
+  const filteredRegularTasks = filteredTasks.filter(task => task.type !== "quiz");
+  const filteredQuizzes = filteredTasks.filter(task => task.type === "quiz");
 
   const renderTaskCard = (task: any) => {
-    const stats = taskStats[task.id] || {
-      totalStudents: 0,
-      completed: 0,
-      attempted: 0,
-      completionRate: 0,
-      attemptRate: 0,
-    };
     const overdue = isOverdue(task.dueDate);
     const isQuiz = task.type === "quiz";
 
     return (
       <Card
         key={task.id}
-        className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 bg-gradient-to-br from-white to-gray-50"
+        className="gap-0 py-0 shadow-none transition-shadow hover:shadow-md"
       >
-        <CardHeader className="pb-3">
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-2">
+        <CardHeader className="gap-2 p-4 pb-2">
+          <div className="flex min-w-0 items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <div className="mb-2 flex min-w-0 items-center gap-2">
                 {isQuiz ? (
-                  <Brain className="w-5 h-5 text-indigo-600" />
+                  <Brain aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
                 ) : (
-                  <FileText className="w-5 h-5 text-green-600" />
+                  <FileText aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
                 )}
-                <CardTitle className="text-lg">{task.title}</CardTitle>
+                <CardTitle className="truncate text-base">{task.title}</CardTitle>
               </div>
-              <div className="flex flex-wrap gap-2 mb-3">
-                <Badge
-                  className={
-                    isQuiz
-                      ? "bg-gradient-to-r from-indigo-500 to-purple-600 text-white border-0"
-                      : "bg-gradient-to-r from-green-500 to-emerald-600 text-white border-0"
-                  }
-                >
+              <div className="mb-1 flex flex-wrap gap-1.5">
+                <Badge variant="secondary">
                   {isQuiz ? "Quiz" : "Task"}
                 </Badge>
                 <Badge className={getPriorityColor(task.priority)}>
                   {task.priority || "Medium"} Priority
                 </Badge>
                 {overdue && (
-                  <Badge className="bg-red-500 text-white border-0">
+                  <Badge variant="destructive">
                     <AlertCircle className="w-3 h-3 mr-1" />
                     Overdue
                   </Badge>
                 )}
                 {task.status === "active" ? (
-                  <Badge className="bg-blue-500 text-white border-0">
+                  <Badge variant="outline" className="border-primary/30 bg-primary/5 text-primary">
                     Active
                   </Badge>
                 ) : (
@@ -267,47 +251,79 @@ export function TasksAndQuizzesManagement({
                 )}
               </div>
             </div>
-            <div className="flex gap-2">
+            <div className="flex shrink-0 gap-1.5">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger
+                    render={
+                      <Button
+                        variant="outline"
+                        size="icon-sm"
+                        aria-label={`View students for ${task.title}`}
+                        onClick={() => onManageStudents(task)}
+                        className="rounded-full text-muted-foreground"
+                      />
+                    }
+                  >
+                    <Users />
+                  </TooltipTrigger>
+                  <TooltipContent>View students</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
               <Button
                 variant="outline"
-                size="sm"
+                size="icon-sm"
+                aria-label={`Edit ${task.title}`}
                 onClick={() => onEditTask(task)}
-                className="hover:bg-blue-50 hover:border-blue-300"
+                className="text-muted-foreground"
               >
-                <Edit2 className="w-4 h-4" />
+                <Edit2 />
               </Button>
               <Button
                 variant="outline"
-                size="sm"
+                size="icon-sm"
+                aria-label={`Delete ${task.title}`}
                 onClick={() => handleDeleteTask(task.id)}
                 disabled={deletingTaskId !== null}
-                className="hover:bg-red-50 hover:border-red-300 text-red-600"
+                className="text-destructive hover:bg-destructive/10"
               >
                 {deletingTaskId === task.id ? (
                   <span className="text-xs">Deleting...</span>
                 ) : (
-                  <Trash2 className="w-4 h-4" />
+                  <Trash2 />
                 )}
               </Button>
             </div>
           </div>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-sm text-muted-foreground">{task.description}</p>
+        <CardContent className="flex flex-col gap-3 p-4 pt-0">
+          {task.description && (
+            <Collapsible className="rounded-lg border bg-muted/30">
+              <CollapsibleTrigger
+                className="group flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm font-medium text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+              >
+                <span>View description</span>
+                <ChevronDown className="size-4 shrink-0 transition-transform group-data-[open]:rotate-180" />
+              </CollapsibleTrigger>
+              <CollapsibleContent className="border-t px-3 py-3 text-sm text-muted-foreground">
+                {task.description}
+              </CollapsibleContent>
+            </Collapsible>
+          )}
 
           {/* Task Details */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-gray-50 rounded-lg">
-            <div className="flex items-center gap-2">
-              <BookOpen className="w-4 h-4 text-blue-500" />
-              <div>
+          <div className="grid min-w-0 grid-cols-1 gap-3 rounded-lg bg-muted/50 p-3 sm:grid-cols-2">
+            <div className="flex min-w-0 items-center gap-2">
+              <BookOpen className="size-4 shrink-0 text-muted-foreground" />
+              <div className="min-w-0">
                 <p className="text-xs text-muted-foreground">Class</p>
-                <p className="text-sm font-medium">{task.className}</p>
+                <p className="truncate text-sm font-medium">{task.className || "All students"}</p>
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-purple-500" />
-              <div>
+            <div className="flex min-w-0 items-center gap-2">
+              <Calendar className="size-4 shrink-0 text-muted-foreground" />
+              <div className="min-w-0">
                 <p className="text-xs text-muted-foreground">Due Date</p>
                 <p className="text-sm font-medium">
                   {formatDate(task.dueDate)}
@@ -315,9 +331,9 @@ export function TasksAndQuizzesManagement({
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              <Target className="w-4 h-4 text-green-500" />
-              <div>
+            <div className="flex min-w-0 items-center gap-2">
+              <Target className="size-4 shrink-0 text-muted-foreground" />
+              <div className="min-w-0">
                 <p className="text-xs text-muted-foreground">Points</p>
                 <p className="text-sm font-medium">
                   {task.totalPoints || task.maxPoints}
@@ -326,9 +342,9 @@ export function TasksAndQuizzesManagement({
             </div>
 
             {isQuiz && (
-              <div className="flex items-center gap-2">
-                <Clock className="w-4 h-4 text-orange-500" />
-                <div>
+              <div className="flex min-w-0 items-center gap-2">
+                <Clock className="size-4 shrink-0 text-muted-foreground" />
+                <div className="min-w-0">
                   <p className="text-xs text-muted-foreground">Duration</p>
                   <p className="text-sm font-medium">{task.duration} min</p>
                 </div>
@@ -336,8 +352,8 @@ export function TasksAndQuizzesManagement({
             )}
 
             {!isQuiz && (
-              <div className="flex items-center gap-2">
-                <FileText className="w-4 h-4 text-indigo-500" />
+              <div className="flex min-w-0 items-center gap-2">
+                <FileText className="size-4 shrink-0 text-muted-foreground" />
                 <div>
                   <p className="text-xs text-muted-foreground">Subject</p>
                   <p className="text-sm font-medium">{task.subject}</p>
@@ -347,495 +363,217 @@ export function TasksAndQuizzesManagement({
           </div>
 
           {/* Statistics - REMOVED Progress Bar and Completion Text */}
-          <div className="space-y-3">
-            {isQuiz && (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Questions</span>
-                  <span className="font-medium">
-                    {task.questions?.length || 0}
-                  </span>
-                </div>
-              </div>
+          <div className="flex items-center justify-between gap-3">
+            {isQuiz ? (
+              <span className="text-xs text-muted-foreground">{task.questions?.length || 0} questions</span>
+            ) : (
+              <span />
             )}
-          </div>
-
-          {/* Action Stats */}
-          <div className="pt-3 border-t">
-            <Button
-              onClick={() => fetchStudentsList(task.id, "attempted")}
-              className="w-full flex items-center justify-center gap-2 bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200 transition-colors py-6"
-            >
-              <Users className="w-5 h-5" />
-              <div className="text-left">
-                <p className="text-sm font-semibold">Manage Students</p>
-                <p className="text-xs text-blue-500">
-                  {stats.totalStudents} Students Assigned
-                </p>
-              </div>
-            </Button>
           </div>
         </CardContent>
       </Card>
     );
   };
 
-  const fetchStudentsList = async (taskId: any, listType: any) => {
-    setLoadingStudents(true);
-    setSelectedTaskForStudents(taskId);
-    setStudentListType("attempted");
-
-    try {
-      const response = await fetch(
-        `/api/teacher/task-students`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            taskId,
-            listType: "assigned",
-          }),
-        },
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        setStudentsList(data.students || []);
-
-        // Fetch existing grades for these students
-        const gradesResponse = await fetch(
-          `/api/teacher/task-grades/${taskId}`,
-          {
-            headers: {
-              Authorization: `Bearer ${accessToken}`,
-            },
-          },
-        );
-
-        if (gradesResponse.ok) {
-          const gradesData = await gradesResponse.json();
-          setStudentGrades(gradesData.grades || {});
-        }
-      } else {
-        console.error("Failed to fetch students list");
-        toast.error("Failed to fetch students list");
-      }
-    } catch (error) {
-      console.error("Error fetching students list:", error);
-      toast.error("Error fetching students list");
-    }
-
-    setLoadingStudents(false);
-    setIsStudentDialogOpen(true);
-  };
-
-  const handleGradeChange = async (studentEmail, grade) => {
-    // 1. Get previous state for rollback
-    const previousGrade = studentGrades[studentEmail];
-    // Check if this is a NEW grade (was previously empty/null)
-    const isNewGrade = !previousGrade || previousGrade === "none";
-
-    console.log(`Grading ${studentEmail}:`, { previousGrade, isNewGrade });
-
-    try {
-      // 2. OPTIMISTIC UPDATE: Update the Grade UI immediately
-      setStudentGrades((prev) => ({
-        ...prev,
-        [studentEmail]: grade,
-      }));
-
-      // 3. OPTIMISTIC UPDATE: Increase Progress Bar immediately
-      // We do this manually so we don't have to wait for the slow server
-      if (isNewGrade) {
-        setTaskStats((prevStats) => {
-          const currentStats = prevStats[selectedTaskForStudents] || {
-            totalStudents: 0,
-            completed: 0,
-          };
-
-          const newCompletedCount = (currentStats.completed || 0) + 1;
-          const total = currentStats.totalStudents || 1;
-          const newCompletionRate = Math.round(
-            (newCompletedCount / total) * 100,
-          );
-
-          return {
-            ...prevStats,
-            [selectedTaskForStudents]: {
-              ...currentStats,
-              completed: newCompletedCount,
-              completionRate: newCompletionRate,
-            },
-          };
-        });
-      }
-
-      // 4. API Call to save to database
-      const response = await fetch(
-        `/api/teacher/task-grade`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            taskId: selectedTaskForStudents,
-            studentEmail,
-            grade,
-          }),
-        },
-      );
-
-      if (!response.ok) {
-        throw new Error("Failed to save");
-      }
-
-      toast.success(`Grade ${grade} saved!`);
-
-      // ❌ REMOVED: calculateTaskStats();
-      // We removed this line because fetching too fast causes the "Snap Back" issue.
-    } catch (error) {
-      console.error("Error saving grade:", error);
-      toast.error("Failed to save grade");
-
-      // 5. ROLLBACK: If API fails, undo the changes
-      setStudentGrades((prev) => ({
-        ...prev,
-        [studentEmail]: previousGrade,
-      }));
-
-      if (isNewGrade) {
-        setTaskStats((prevStats) => {
-          const currentStats = prevStats[selectedTaskForStudents];
-          const oldCompleted = Math.max(0, (currentStats.completed || 0) - 1);
-          const total = currentStats.totalStudents || 1;
-          const oldRate = Math.round((oldCompleted / total) * 100);
-
-          return {
-            ...prevStats,
-            [selectedTaskForStudents]: {
-              ...currentStats,
-              completed: oldCompleted,
-              completionRate: oldRate,
-            },
-          };
-        });
-      }
-    }
-  };
-
-  const getGradeColor = (grade: any) => {
-    const gradeObj = letterGrades.find((g) => g.value === grade);
-    return gradeObj
-      ? gradeObj.color
-      : "bg-gray-100 text-gray-700 border-gray-200";
-  };
-
   return (
-    <div className="p-6">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold mb-2 bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
-          Tasks & Quizzes Management
-        </h1>
-        <p className="text-muted-foreground">
-          View and manage all your assigned tasks and quizzes
-        </p>
+    <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 p-4 sm:p-6">
+      <div className="mb-6 flex flex-wrap items-center justify-end gap-2">
+        <Button variant="outline" onClick={() => openCreationDialog("task")}>
+          <Plus data-icon="inline-start" />
+          Create task
+        </Button>
+        <Button onClick={() => openCreationDialog("quiz")}>
+          <Plus data-icon="inline-start" />
+          Create quiz
+        </Button>
       </div>
 
-      {/* Summary Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <Card className="border-0 shadow-lg bg-gradient-to-br from-blue-50 to-white">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground mb-1">
-                  Total Tasks
-                </p>
-                <p className="text-3xl font-bold text-blue-600">
-                  {regularTasks.length}
-                </p>
-              </div>
-              <div className="p-3 bg-blue-100 rounded-full">
-                <FileText className="w-6 h-6 text-blue-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-0 shadow-lg bg-gradient-to-br from-purple-50 to-white">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground mb-1">
-                  Total Quizzes
-                </p>
-                <p className="text-3xl font-bold text-purple-600">
-                  {quizzes.length}
-                </p>
-              </div>
-              <div className="p-3 bg-purple-100 rounded-full">
-                <Brain className="w-6 h-6 text-purple-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-0 shadow-lg bg-gradient-to-br from-green-50 to-white">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground mb-1">Active</p>
-                <p className="text-3xl font-bold text-green-600">
-                  {allTasks.filter((t) => t.status === "active").length}
-                </p>
-              </div>
-              <div className="p-3 bg-green-100 rounded-full">
-                <CheckCircle2 className="w-6 h-6 text-green-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-0 shadow-lg bg-gradient-to-br from-orange-50 to-white">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground mb-1">Overdue</p>
-                <p className="text-3xl font-bold text-orange-600">
-                  {
-                    allTasks.filter(
-                      (t) => isOverdue(t.dueDate) && t.status === "active",
-                    ).length
-                  }
-                </p>
-              </div>
-              <div className="p-3 bg-orange-100 rounded-full">
-                <AlertCircle className="w-6 h-6 text-orange-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <KpiCard label="Tasks" value={regularTasks.length} icon={<FileText aria-hidden="true" />} />
+        <KpiCard label="Quizzes" value={quizzes.length} icon={<Brain aria-hidden="true" />} />
+        <KpiCard
+          label="Active"
+          value={allTasks.filter(task => task.status === "active").length}
+          icon={<CheckCircle2 aria-hidden="true" />}
+        />
+        <KpiCard
+          label="Overdue"
+          value={allTasks.filter(task => task.status === "active" && isOverdue(task.dueDate)).length}
+          icon={<AlertCircle aria-hidden="true" />}
+        />
       </div>
 
-      {/* Tabs for Tasks and Quizzes */}
       <Tabs defaultValue="all" className="w-full">
-        <TabsList className="grid w-full max-w-lg grid-cols-3 mb-6">
-          <TabsTrigger value="all">All ({allTasks.length})</TabsTrigger>
-          <TabsTrigger value="tasks">Tasks ({regularTasks.length})</TabsTrigger>
-          <TabsTrigger value="quizzes">Quizzes ({quizzes.length})</TabsTrigger>
-        </TabsList>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <TabsList className="grid w-full grid-cols-3 sm:w-[min(100%,28rem)]">
+            <TabsTrigger value="all">All</TabsTrigger>
+            <TabsTrigger value="tasks">Tasks</TabsTrigger>
+            <TabsTrigger value="quizzes">Quizzes</TabsTrigger>
+          </TabsList>
+          <div className="grid gap-2 sm:flex sm:flex-wrap sm:justify-end">
+            <div className="relative sm:w-56">
+              <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                aria-label="Search tasks and quizzes"
+                placeholder="Search tasks and quizzes"
+                value={searchTerm}
+                onChange={event => setSearchTerm(event.target.value)}
+                className="pl-9"
+              />
+            </div>
+            <Select value={classFilter} onValueChange={value => setClassFilter(value ?? "all")}>
+              <SelectTrigger aria-label="Filter by class" className="w-full sm:w-48">
+                <SelectValue placeholder="All classes" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All classes</SelectItem>
+                {classes.map(classItem => (
+                  <SelectItem key={classItem.id} value={String(classItem.id)}>
+                    {classItem.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={statusFilter} onValueChange={value => setStatusFilter(value ?? "all")}>
+              <SelectTrigger aria-label="Filter by status" className="w-full sm:w-36">
+                <SelectValue placeholder="Any status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Any status</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="inactive">Inactive</SelectItem>
+                <SelectItem value="overdue">Overdue</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
 
-        <TabsContent value="all" className="space-y-6">
-          {allTasks.length === 0 ? (
-            <Card className="border-0 shadow-lg">
-              <CardContent className="p-12 text-center">
-                <div className="p-4 bg-gradient-to-br from-gray-100 to-gray-200 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-                  <ListTodo className="w-8 h-8 text-gray-400" />
+        <TabsContent value="all" className="mt-4">
+          {filteredTasks.length === 0 ? (
+            <Card>
+              <CardContent className="p-8 text-center">
+                <div className="mx-auto mb-4 flex size-16 items-center justify-center rounded-full bg-muted">
+                  <ListTodo className="size-8 text-muted-foreground" />
                 </div>
-                <h3 className="text-lg font-medium mb-2">
-                  No Tasks or Quizzes Yet
+                <h3 className="mb-2 text-lg font-medium">
+                  {allTasks.length ? "No matching tasks or quizzes" : "No Tasks or Quizzes Yet"}
                 </h3>
                 <p className="text-muted-foreground">
-                  You haven't created any tasks or quizzes. Start by creating
-                  one!
+                  {allTasks.length
+                    ? "Try adjusting your search or filters."
+                    : "Use Create task or Create quiz above to add the first item."}
                 </p>
               </CardContent>
             </Card>
           ) : (
-            allTasks.map((task) => renderTaskCard(task))
+            <div className="grid gap-3 2xl:grid-cols-2">
+              {filteredTasks.map((task) => renderTaskCard(task))}
+            </div>
           )}
         </TabsContent>
 
-        <TabsContent value="tasks" className="space-y-6">
-          {regularTasks.length === 0 ? (
-            <Card className="border-0 shadow-lg">
-              <CardContent className="p-12 text-center">
-                <div className="p-4 bg-gradient-to-br from-gray-100 to-gray-200 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-                  <FileText className="w-8 h-8 text-gray-400" />
+        <TabsContent value="tasks" className="mt-4">
+          {filteredRegularTasks.length === 0 ? (
+            <Card>
+              <CardContent className="p-8 text-center">
+                <div className="mx-auto mb-4 flex size-16 items-center justify-center rounded-full bg-muted">
+                  <FileText className="size-8 text-muted-foreground" />
                 </div>
-                <h3 className="text-lg font-medium mb-2">No Tasks Created</h3>
+                <h3 className="mb-2 text-lg font-medium">
+                  {regularTasks.length ? "No matching tasks" : "No Tasks Created"}
+                </h3>
                 <p className="text-muted-foreground">
-                  Create your first task from a class view.
+                  {regularTasks.length ? "Try adjusting your search or filters." : "Create a task with the button above."}
                 </p>
               </CardContent>
             </Card>
           ) : (
-            regularTasks.map((task) => renderTaskCard(task))
+            <div className="grid gap-3 2xl:grid-cols-2">
+              {filteredRegularTasks.map((task) => renderTaskCard(task))}
+            </div>
           )}
         </TabsContent>
 
-        <TabsContent value="quizzes" className="space-y-6">
-          {quizzes.length === 0 ? (
-            <Card className="border-0 shadow-lg">
-              <CardContent className="p-12 text-center">
-                <div className="p-4 bg-gradient-to-br from-gray-100 to-gray-200 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-                  <Brain className="w-8 h-8 text-gray-400" />
+        <TabsContent value="quizzes" className="mt-4">
+          {filteredQuizzes.length === 0 ? (
+            <Card>
+              <CardContent className="p-8 text-center">
+                <div className="mx-auto mb-4 flex size-16 items-center justify-center rounded-full bg-muted">
+                  <Brain className="size-8 text-muted-foreground" />
                 </div>
-                <h3 className="text-lg font-medium mb-2">No Quizzes Created</h3>
+                <h3 className="mb-2 text-lg font-medium">
+                  {quizzes.length ? "No matching quizzes" : "No Quizzes Created"}
+                </h3>
                 <p className="text-muted-foreground">
-                  Create your first quiz from a class view.
+                  {quizzes.length ? "Try adjusting your search or filters." : "Create a quiz with the button above."}
                 </p>
               </CardContent>
             </Card>
           ) : (
-            quizzes.map((task) => renderTaskCard(task))
+            <div className="grid gap-3 2xl:grid-cols-2">
+              {filteredQuizzes.map((task) => renderTaskCard(task))}
+            </div>
           )}
         </TabsContent>
       </Tabs>
 
-      {/* Student Management Dialog */}
-      <Dialog open={isStudentDialogOpen} onOpenChange={setIsStudentDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col p-0 border-0 shadow-2xl">
-          <DialogHeader className="p-6 bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-t-lg">
-            <div className="flex items-center justify-between">
-              <div>
-                <DialogTitle className="text-2xl font-bold text-white flex items-center gap-2">
-                  <Users className="w-6 h-6" />
-                  Student Submissions
-                </DialogTitle>
-                <DialogDescription className="text-blue-100 mt-1">
-                  Manage and grade student submissions for this task
-                </DialogDescription>
-              </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setIsStudentDialogOpen(false)}
-                className="text-white hover:bg-white/20 border-0"
-              >
-                <X className="w-5 h-5" />
-              </Button>
-            </div>
+      <Dialog
+        open={creationType !== null}
+        onOpenChange={open => { if (!open) closeCreationDialog(); }}
+      >
+        <DialogContent className={selectedCreationClass
+          ? "flex h-[calc(100vh-1rem)] max-h-[calc(100vh-1rem)] w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] flex-col gap-0 overflow-hidden p-0 sm:h-[calc(100vh-2rem)] sm:max-h-[calc(100vh-2rem)] sm:w-[calc(100vw-2rem)] sm:max-w-[calc(100vw-2rem)]"
+          : "flex w-[calc(100%-2rem)] max-w-lg flex-col gap-0 overflow-hidden p-0"}>
+          <DialogHeader className="shrink-0 border-b px-5 py-5 pr-14 sm:px-7 sm:py-6 lg:px-8">
+            <DialogTitle>Create {creationType === "quiz" ? "quiz" : "task"}</DialogTitle>
+            <DialogDescription>
+              Choose the class for this {creationType || "task"}, then fill in its details.
+            </DialogDescription>
           </DialogHeader>
-
-          <div className="flex-1 overflow-y-auto p-6 bg-gray-50">
-            {loadingStudents ? (
-              <div className="flex flex-col items-center justify-center py-12 space-y-4">
-                <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                <p className="text-muted-foreground animate-pulse">
-                  Loading student data...
-                </p>
+          <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-7 sm:py-6 lg:px-8 lg:py-8">
+            <div className="flex flex-col gap-6">
+              <div className="flex flex-col gap-2 sm:max-w-xl">
+                <Label htmlFor="creation-class">Class</Label>
+                <Select value={creationClassId} onValueChange={value => setCreationClassId(value ?? "")}>
+                  <SelectTrigger id="creation-class" className="w-full">
+                    <SelectValue placeholder="Select a class" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {classes.map(classItem => (
+                      <SelectItem key={classItem.id} value={String(classItem.id)}>
+                        {classItem.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-            ) : studentsList.length === 0 ? (
-              <div className="text-center py-12 bg-white rounded-xl border-2 border-dashed border-gray-200">
-                <Users className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900">
-                  No Students Found
-                </h3>
-                <p className="text-muted-foreground">
-                  No students are currently associated with this task.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {studentsList.map((student) => {
-                  const currentGrade =
-                    studentGrades[student.email] || student.grade;
-                  const isCompleted = !!currentGrade;
-
-                  return (
-                    <div
-                      key={student.email}
-                      className={`flex items-center justify-between p-4 rounded-xl border transition-all duration-200 shadow-sm ${
-                        isCompleted
-                          ? "bg-green-50 border-green-100 hover:shadow-md"
-                          : "bg-white border-gray-100 hover:border-blue-200 hover:shadow-md"
-                      }`}
-                    >
-                      <div className="flex items-center gap-4">
-                        <div
-                          className={`p-3 rounded-full ${isCompleted ? "bg-green-100" : "bg-blue-100"}`}
-                        >
-                          <Users
-                            className={`w-5 h-5 ${isCompleted ? "text-green-600" : "text-blue-600"}`}
-                          />
-                        </div>
-                        <div>
-                          <p className="font-semibold text-gray-900">
-                            {student.name || "Unknown Student"}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            {student.email}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-4">
-                        <Badge
-                          variant="secondary"
-                          className={`px-3 py-1 ${
-                            isCompleted
-                              ? "bg-green-200 text-green-800 border-green-300"
-                              : "bg-gray-100 text-gray-600 border-gray-200"
-                          }`}
-                        >
-                          {isCompleted ? (
-                            <span className="flex items-center gap-1">
-                              <CheckCircle2 className="w-3 h-3" />
-                              Completed
-                            </span>
-                          ) : (
-                            <span className="flex items-center gap-1">
-                              <Clock className="w-3 h-3" />
-                              Pending
-                            </span>
-                          )}
-                        </Badge>
-
-                        <div className="w-32">
-                          <Select
-                            value={currentGrade || "none"}
-                            onValueChange={(val) =>
-                              handleGradeChange(student.email, val)
-                            }
-                          >
-                            <SelectTrigger
-                              className={`h-9 border-2 transition-colors ${
-                                isCompleted
-                                  ? "border-green-300 bg-white text-green-800"
-                                  : "border-gray-200 bg-white"
-                              }`}
-                            >
-                              <SelectValue placeholder="Grade" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="none" disabled>
-                                Select Grade
-                              </SelectItem>
-                              {letterGrades.map((g) => (
-                                <SelectItem key={g.value} value={g.value}>
-                                  <div className="flex items-center gap-2">
-                                    <span
-                                      className={`w-2 h-2 rounded-full ${g.color.split(" ")[0]}`}
-                                    />
-                                    {g.label}
-                                  </div>
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-          <div className="p-4 border-t bg-gray-50 flex justify-end">
-            <Button
-              variant="outline"
-              onClick={() => setIsStudentDialogOpen(false)}
-            >
-              Close
-            </Button>
+              {selectedCreationClass && creationType === "task" && (
+                <AddTask
+                  key={`${creationType}-${selectedCreationClass.id}`}
+                  classData={selectedCreationClass}
+                  students={students}
+                  accessToken={accessToken}
+                  embedded
+                  onBack={closeCreationDialog}
+                  onAddTask={onCreateTask}
+                />
+              )}
+              {selectedCreationClass && creationType === "quiz" && (
+                <AddQuiz
+                  key={`${creationType}-${selectedCreationClass.id}`}
+                  classData={selectedCreationClass}
+                  students={students}
+                  accessToken={accessToken}
+                  embedded
+                  onBack={closeCreationDialog}
+                  onAddQuiz={onCreateTask}
+                />
+              )}
+            </div>
           </div>
         </DialogContent>
       </Dialog>
+
     </div>
   );
 }

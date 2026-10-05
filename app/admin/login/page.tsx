@@ -1,5 +1,5 @@
-import App from '@/components/App';
+import { AdminAuthPage } from "@/components/AdminAuthPage";
 
 export default function AdminLoginPage() {
-  return <App />;
+  return <AdminAuthPage mode="login" />;
 }

@@ -11,7 +11,7 @@ import { reactivateIfNeeded } from './services/account';
 import { DASHBOARD_LOGOUT_EVENT } from '../lib/dashboard-events';
 
 interface StudentAppProps {
-  onBackToLanding: () => void;
+  onBackToLanding?: () => void;
 }
 
 export function StudentApp({ onBackToLanding }: StudentAppProps) {
@@ -189,7 +189,11 @@ export function StudentApp({ onBackToLanding }: StudentAppProps) {
   };
 
   const handleSwitchToAdmin = () => {
-    onBackToLanding();
+    if (onBackToLanding) {
+      onBackToLanding();
+    } else {
+      router.push('/');
+    }
   };
 
   if (isLoading) {
