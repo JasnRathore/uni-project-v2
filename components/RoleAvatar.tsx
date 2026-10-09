@@ -64,7 +64,7 @@ export function RoleAvatar({
   const rawIdentity = String(identifier || name || "user").trim();
   const identity = rawIdentity.includes("@") ? rawIdentity.toLowerCase() : rawIdentity;
   const avatar = useMemo(() => {
-    const seedHash = hashSeed(`${role}:${identity}`);
+    const seedHash = hashSeed(identity);
     const styleIndex = seedHash % (role === "professor" ? professorStyles.length : studentStyles.length);
     const style = role === "professor"
       ? professorStyles[styleIndex]

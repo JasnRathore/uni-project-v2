@@ -1,7 +1,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-const SCHEMA_VERSION = '1';
+const SCHEMA_VERSION = '2';
 
 const getSchemaPath = () => {
   const candidates = [
@@ -61,6 +61,16 @@ const ensureDatabaseSchema = async db => {
           `ALTER TABLE ${quoteIdentifier(table.name)} ADD COLUMN ${quoteIdentifier(column.name)} ${getAlterColumnDefinition(column.definition)}`,
         );
       }
+
+      // Backfill the normalized membership table from the legacy one-class-per-
+      // teacher roster. This is deliberately idempotent for existing local DBs.
+      await db.execute(`
+        INSERT OR IGNORE INTO class_memberships
+          (teacher_id, student_id, class_id, status, assigned_at, created_at, updated_at, source_json)
+        SELECT teacher_id, student_id, class_id, status, assigned_at, created_at, updated_at, source_json
+        FROM teacher_students
+        WHERE class_id IS NOT NULL
+      `);
     }
   }
 

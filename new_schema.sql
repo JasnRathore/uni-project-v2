@@ -83,6 +83,25 @@ CREATE INDEX IF NOT EXISTS idx_teacher_students_student
 CREATE INDEX IF NOT EXISTS idx_teacher_students_class
     ON teacher_students(class_id);
 
+-- A student may belong to multiple classes for the same teacher. Keep the
+-- legacy teacher_students row as the teacher-level roster/compatibility view.
+CREATE TABLE IF NOT EXISTS class_memberships (
+    teacher_id      TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    student_id      TEXT NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+    class_id        TEXT NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
+    status          TEXT,
+    assigned_at     TEXT,
+    created_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    source_json     TEXT NOT NULL DEFAULT '{}',
+    PRIMARY KEY (teacher_id, student_id, class_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_class_memberships_student
+    ON class_memberships(student_id);
+CREATE INDEX IF NOT EXISTS idx_class_memberships_class
+    ON class_memberships(class_id);
+
 CREATE TABLE IF NOT EXISTS tasks (
     id              TEXT PRIMARY KEY,
     teacher_id      TEXT REFERENCES users(id) ON DELETE SET NULL,

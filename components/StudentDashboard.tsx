@@ -101,11 +101,15 @@ export function StudentDashboard({
         setGrades(data.grades || []);
         setTasks(data.tasks || []);
         setAdminMessage(data.adminMessage || null);
-        calculateStats(
-          data.grades || [],
-          data.tasks || [],
-          data.streakData || { currentStreak: 0, longestStreak: 0 },
-        );
+        if (data.stats) {
+          setStats(data.stats);
+        } else {
+          calculateStats(
+            data.grades || [],
+            data.tasks || [],
+            data.streakData || { currentStreak: 0, longestStreak: 0 },
+          );
+        }
       }
     } catch (error) {
       console.error("Error loading student data:", error);

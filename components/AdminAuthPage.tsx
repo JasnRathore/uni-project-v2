@@ -24,7 +24,7 @@ export function AdminAuthPage({ mode }: AdminAuthPageProps) {
           ? "Connection error. Please check your internet connection and try again."
           : error.message;
       toast.error(message);
-      throw error;
+      return;
     }
 
     if (!data.session) return;

@@ -129,16 +129,31 @@ const readPortalData = async key => {
         ts.status AS membership_status, ts.assigned_at, ts.source_json AS membership_json
         FROM teacher_students ts JOIN students s ON s.id = ts.student_id
         WHERE ts.teacher_id = ? ORDER BY ts.rowid`, [suffix]);
-      return rows.map(row => {
+      return Promise.all(rows.map(async row => {
         const membership = parseJson(row.membership_json) || {};
+        const memberships = await readRows(`SELECT cm.class_id, c.name AS class_name,
+            cm.status, cm.assigned_at, cm.source_json
+          FROM class_memberships cm
+          JOIN classes c ON c.id = cm.class_id AND c.teacher_id = cm.teacher_id
+          WHERE cm.teacher_id = ? AND cm.student_id = ?
+          ORDER BY cm.created_at, cm.class_id`, [suffix, row.id]);
+        const classIds = memberships.map(item => item.class_id);
+        const classMemberships = memberships.map(item => ({
+          ...parseJson(item.source_json),
+          classId: item.class_id, className: item.class_name,
+          status: item.status || 'active', addedAt: item.assigned_at,
+        }));
         return { ...studentToLegacy(row), ...membership, id: membership.id || row.id,
           email: row.email, name: membership.name || row.name,
-          classId: row.membership_class_id || membership.classId || null,
-          className: membership.className || null,
+          // classId/className remain for older clients; classIds is authoritative.
+          classId: classIds[0] || row.membership_class_id || membership.classId || null,
+          className: classMemberships[0]?.className || membership.className || null,
+          classIds,
+          classMemberships,
           status: row.membership_status || membership.status || 'active',
           addedAt: row.assigned_at || membership.addedAt,
         };
-      });
+      }));
     case 'tasks':
       return (await readRows('SELECT * FROM tasks WHERE teacher_id = ? ORDER BY rowid', [suffix])).map(taskToLegacy);
     case 'student_tasks':
@@ -158,6 +173,12 @@ const readPortalData = async key => {
       const student = await findStudent(getDatabaseClient(), suffix);
       if (!student) return null;
       const profile = parseJson(student.profile_json) || {};
+      const memberships = await readRows(`SELECT cm.teacher_id, cm.class_id, c.name AS class_name,
+          cm.status, cm.assigned_at
+        FROM class_memberships cm
+        JOIN classes c ON c.id = cm.class_id AND c.teacher_id = cm.teacher_id
+        WHERE cm.student_id = ?
+        ORDER BY cm.updated_at DESC, cm.teacher_id, cm.class_id`, [student.id]);
       return {
         ...profile, id: student.id, email: student.email, name: student.name,
         username: student.username || profile.username || '',
@@ -165,6 +186,13 @@ const readPortalData = async key => {
         batch: student.batch || profile.batch || '',
         currentLevel: student.current_level, totalPoints: student.total_points,
         gameProgress: student.game_progress,
+        classIds: memberships.map(row => row.class_id),
+        classMemberships: memberships.map(row => ({
+          teacherId: row.teacher_id, classId: row.class_id, className: row.class_name,
+          status: row.status || 'active', addedAt: row.assigned_at,
+        })),
+        classId: memberships[0]?.class_id || profile.classId || null,
+        className: memberships[0]?.class_name || profile.className || null,
       };
     }
     case 'student': {
@@ -270,17 +298,39 @@ const writeRoster = async (tx, teacherId, records) => {
     const email = String(item.email).trim();
     const student = await ensureStudent(tx, email, item);
     emails.add(email.toLowerCase());
-    const requestedClassId = asText(item.classId);
-    const classExists = requestedClassId
-      ? (await run(tx, 'SELECT id FROM classes WHERE id=? AND teacher_id=?', [requestedClassId, teacherId])).rows.length > 0
-      : false;
+    const requestedMemberships = Array.isArray(item.classMemberships)
+      ? item.classMemberships
+      : (Array.isArray(item.classIds) ? item.classIds.map(classId => ({ classId })) : []);
+    const requestedClassIds = [...new Set([
+      ...requestedMemberships.map(entry => asText(entry?.classId || entry?.id)).filter(Boolean),
+      asText(item.classId),
+    ])];
+    for (const classId of requestedClassIds) {
+      const classExists = await run(tx, 'SELECT id FROM classes WHERE id=? AND teacher_id=?', [classId, teacherId]);
+      if (!classExists.rows.length) throw new Error(`Class ${classId} does not belong to teacher ${teacherId}`);
+    }
+    await run(tx, 'DELETE FROM class_memberships WHERE teacher_id=? AND student_id=?', [teacherId, student.id]);
+    for (const classId of requestedClassIds) {
+      const membership = requestedMemberships.find(entry => asText(entry?.classId || entry?.id) === classId) || {};
+      await run(tx, `INSERT INTO class_memberships
+        (teacher_id, student_id, class_id, status, assigned_at, updated_at, source_json)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(teacher_id, student_id, class_id) DO UPDATE SET
+        status=excluded.status, assigned_at=excluded.assigned_at,
+        updated_at=excluded.updated_at, source_json=excluded.source_json`, [
+        teacherId, student.id, classId, asText(membership.status || item.status),
+        asText(membership.addedAt || membership.assignedAt || item.addedAt || item.assignedAt),
+        new Date().toISOString(), JSON.stringify({ ...item, ...membership, classId }),
+      ]);
+    }
+    const requestedClassId = requestedClassIds[0] || null;
     await run(tx, `INSERT INTO teacher_students
       (teacher_id, student_id, class_id, status, assigned_at, updated_at, source_json)
       VALUES (?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(teacher_id, student_id) DO UPDATE SET
       class_id=excluded.class_id, status=excluded.status, assigned_at=excluded.assigned_at,
       updated_at=excluded.updated_at, source_json=excluded.source_json`, [
-      teacherId, student.id, classExists ? requestedClassId : null, asText(item.status),
+      teacherId, student.id, requestedClassId, asText(item.status),
       asText(item.addedAt || item.assignedAt), asText(item.updatedAt) || new Date().toISOString(), JSON.stringify(item),
     ]);
   }
@@ -289,6 +339,7 @@ const writeRoster = async (tx, teacherId, records) => {
   for (const row of existing.rows) {
     if (!emails.has(String(row.email).toLowerCase())) {
       await run(tx, 'DELETE FROM teacher_students WHERE teacher_id=? AND student_id=?', [teacherId, row.student_id]);
+      await run(tx, 'DELETE FROM class_memberships WHERE teacher_id=? AND student_id=?', [teacherId, row.student_id]);
     }
   }
 };
@@ -341,8 +392,11 @@ const writeStudentTasks = async (tx, email, records) => {
     const teacherId = teacherExists ? requestedTeacherId : null;
     const requestedClassId = asText(item.classId);
     const classExists = requestedClassId
-      ? (await run(tx, 'SELECT id FROM classes WHERE id=?', [requestedClassId])).rows.length > 0
-      : false;
+      ? (await run(tx, 'SELECT id, teacher_id FROM classes WHERE id=?', [requestedClassId])).rows[0]
+      : null;
+    if (requestedClassId && (!classExists || (teacherId && classExists.teacher_id !== teacherId))) {
+      throw new Error(`Class ${requestedClassId} does not belong to teacher ${teacherId || 'the assignment owner'}`);
+    }
     await run(tx, `INSERT INTO tasks
       (id, teacher_id, class_id, title, description, subject, due_at, priority, status,
        max_points, total_points, created_at, updated_at, source_json)
@@ -543,13 +597,18 @@ const writePortalData = (key, value) => {
       case 'daily_quest': {
         if (!value || typeof value !== 'object' || Array.isArray(value) || !value.id) throw new Error('Daily quest requires an id');
         const teacherId = asText(value.teacherId);
+        const classId = asText(value.classId);
+        if (classId) {
+          const ownedClass = await run(tx, 'SELECT id FROM classes WHERE id=? AND teacher_id=?', [classId, teacherId]);
+          if (!ownedClass.rows.length) throw new Error(`Class ${classId} does not belong to teacher ${teacherId}`);
+        }
         await run(tx, `INSERT INTO daily_quests
           (id, teacher_id, class_id, quest_date, title, description, points, source_json)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(id) DO UPDATE SET teacher_id=excluded.teacher_id, class_id=excluded.class_id,
           quest_date=excluded.quest_date, title=excluded.title, description=excluded.description,
           points=excluded.points, source_json=excluded.source_json`, [
-          String(value.id), teacherId, asText(value.classId), asText(value.date),
+          String(value.id), teacherId, classId, asText(value.date),
           asText(value.title), asText(value.description), finiteNumber(value.points), JSON.stringify(value),
         ]);
         return;

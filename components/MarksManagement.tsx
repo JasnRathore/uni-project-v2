@@ -90,12 +90,12 @@ export function MarksManagement({ students, classes, accessToken, projectId }: {
         setIsLoadingGrades(false);
       }
     };
-    if (accessToken && projectId) loadGrades();
+    if (accessToken) loadGrades();
     else setIsLoadingGrades(false);
   }, [accessToken, projectId]);
 
   const syncGradesToBackend = async () => {
-    if (!accessToken || !projectId) return;
+    if (!accessToken) return;
     
     try {
       const response = await fetch(

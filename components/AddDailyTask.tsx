@@ -15,10 +15,6 @@ import {
 } from './ui/select';
 import { ArrowLeft, Sparkles, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import { projectId } from './utils/supabase/info';
-
-const EDGE_URL = `/api`;
-
 interface AddDailyTaskProps {
   selectedClass?: any;
   classes?: any[];
@@ -67,41 +63,28 @@ export function AddDailyTask({ selectedClass, classes = [], students = [], onBac
         type: 'task',
       };
 
-      // Try the newer /teacher/add-task endpoint first, fall back to /teacher/tasks
-      let response = await fetch(`${EDGE_URL}/teacher/add-task`, {
+      const response = await fetch('/api/teacher/tasks', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${accessToken}`,
         },
-        body: JSON.stringify(taskPayload),
+        body: JSON.stringify({
+          id: `task-${Date.now()}`,
+          title: taskPayload.title,
+          description: taskPayload.description,
+          maxPoints: pts,
+          points: pts,
+          dueDate,
+          date: dueDate,
+          classId: activeClass?.id || null,
+          className: activeClass?.name || null,
+          subject: taskPayload.subject,
+          priority,
+          type: 'task',
+          status: 'active',
+        }),
       });
-
-      // If add-task doesn't exist on deployed version, fall back to /teacher/tasks
-      if (response.status === 404) {
-        response = await fetch(`${EDGE_URL}/teacher/tasks`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${accessToken}`,
-          },
-          body: JSON.stringify({
-            id: `task-${Date.now()}`,
-            title: taskPayload.title,
-            description: taskPayload.description,
-            maxPoints: pts,
-            points: pts,
-            dueDate: dueDate,
-            date: dueDate,
-            classId: activeClass?.id || null,
-            className: activeClass?.name || null,
-            subject: taskPayload.subject,
-            priority: priority,
-            type: 'task',
-            status: 'active',
-          }),
-        });
-      }
 
       if (!response.ok) {
         const errBody = await response.json().catch(() => ({}));

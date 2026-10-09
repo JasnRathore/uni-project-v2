@@ -4,11 +4,18 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Progress } from './ui/progress';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from './ui/dialog';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import {
+  Combobox,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+} from './ui/combobox';
 import { Textarea } from './ui/textarea';
 import { toast } from 'sonner';
 import { RoleAvatar } from './RoleAvatar';
@@ -17,19 +24,18 @@ import {
   Users, 
   BookOpen, 
   Award, 
-  TrendingUp, 
   User,
-  Calendar,
   Target,
   BarChart3,
   GraduationCap,
   Plus,
-  FileEdit,
+  UserPlus,
   CheckCircle,
   XCircle,
   Flame,
   CheckCircle2,
-  ListTodo
+  ListTodo,
+  Eye,
 } from 'lucide-react';
 
 // Dental college subjects
@@ -69,16 +75,22 @@ interface ClassViewProps {
   onBack: () => void;
   onAddTask: (task: any) => void;
   onAddQuiz: (quiz: any) => void;
+  onStudentAssigned?: () => void;
+  onViewStudent?: (student: any) => void;
   accessToken: string;
   projectId: string;
 }
 
-export function ClassView({ classData, students, onBack, onAddTask, onAddQuiz, accessToken, projectId }: ClassViewProps) {
+export function ClassView({ classData, students, onBack, onAddTask, onAddQuiz, onStudentAssigned, onViewStudent, accessToken, projectId }: ClassViewProps) {
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
+  const [isAssignDialogOpen, setIsAssignDialogOpen] = useState(false);
+  const [studentToAssign, setStudentToAssign] = useState('');
+  const [isAssigning, setIsAssigning] = useState(false);
   const [isGradeDialogOpen, setIsGradeDialogOpen] = useState(false);
   const [studentAttemptedTasks, setStudentAttemptedTasks] = useState<any[]>([]);
   const [isLoadingTasks, setIsLoadingTasks] = useState(false);
   const [studentsWithData, setStudentsWithData] = useState<any[]>([]);
+  const [studentDataRefreshKey, setStudentDataRefreshKey] = useState(0);
   const [isLoadingStudentData, setIsLoadingStudentData] = useState(false);
   const [newGrade, setNewGrade] = useState({
     subject: '',
@@ -91,7 +103,7 @@ export function ClassView({ classData, students, onBack, onAddTask, onAddQuiz, a
 
   // Sort enrolled students by roll number
   const enrolledStudents = students
-    .filter(student => student.classId === classData.id)
+    .filter(student => student.classId === classData.id || student.classIds?.includes(classData.id))
     .sort((a, b) => {
       // If both have roll numbers, sort numerically
       if (a.rollNumber && b.rollNumber) {
@@ -109,8 +121,7 @@ export function ClassView({ classData, students, onBack, onAddTask, onAddQuiz, a
     const fetchAllStudentData = async () => {
       setIsLoadingStudentData(true);
       
-      if (!accessToken || !projectId) {
-        console.error('Missing accessToken or projectId');
+      if (!accessToken) {
         setStudentsWithData(enrolledStudents);
         setIsLoadingStudentData(false);
         return;
@@ -145,7 +156,10 @@ export function ClassView({ classData, students, onBack, onAddTask, onAddQuiz, a
           const studentsWithEnhancedData = enrolledStudents.map(student => ({
             ...student,
             streakData: studentsData[student.email]?.streakData || { currentStreak: 0, longestStreak: 0, dates: [] },
-            taskData: studentsData[student.email]?.taskData || { completedCount: 0, totalCount: 0 }
+            taskData: studentsData[student.email]?.taskData || { completedCount: 0, totalCount: 0 },
+            averageGrade: Number.isFinite(Number(studentsData[student.email]?.averageGrade))
+              ? Number(studentsData[student.email].averageGrade)
+              : Number(student.averageGrade) || 0,
           }));
 
           setStudentsWithData(studentsWithEnhancedData);
@@ -166,7 +180,7 @@ export function ClassView({ classData, students, onBack, onAddTask, onAddQuiz, a
     } else {
       setStudentsWithData([]);
     }
-  }, [enrolledStudents.length, accessToken, projectId]);
+  }, [enrolledStudents.length, accessToken, studentDataRefreshKey]);
 
   // Use studentsWithData instead of enrolledStudents for display
   const displayStudents = studentsWithData.length > 0 ? studentsWithData : enrolledStudents;
@@ -180,7 +194,6 @@ export function ClassView({ classData, students, onBack, onAddTask, onAddQuiz, a
     console.log('Student:', student.name);
     console.log('Student email:', student.email);
     console.log('AccessToken exists:', !!accessToken);
-    console.log('ProjectId:', projectId);
     
     if (!accessToken) {
       console.error('ERROR: No accessToken provided to ClassView!');
@@ -189,13 +202,6 @@ export function ClassView({ classData, students, onBack, onAddTask, onAddQuiz, a
       return;
     }
 
-    if (!projectId) {
-      console.error('ERROR: No projectId provided to ClassView!');
-      toast.error('Configuration error - please refresh the page');
-      setIsLoadingTasks(false);
-      return;
-    }
-    
     try {
       // Fetch student tasks from backend
       const url = `/api/teacher/student-tasks/${encodeURIComponent(student.email)}`;
@@ -286,18 +292,63 @@ export function ClassView({ classData, students, onBack, onAddTask, onAddQuiz, a
       feedback: ''
     });
     setIsGradeDialogOpen(false);
+    setStudentDataRefreshKey(previous => previous + 1);
     toast.success(`Grade added for ${selectedStudent.name}!`);
   };
 
   const averageProgress = displayStudents.length > 0
-    ? Math.round(displayStudents.reduce((acc, s) => acc + s.gameProgress, 0) / displayStudents.length)
+    ? Math.round(displayStudents.reduce((acc, s) => acc + (Number(s.gameProgress) || 0), 0) / displayStudents.length)
     : 0;
   
   const averageGrade = displayStudents.length > 0
-    ? Math.round(displayStudents.reduce((acc, s) => acc + s.averageGrade, 0) / displayStudents.length)
+    ? Math.round(displayStudents.reduce((acc, s) => acc + (Number(s.averageGrade) || 0), 0) / displayStudents.length)
     : 0;
 
-  const activeStudents = displayStudents.filter(s => s.status === 'active').length;
+  const availableStudents = students.filter(student =>
+    student.email &&
+    !(student.classId === classData.id || student.classIds?.includes(classData.id)),
+  );
+  const studentOptions = availableStudents.map(student => {
+    const id = String(student.id || student.email);
+    return {
+      id,
+      searchValue: [id, student.name, student.email, student.rollNumber]
+        .filter(Boolean)
+        .join(' '),
+      student,
+    };
+  });
+
+  const assignStudent = async () => {
+    const student = studentOptions.find(option => option.id === studentToAssign)?.student;
+    if (!student) return;
+    setIsAssigning(true);
+    try {
+      const response = await fetch('/api/teacher/assign-student', {
+        method: 'POST',
+        headers: {
+          Authorization: ['Bearer', accessToken].join(' '),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          studentId: student.id,
+          studentEmail: student.email,
+          classId: classData.id,
+          className: classData.name,
+        }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || 'Failed to assign student');
+      toast.success(`${student.name || student.email} assigned to ${classData.name}`);
+      setIsAssignDialogOpen(false);
+      setStudentToAssign('');
+      onStudentAssigned?.();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to assign student');
+    } finally {
+      setIsAssigning(false);
+    }
+  };
   
   const getGradeColorByScore = (score: number) => {
     return score < 60 ? 'destructive' : 'secondary';
@@ -316,6 +367,20 @@ export function ClassView({ classData, students, onBack, onAddTask, onAddQuiz, a
     });
   };
 
+  useEffect(() => {
+    const title = `${classData.subject || classData.name} · ${classData.grade}`;
+    const titleTimer = window.setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('dashboard-title-change', { detail: title }));
+    }, 0);
+
+    return () => {
+      window.clearTimeout(titleTimer);
+      window.dispatchEvent(new CustomEvent('dashboard-title-change', {
+        detail: 'Class Details',
+      }));
+    };
+  }, [classData.subject, classData.name, classData.grade]);
+
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
@@ -326,15 +391,88 @@ export function ClassView({ classData, students, onBack, onAddTask, onAddQuiz, a
           <ArrowLeft className="w-4 h-4 mr-2" />
           Back to Classes
         </Button>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap justify-end gap-3">
+          <Dialog open={isAssignDialogOpen} onOpenChange={setIsAssignDialogOpen}>
+            <DialogTrigger render={<Button size="lg" />}>
+              <UserPlus className="w-4 h-4 mr-2" />
+              Assign Student
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Assign student to {classData.name}</DialogTitle>
+                <DialogDescription>
+                  Choose a student to add to this class. Students can belong to multiple classes.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-3">
+                <Combobox
+                  items={studentOptions.map(option => option.searchValue)}
+                  value={studentToAssign || null}
+                  onValueChange={searchValue => {
+                    const option = studentOptions.find(item => item.searchValue === searchValue);
+                    setStudentToAssign(option?.id || '');
+                  }}
+                  itemToStringValue={searchValue => {
+                    const student = studentOptions.find(
+                      item => item.searchValue === searchValue,
+                    )?.student;
+                    return student
+                      ? [student.name || student.email, student.email, student.rollNumber]
+                          .filter(Boolean)
+                          .join(' · ')
+                      : searchValue;
+                  }}
+                >
+                  <ComboboxInput
+                    aria-label="Search students to assign"
+                    placeholder="Search by name, email, or roll number"
+                    className="w-full"
+                  />
+                  <ComboboxContent>
+                    <ComboboxEmpty>No matching students found.</ComboboxEmpty>
+                    <ComboboxList>
+                      {(searchValue) => {
+                        const student = studentOptions.find(
+                          item => item.searchValue === searchValue,
+                        )?.student;
+                        if (!student) return null;
+                        return (
+                          <ComboboxItem key={searchValue} value={searchValue}>
+                            <span className="flex min-w-0 flex-col">
+                              <span className="truncate">{student.name || student.email}</span>
+                              <span className="truncate text-xs text-muted-foreground">
+                                {[student.email, student.rollNumber].filter(Boolean).join(' · ')}
+                              </span>
+                            </span>
+                          </ComboboxItem>
+                        );
+                      }}
+                    </ComboboxList>
+                  </ComboboxContent>
+                </Combobox>
+                {!availableStudents.length && (
+                  <p className="text-sm text-muted-foreground">All available students are already in this class.</p>
+                )}
+                <Button
+                  size="lg"
+                  className="w-full"
+                  onClick={assignStudent}
+                  disabled={!studentToAssign || isAssigning}
+                >
+                  {isAssigning ? 'Assigning...' : 'Assign Student'}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
           <Button
+            size="lg"
             onClick={onAddQuiz}
           >
             <Plus className="w-4 h-4 mr-2" />
             Add Quiz
           </Button>
           <Button
-            size="sm"
+            size="lg"
             onClick={onAddTask}
           >
             <Plus className="w-4 h-4 mr-2" />
@@ -343,443 +481,145 @@ export function ClassView({ classData, students, onBack, onAddTask, onAddQuiz, a
         </div>
       </div>
 
-      {/* Class Header */}
-      <Card className="mb-6">
-        <CardContent className="flex flex-col justify-between gap-6 p-6 md:flex-row md:items-center">
-          <div className="min-w-0">
-            <div className="mb-3 flex items-center gap-3">
-              <div className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-                <BookOpen className="size-5" />
-              </div>
-              <div className="min-w-0">
-                <h2 className="truncate text-xl font-semibold tracking-tight">{classData.name}</h2>
-                <p className="mt-1 text-sm text-muted-foreground">{classData.subject}</p>
-              </div>
+      <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <Card className="py-0">
+          <CardContent className="flex items-center gap-3 p-4">
+            <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+              <Users className="size-4" />
             </div>
-            <Badge variant="secondary">{classData.grade}</Badge>
-            {classData.description && (
-              <p className="mt-3 max-w-3xl text-sm text-muted-foreground">{classData.description}</p>
-            )}
-          </div>
-          <div className="grid shrink-0 grid-cols-2 gap-3">
-            <div className="min-w-32 rounded-lg border bg-muted/50 p-4">
-              <div className="mb-1 flex items-center gap-2 text-sm text-muted-foreground">
-                <Users className="size-4" />
-                <span>Enrolled</span>
-              </div>
-              <p className="text-xl font-semibold tabular-nums">{enrolledStudents.length}/{classData.capacity}</p>
+            <div>
+              <p className="text-xs text-muted-foreground">Enrolled</p>
+              <p className="text-lg font-semibold tabular-nums">
+                {enrolledStudents.length}/{classData.capacity}
+              </p>
             </div>
-            <div className="min-w-32 rounded-lg border bg-muted/50 p-4">
-              <div className="mb-1 flex items-center gap-2 text-sm text-muted-foreground">
-                <TrendingUp className="size-4" />
-                <span>Active</span>
-              </div>
-              <p className="text-xl font-semibold tabular-nums">{activeStudents}</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Statistics Cards - REMOVED Progress Bars */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <Target className="w-4 h-4 text-muted-foreground" />
-              Average Progress
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="mb-2 text-3xl font-semibold tabular-nums text-foreground">{averageProgress}%</div>
           </CardContent>
         </Card>
-
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <Award className="w-4 h-4 text-muted-foreground" />
-              Average Grade
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="mb-2 text-3xl font-semibold tabular-nums text-foreground">{averageGrade}%</div>
+        <Card className="py-0">
+          <CardContent className="flex items-center gap-3 p-4">
+            <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+              <Target className="size-4" />
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Avg. progress</p>
+              <p className="text-lg font-semibold tabular-nums">{averageProgress}%</p>
+            </div>
           </CardContent>
         </Card>
-
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <BarChart3 className="w-4 h-4 text-muted-foreground" />
-              Capacity
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="mb-2 text-3xl font-semibold tabular-nums text-foreground">
-              {Math.round((enrolledStudents.length / classData.capacity) * 100)}%
+        <Card className="py-0">
+          <CardContent className="flex items-center gap-3 p-4">
+            <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+              <Award className="size-4" />
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Avg. grade</p>
+              <p className="text-lg font-semibold tabular-nums">{averageGrade}%</p>
             </div>
           </CardContent>
         </Card>
       </div>
 
       {/* Students List */}
-      <Tabs defaultValue="all" className="w-full">
-        <TabsList className="grid w-full max-w-md grid-cols-3 mb-6">
-          <TabsTrigger value="all">
-            All Students ({enrolledStudents.length})
-          </TabsTrigger>
-          <TabsTrigger value="active">
-            Active ({activeStudents})
-          </TabsTrigger>
-          <TabsTrigger value="inactive">
-            Inactive ({enrolledStudents.length - activeStudents})
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="all" className="space-y-4">
-          {enrolledStudents.length === 0 ? (
-            <Card>
-              <CardContent className="p-12 text-center">
-                <div className="mx-auto mb-4 flex size-16 items-center justify-center rounded-full bg-muted">
-                  <Users className="size-8 text-muted-foreground" />
-                </div>
-                <h3 className="text-lg font-medium mb-2">No Students Enrolled</h3>
-                <p className="text-muted-foreground">
-                  This class doesn't have any students yet. Add students to get started.
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            displayStudents.map((student) => (
-              <Card key={student.id}>
-                <CardContent className="p-6">
-                  <div className="flex flex-col md:flex-row gap-6">
-                    {/* Student Info */}
-                    <div className="flex items-start gap-4 flex-1">
-                      <RoleAvatar
-                        role="student"
-                        identifier={student.id || student.email}
-                        name={student.name || 'Student'}
-                        className="size-16 shadow-lg"
-                        fallbackClassName="text-xl font-semibold"
-                      />
-                      <div className="flex-1">
-                        <h3 className="text-lg font-medium mb-1">{student.name}</h3>
-                        <p className="text-sm text-muted-foreground mb-2">{student.email}</p>
-                        <div className="flex flex-wrap gap-2">
-                          <Badge variant={student.status === 'active' ? 'default' : 'secondary'}>
-                            {student.status === 'active' ? '🟢 Active' : '🔴 Inactive'}
-                          </Badge>
-                          <Badge variant="outline" className="text-xs">
-                            <Calendar className="w-3 h-3 mr-1" />
-                            {student.lastActive}
-                          </Badge>
-                        </div>
-                      </div>
+      <div className="space-y-4">
+        {enrolledStudents.length === 0 ? (
+          <Card>
+            <CardContent className="p-12 text-center">
+              <div className="mx-auto mb-4 flex size-16 items-center justify-center rounded-full bg-muted">
+                <Users className="size-8 text-muted-foreground" />
+              </div>
+              <h3 className="mb-2 text-lg font-medium">No Students Enrolled</h3>
+              <p className="text-muted-foreground">
+                This class doesn't have any students yet. Add students to get started.
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          displayStudents.map(student => (
+            <Card key={student.id} className="py-0">
+              <CardContent className="p-4">
+                <div className="flex flex-col gap-2 md:flex-row">
+                  <div className="flex min-w-0 flex-1 items-center gap-3">
+                    <RoleAvatar
+                      role="student"
+                      identifier={student.id || student.email}
+                      name={student.name || 'Student'}
+                      className="size-12 shrink-0"
+                      fallbackClassName="text-base font-semibold"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <h3 className="truncate text-base font-medium">{student.name}</h3>
+                      <p className="truncate text-sm text-muted-foreground">{student.email}</p>
                     </div>
-
-                    {/* Student Stats */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
-                      <div className="text-center">
-                        <div className="flex items-center justify-center gap-1 mb-1">
-                          <GraduationCap className="w-4 h-4 text-muted-foreground" />
-                          <p className="text-xs text-muted-foreground">Level</p>
-                        </div>
-                        <p className="text-xl font-semibold tabular-nums text-foreground">{student.currentLevel}</p>
-                      </div>
-                      
-                      <div className="text-center">
-                        <div className="flex items-center justify-center gap-1 mb-1">
-                          <Award className="w-4 h-4 text-muted-foreground" />
-                          <p className="text-xs text-muted-foreground">Points</p>
-                        </div>
-                        <p className="text-xl font-semibold tabular-nums text-foreground">{student.totalPoints}</p>
-                      </div>
-                      
-                      <div className="text-center">
-                        <div className="flex items-center justify-center gap-1 mb-1">
-                          <Target className="w-4 h-4 text-muted-foreground" />
-                          <p className="text-xs text-muted-foreground">Progress</p>
-                        </div>
-                        <div className="flex items-center justify-center gap-1">
-                          <p className="text-xl font-semibold tabular-nums text-foreground">{student.gameProgress}%</p>
-                        </div>
-                      </div>
-                      
-                      <div className="text-center">
-                        <div className="flex items-center justify-center gap-1 mb-1">
-                          <BarChart3 className="w-4 h-4 text-muted-foreground" />
-                          <p className="text-xs text-muted-foreground">Grade</p>
-                        </div>
-                        <Badge variant={getGradeColorByScore(student.averageGrade)} className="text-lg">
-                          {student.averageGrade}%
-                        </Badge>
-                      </div>
-                    </div>
+                    {onViewStudent && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="size-10 shrink-0 rounded-full"
+                        aria-label={`View ${student.name || 'student'} profile`}
+                        title="View student profile"
+                        onClick={() => onViewStudent(student)}
+                      >
+                        <Eye aria-hidden="true" className="size-4" />
+                      </Button>
+                    )}
                   </div>
-
-                  {/* Progress Bar */}
-                  <div className="mt-4">
-                    <div className="flex justify-between mb-2">
-                      <span className="text-xs text-muted-foreground">Game Progress</span>
-                      <span className="text-xs font-medium">{student.gameProgress}%</span>
-                    </div>
-                    <div className="h-2 w-full rounded-full bg-muted">
-                      <div 
-                        className="h-full rounded-full bg-primary transition-[width] duration-300"
-                        style={{ width: `${student.gameProgress}%` }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Streak and Task Completion */}
-                  <div className="mt-4 grid grid-cols-2 gap-3 rounded-lg border bg-muted/50 p-3">
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-5 md:min-w-[34rem] md:grid-cols-5 md:gap-2">
                     <div className="text-center">
-                      <div className="flex items-center justify-center gap-1 mb-1">
-                        <Flame className="w-4 h-4 text-muted-foreground" />
-                        <span className="text-xs text-muted-foreground">Current Streak</span>
+                      <div className="mb-1 flex items-center justify-center gap-1">
+                        <GraduationCap className="size-4 text-muted-foreground" />
+                        <p className="text-xs text-muted-foreground">Level</p>
                       </div>
-                      <p className="text-2xl font-semibold tabular-nums text-foreground">
-                        {student.streakData?.currentStreak || 0}
-                      </p>
-                      <p className="text-xs text-muted-foreground">days</p>
+                      <p className="text-lg font-semibold tabular-nums">{student.currentLevel}</p>
                     </div>
                     <div className="text-center">
-                      <div className="flex items-center justify-center gap-1 mb-1">
-                        <CheckCircle2 className="w-4 h-4 text-muted-foreground" />
-                        <span className="text-xs text-muted-foreground">Tasks Completed</span>
+                      <div className="mb-1 flex items-center justify-center gap-1">
+                        <Award className="size-4 text-muted-foreground" />
+                        <p className="text-xs text-muted-foreground">Points</p>
                       </div>
-                      <p className="text-2xl font-semibold tabular-nums text-foreground">
-                        {student.taskData?.completedCount || 0}<span className="text-lg text-muted-foreground">/{student.taskData?.totalCount || 0}</span>
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {student.taskData?.totalCount > 0 
-                          ? `${Math.round((student.taskData.completedCount / student.taskData.totalCount) * 100)}% complete`
-                          : 'No tasks assigned'
-                        }
+                      <p className="text-lg font-semibold tabular-nums">{student.totalPoints}</p>
+                    </div>
+                    <div className="text-center">
+                      <div className="mb-1 flex items-center justify-center gap-1">
+                        <BarChart3 className="size-4 text-muted-foreground" />
+                        <p className="text-xs text-muted-foreground">Grade</p>
+                      </div>
+                      <Badge variant={getGradeColorByScore(student.averageGrade)} className="text-base">
+                        {student.averageGrade}%
+                      </Badge>
+                    </div>
+                    <div className="text-center">
+                      <div className="mb-1 flex items-center justify-center gap-1">
+                        <Flame className="size-4 text-muted-foreground" />
+                        <p className="text-xs text-muted-foreground">Streak</p>
+                      </div>
+                      <p className="text-lg font-semibold tabular-nums">{student.streakData?.currentStreak || 0}</p>
+                    </div>
+                    <div className="text-center">
+                      <div className="mb-1 flex items-center justify-center gap-1">
+                        <CheckCircle2 className="size-4 text-muted-foreground" />
+                        <p className="text-xs text-muted-foreground">Tasks</p>
+                      </div>
+                      <p className="text-lg font-semibold tabular-nums">
+                        {student.taskData?.completedCount || 0}/{student.taskData?.totalCount || 0}
                       </p>
                     </div>
                   </div>
-
-                  {/* Add Grade Button */}
-                  <div className="mt-4 border-t pt-4">
-                    <Button
-                      onClick={() => handleGradeDialogOpen(student)}
-                      variant="outline"
-                      className="w-full"
-                    >
-                      <FileEdit className="w-4 h-4 mr-2" />
-                      Add/Upload Grade
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))
-          )}
-        </TabsContent>
-
-        <TabsContent value="active" className="space-y-4">
-          {enrolledStudents.filter(s => s.status === 'active').length === 0 ? (
-            <Card>
-              <CardContent className="p-12 text-center">
-                <div className="mx-auto mb-4 flex size-16 items-center justify-center rounded-full bg-muted">
-                  <Users className="size-8 text-muted-foreground" />
                 </div>
-                <h3 className="text-lg font-medium mb-2">No Active Students</h3>
-                <p className="text-muted-foreground">
-                  There are no active students in this class.
-                </p>
+                <div className="mt-1">
+                  <span className="mb-1 block text-xs text-muted-foreground">Game Progress</span>
+                  <div className="h-2 w-full rounded-full bg-muted">
+                    <div
+                      className="h-full rounded-full bg-primary transition-[width] duration-300"
+                      style={{ width: `${student.gameProgress}%` }}
+                    />
+                  </div>
+                </div>
               </CardContent>
             </Card>
-          ) : (
-            enrolledStudents.filter(s => s.status === 'active').map((student) => (
-              <Card key={student.id}>
-                <CardContent className="p-6">
-                  <div className="flex flex-col md:flex-row gap-6">
-                    <div className="flex items-start gap-4 flex-1">
-                      <RoleAvatar
-                        role="student"
-                        identifier={student.id || student.email}
-                        name={student.name || 'Student'}
-                        className="size-16 shadow-lg"
-                        fallbackClassName="text-xl font-semibold"
-                      />
-                      <div className="flex-1">
-                        <h3 className="text-lg font-medium mb-1">{student.name}</h3>
-                        <p className="text-sm text-muted-foreground mb-2">{student.email}</p>
-                        <div className="flex flex-wrap gap-2">
-                          <Badge variant="default">🟢 Active</Badge>
-                          <Badge variant="outline" className="text-xs">
-                            <Calendar className="w-3 h-3 mr-1" />
-                            {student.lastActive}
-                          </Badge>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
-                      <div className="text-center">
-                        <div className="flex items-center justify-center gap-1 mb-1">
-                          <GraduationCap className="w-4 h-4 text-muted-foreground" />
-                          <p className="text-xs text-muted-foreground">Level</p>
-                        </div>
-                        <p className="text-xl font-semibold tabular-nums text-foreground">{student.currentLevel}</p>
-                      </div>
-                      <div className="text-center">
-                        <div className="flex items-center justify-center gap-1 mb-1">
-                          <Award className="w-4 h-4 text-muted-foreground" />
-                          <p className="text-xs text-muted-foreground">Points</p>
-                        </div>
-                        <p className="text-xl font-semibold tabular-nums text-foreground">{student.totalPoints}</p>
-                      </div>
-                      <div className="text-center">
-                        <div className="flex items-center justify-center gap-1 mb-1">
-                          <Target className="w-4 h-4 text-muted-foreground" />
-                          <p className="text-xs text-muted-foreground">Progress</p>
-                        </div>
-                        <p className="text-xl font-semibold tabular-nums text-foreground">{student.gameProgress}%</p>
-                      </div>
-                      <div className="text-center">
-                        <div className="flex items-center justify-center gap-1 mb-1">
-                          <BarChart3 className="w-4 h-4 text-muted-foreground" />
-                          <p className="text-xs text-muted-foreground">Grade</p>
-                        </div>
-                        <Badge variant={getGradeColorByScore(student.averageGrade)} className="text-lg">
-                          {student.averageGrade}%
-                        </Badge>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="mt-4">
-                    <div className="flex justify-between mb-2">
-                      <span className="text-xs text-muted-foreground">Game Progress</span>
-                      <span className="text-xs font-medium">{student.gameProgress}%</span>
-                    </div>
-                    <div className="h-2 w-full rounded-full bg-muted">
-                      <div 
-                        className="h-full rounded-full bg-primary transition-[width] duration-300"
-                        style={{ width: `${student.gameProgress}%` }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Add Grade Button */}
-                  <div className="mt-4 border-t pt-4">
-                    <Button
-                      onClick={() => handleGradeDialogOpen(student)}
-                      variant="outline"
-                      className="w-full"
-                    >
-                      <FileEdit className="w-4 h-4 mr-2" />
-                      Add/Upload Grade
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))
-          )}
-        </TabsContent>
-
-        <TabsContent value="inactive" className="space-y-4">
-          {enrolledStudents.filter(s => s.status === 'inactive').length === 0 ? (
-            <Card>
-              <CardContent className="p-12 text-center">
-                <div className="mx-auto mb-4 flex size-16 items-center justify-center rounded-full bg-muted">
-                  <Users className="size-8 text-muted-foreground" />
-                </div>
-                <h3 className="text-lg font-medium mb-2">No Inactive Students</h3>
-                <p className="text-muted-foreground">
-                  All students in this class are currently active!
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            enrolledStudents.filter(s => s.status === 'inactive').map((student) => (
-              <Card key={student.id}>
-                <CardContent className="p-6">
-                  <div className="flex flex-col md:flex-row gap-6">
-                    <div className="flex items-start gap-4 flex-1">
-                      <RoleAvatar
-                        role="student"
-                        identifier={student.id || student.email}
-                        name={student.name || 'Student'}
-                        className="size-16 shadow-lg"
-                        fallbackClassName="text-xl font-semibold"
-                      />
-                      <div className="flex-1">
-                        <h3 className="text-lg font-medium mb-1">{student.name}</h3>
-                        <p className="text-sm text-muted-foreground mb-2">{student.email}</p>
-                        <div className="flex flex-wrap gap-2">
-                          <Badge variant="secondary">🔴 Inactive</Badge>
-                          <Badge variant="outline" className="text-xs">
-                            <Calendar className="w-3 h-3 mr-1" />
-                            {student.lastActive}
-                          </Badge>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
-                      <div className="text-center">
-                        <div className="flex items-center justify-center gap-1 mb-1">
-                          <GraduationCap className="w-4 h-4 text-muted-foreground" />
-                          <p className="text-xs text-muted-foreground">Level</p>
-                        </div>
-                        <p className="text-xl font-semibold tabular-nums text-foreground">{student.currentLevel}</p>
-                      </div>
-                      <div className="text-center">
-                        <div className="flex items-center justify-center gap-1 mb-1">
-                          <Award className="w-4 h-4 text-muted-foreground" />
-                          <p className="text-xs text-muted-foreground">Points</p>
-                        </div>
-                        <p className="text-xl font-semibold tabular-nums text-foreground">{student.totalPoints}</p>
-                      </div>
-                      <div className="text-center">
-                        <div className="flex items-center justify-center gap-1 mb-1">
-                          <Target className="w-4 h-4 text-muted-foreground" />
-                          <p className="text-xs text-muted-foreground">Progress</p>
-                        </div>
-                        <p className="text-xl font-semibold tabular-nums text-foreground">{student.gameProgress}%</p>
-                      </div>
-                      <div className="text-center">
-                        <div className="flex items-center justify-center gap-1 mb-1">
-                          <BarChart3 className="w-4 h-4 text-muted-foreground" />
-                          <p className="text-xs text-muted-foreground">Grade</p>
-                        </div>
-                        <Badge variant={getGradeColorByScore(student.averageGrade)} className="text-lg">
-                          {student.averageGrade}%
-                        </Badge>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="mt-4">
-                    <div className="flex justify-between mb-2">
-                      <span className="text-xs text-muted-foreground">Game Progress</span>
-                      <span className="text-xs font-medium">{student.gameProgress}%</span>
-                    </div>
-                    <div className="h-2 w-full rounded-full bg-muted">
-                      <div 
-                        className="h-full rounded-full bg-primary transition-[width] duration-300"
-                        style={{ width: `${student.gameProgress}%` }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Add Grade Button */}
-                  <div className="mt-4 border-t pt-4">
-                    <Button
-                      onClick={() => handleGradeDialogOpen(student)}
-                      variant="outline"
-                      className="w-full"
-                    >
-                      <FileEdit className="w-4 h-4 mr-2" />
-                      Add/Upload Grade
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))
-          )}
-        </TabsContent>
-      </Tabs>
-
+          ))
+        )}
+      </div>
       {/* Grade Dialog */}
       <Dialog open={isGradeDialogOpen} onOpenChange={handleGradeDialogClose}>
         <DialogContent className="sm:max-w-[500px]">

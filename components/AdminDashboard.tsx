@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
@@ -20,7 +20,6 @@ import { DebugPanel } from './DebugPanel';
 import { AddDailyTask } from './AddDailyTask';
 import { 
   Users, 
-  GraduationCap, 
   BookOpen, 
   School,
 } from 'lucide-react';
@@ -67,6 +66,7 @@ export function AdminDashboard({ currentUser: initialUser, onLogout, accessToken
   const [hasLoadedData, setHasLoadedData] = useState(false);
   const [registeredStudents, setRegisteredStudents] = useState<any[]>([]);
   const [isLoadingRegisteredStudents, setIsLoadingRegisteredStudents] = useState(true);
+  const lastPersistedStudents = useRef('');
 
   // Load data from backend on mount
   useEffect(() => {
@@ -95,7 +95,11 @@ export function AdminDashboard({ currentUser: initialUser, onLogout, accessToken
   // Save students to backend whenever they change
   useEffect(() => {
     if (hasLoadedData) {
-      saveStudents();
+      const serializedStudents = JSON.stringify(students);
+      if (serializedStudents !== lastPersistedStudents.current) {
+        lastPersistedStudents.current = serializedStudents;
+        saveStudents();
+      }
     }
   }, [students, hasLoadedData]);
 
@@ -118,6 +122,7 @@ export function AdminDashboard({ currentUser: initialUser, onLogout, accessToken
       if (response.ok) {
         const data = await response.json();
         setStudents(data.students || []);
+        lastPersistedStudents.current = JSON.stringify(data.students || []);
         setClasses(data.classes || []);
         setTasks(data.tasks || []);
         setHasLoadedData(true);
@@ -180,7 +185,10 @@ export function AdminDashboard({ currentUser: initialUser, onLogout, accessToken
         },
         body: JSON.stringify({ students })
       });
-      if (!response.ok) throw new Error(`Save students failed (${response.status})`);
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Save students failed (${response.status})`);
+      }
     } catch (error) {
       console.error('Error saving students:', error);
       toast.error('Failed to save students');
@@ -634,6 +642,11 @@ export function AdminDashboard({ currentUser: initialUser, onLogout, accessToken
             onBack={() => setActiveView('classes')}
             onAddTask={() => setActiveView('add-task')}
             onAddQuiz={() => setActiveView('add-quiz')}
+            onStudentAssigned={loadTeacherData}
+            onViewStudent={(student) => {
+              setSelectedStudent(student);
+              setActiveView('assign-student', student.email || student.id);
+            }}
             accessToken={accessToken}
             projectId={projectId}
           />
@@ -745,10 +758,9 @@ export function AdminDashboard({ currentUser: initialUser, onLogout, accessToken
               </p>
             </section>
 
-            <section aria-label="Workspace totals" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <section aria-label="Workspace totals" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
               {[
                 { label: 'Students', value: allStudents.length, icon: Users },
-                { label: 'Portal accounts', value: registeredStudents.length, icon: GraduationCap },
                 { label: 'Classes', value: classes.length, icon: School },
                 { label: 'Tasks and quizzes', value: tasks.length, icon: BookOpen },
               ].map(({ label, value, icon: Icon }) => (

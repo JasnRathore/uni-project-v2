@@ -34,12 +34,12 @@ export function Login({ onLogin, onSwitchToSignup, onBack }: LoginProps) {
     try {
       await onLogin(email, password);
     } catch (error: unknown) {
-      console.error('Login error:', error);
-      setIsLoading(false);
       // Show connection test option if there's a network error
       if (error instanceof Error && error.message.includes('fetch')) {
         setShowConnectionTest(true);
       }
+    } finally {
+      setIsLoading(false);
     }
   };
 

@@ -88,11 +88,13 @@ const titles: Record<string, string> = {
 function AccountMenu({
   displayName,
   email,
+  identifier,
   onNavigate,
   onLogout,
 }: {
   displayName: string;
   email: string;
+  identifier: string;
   onNavigate: (path: string) => void;
   onLogout: () => void;
 }) {
@@ -112,7 +114,7 @@ function AccountMenu({
               />
             }
           >
-            <RoleAvatar role="professor" identifier={email} name={displayName} />
+            <RoleAvatar role="professor" identifier={identifier} name={displayName} />
             <span className="grid min-w-0 flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
               <span className="truncate font-medium">{displayName}</span>
               <span className="truncate text-xs text-muted-foreground">{email}</span>
@@ -128,7 +130,7 @@ function AccountMenu({
             <DropdownMenuGroup>
               <DropdownMenuLabel className="p-0 font-normal">
                 <span className="flex items-center gap-3 px-2 py-2">
-                  <RoleAvatar role="professor" identifier={email} name={displayName} />
+                  <RoleAvatar role="professor" identifier={identifier} name={displayName} />
                   <span className="grid min-w-0 text-left text-sm leading-tight">
                     <span className="truncate font-medium text-foreground">{displayName}</span>
                     <span className="truncate text-xs text-muted-foreground">{email}</span>
@@ -191,6 +193,8 @@ export default function AdminDashboardLayout({
   const router = useRouter();
   const [displayName, setDisplayName] = useState('Administrator');
   const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState('');
+  const [pageTitle, setPageTitle] = useState('Overview');
   const activeView = pathname.slice('/admin/dashboard'.length).split('/').filter(Boolean)[0] || 'dashboard';
   const isItemActive = (itemId: string) => activeView === itemId
     || (itemId === 'students' && activeView === 'portal-students')
@@ -204,12 +208,22 @@ export default function AdminDashboardLayout({
         const name = user?.user_metadata?.name || user?.user_metadata?.full_name;
         if (name) setDisplayName(name);
         if (user?.email) setEmail(user.email);
+        if (user?.id) setIdentifier(user.id);
       }
     }).catch(error => {
       console.error('Failed to load admin name:', error);
     });
     return () => { active = false; };
   }, []);
+
+  useEffect(() => {
+    const handleTitleChange = (event: Event) => {
+      const detail = (event as CustomEvent<string>).detail;
+      if (detail) setPageTitle(detail);
+    };
+    window.addEventListener('dashboard-title-change', handleTitleChange);
+    return () => window.removeEventListener('dashboard-title-change', handleTitleChange);
+  }, [activeView]);
 
   const logout = () => {
     window.dispatchEvent(new Event(DASHBOARD_LOGOUT_EVENT));
@@ -245,6 +259,7 @@ export default function AdminDashboardLayout({
               <AccountMenu
                 displayName={displayName}
                 email={email}
+                identifier={identifier || email}
                 onNavigate={path => router.push(path)}
                 onLogout={logout}
               />
@@ -254,7 +269,7 @@ export default function AdminDashboardLayout({
             <header className="sticky top-0 z-10 flex min-h-14 items-center gap-3 border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/80">
               <SidebarTrigger />
               <h1 className="truncate text-sm font-semibold">
-                {titles[activeView] || 'Overview'}
+                {activeView === 'class-view' ? pageTitle : (titles[activeView] || 'Overview')}
               </h1>
             </header>
             <main id="main-content" className="min-h-0 flex-1 overflow-auto">

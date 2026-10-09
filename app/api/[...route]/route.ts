@@ -4,26 +4,10 @@ import studentController from '@/lib/api/controllers/studentController.js';
 import teacherController from '@/lib/api/controllers/teacherController.js';
 import { getUser } from '@/lib/api/middleware/authMiddleware.js';
 import { ensureDatabaseReady, readPortalData } from '@/database/services/dbService';
+import { createRouteRegistry, findRoute } from '@/lib/api/routeRegistry';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-
-type ApiRequest = {
-  body: Record<string, unknown>;
-  params: Record<string, string>;
-  user?: {
-    id: string;
-    email: string;
-    user_metadata?: Record<string, unknown>;
-    app_metadata?: Record<string, unknown>;
-  };
-  headers: Record<string, string>;
-};
-type ApiResponse = {
-  status(code: number): { json(value: unknown): Response | undefined };
-  json(value: unknown): Response | undefined;
-};
-type Handler = (req: ApiRequest, res: ApiResponse) => Promise<unknown>;
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -46,75 +30,19 @@ async function dispatch(request: NextRequest, segments: string[]) {
   const path = `/${segments.join('/')}`;
   if (path === '/health') return response({ status: 'ok' });
 
-  const routes: Array<[string, string, Handler, boolean, boolean]> = [
-    ['POST', '/auth/login', authController.login, false, false],
-    ['POST', '/signup', authController.signup, false, false],
-    ['POST', '/student/signup', authController.studentSignup, false, false],
-    ['POST', '/account/reactivate', authController.reactivateAccount, true, false],
-    ['GET', '/student/profile', studentController.getProfile, true, true],
-    ['GET', '/student/data', studentController.getData, true, true],
-    ['GET', '/student/dashboard', studentController.getDashboard, true, true],
-    ['GET', '/student/leaderboard', studentController.getLeaderboard, true, true],
-    ['GET', '/student/notifications', studentController.getNotifications, true, true],
-    ['POST', '/student/notifications/read', studentController.markNotificationRead, true, true],
-    ['POST', '/student/profile/update', studentController.updateProfile, true, true],
-    ['POST', '/student/quiz/submit', studentController.submitQuiz, true, true],
-    ['GET', '/student/quest', studentController.getQuest, true, true],
-    ['GET', '/quest', studentController.getQuest, true, true],
-    ['GET', '/teacher/profile', teacherController.getProfile, true, false],
-    ['GET', '/teacher/data', teacherController.getData, true, false],
-    ['POST', '/teacher/students', teacherController.saveStudents, true, false],
-    ['POST', '/teacher/classes', teacherController.saveClasses, true, false],
-    ['POST', '/teacher/tasks', teacherController.createTask, true, false],
-    ['POST', '/teacher/add-task', teacherController.addTask, true, false],
-    ['POST', '/teacher/quest', teacherController.addTask, true, false],
-    ['POST', '/teacher/task-students', teacherController.getTaskStudents, true, false],
-    ['POST', '/teacher/grades', teacherController.saveGrades, true, false],
-    ['GET', '/teacher/all-students', teacherController.getAllStudents, true, false],
-    ['GET', '/teacher/task-stats', teacherController.getTaskStats, true, false],
-    ['POST', '/teacher/profile/update', teacherController.updateProfile, true, false],
-    ['POST', '/teacher/account/deactivate', teacherController.deactivateAccount, true, false],
-    ['DELETE', '/teacher/account', teacherController.deleteAccount, true, false],
-    ['POST', '/teacher/assign-student', teacherController.assignStudent, true, false],
-    ['POST', '/teacher/unassign-student', teacherController.unassignStudent, true, false],
-    ['POST', '/teacher/students-batch-data', teacherController.batchStudentData, true, false],
-    ['POST', '/teacher/task-grade', teacherController.saveSingleTaskGrade, true, false],
-  ];
-
   const method = request.method;
-  const params: Record<string, string> = {};
-  let match: [string, string, Handler, boolean, boolean] | [string, string, Handler, boolean, boolean, string] | undefined =
-    routes.find(([routeMethod, routePath]) => routeMethod === method && routePath === path);
-  if (!match) {
-    const patterns: Array<[string, string, Handler, boolean, boolean, string]> = [
-      ['DELETE', '/teacher/classes/:classId', teacherController.deleteClass, true, false, 'classId'],
-      ['PUT', '/teacher/students/:studentId', teacherController.updateManualStudent, true, false, 'studentId'],
-      ['PUT', '/teacher/tasks/:taskId', teacherController.updateTask, true, false, 'taskId'],
-      ['DELETE', '/teacher/tasks/:taskId', teacherController.deleteTask, true, false, 'taskId'],
-      ['GET', '/teacher/task-grades/:taskId', teacherController.getTaskGrades, true, false, 'taskId'],
-      ['GET', '/teacher/student-streak/:email', teacherController.getStudentStreak, true, false, 'email'],
-      ['GET', '/teacher/student-tasks/:email', teacherController.getStudentTasks, true, false, 'email'],
-    ];
-    const pattern = patterns.find(([routeMethod, routePath]) => {
-      const base = routePath.replace(/:[^/]+$/, '');
-      return routeMethod === method && path.startsWith(base);
-    });
-    if (pattern) {
-      const key = pattern[5];
-      params[key] = decodeURIComponent(path.slice(pattern[1].slice(0, pattern[1].indexOf(':')).length));
-      match = pattern;
-    }
-  }
+  const route = findRoute(createRouteRegistry(authController, studentController, teacherController), method, path);
+  const params = route?.params || {};
 
-  if (!match && method === 'GET' && path === '/debug/students') {
+  if (!route && method === 'GET' && path === '/debug/students') {
     const user = await getUser(request.headers.get('authorization'));
     if (!user) return response({ error: 'Unauthorized' }, 401);
     const students = (await readPortalData(`students:${user.id}`)) || [];
     return response({ students, count: Array.isArray(students) ? students.length : 0 });
   }
-  if (!match) return response({ error: 'Not found' }, 404);
+  if (!route) return response({ error: 'Not found' }, 404);
 
-  const [, , handler, protectedRoute, studentOnly] = match;
+  const { handler, protectedRoute, studentOnly } = route.route;
   let user;
   if (protectedRoute) {
     user = await getUser(request.headers.get('authorization'));
@@ -145,7 +73,14 @@ async function dispatch(request: NextRequest, segments: string[]) {
     status(code: number) { return { json(value: unknown) { result = response(value, code); return result; } }; },
     json(value: unknown) { result = response(value); return result; },
   };
-  await handler(req, res);
+  try {
+    await handler(req, res);
+  } catch (error: unknown) {
+    console.error(`API handler failed for ${method} ${path}:`, error);
+    return response({
+      error: error instanceof Error ? error.message : 'Request failed',
+    }, 500);
+  }
   return result || response({ error: 'No response returned' }, 500);
 }
 
