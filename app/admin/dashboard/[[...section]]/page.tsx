@@ -1,13 +1,13 @@
-import { AdminDashboardPage as AdminDashboardPageClient } from "@/components/AdminDashboardPage";
-import { notFound } from 'next/navigation';
+import { redirect } from 'next/navigation';
 
-export default async function AdminDashboardPage({
+export default async function AdminDashboardAlias({
   params,
 }: {
   params: Promise<{ section?: string[] }>;
 }) {
   const { section } = await params;
-  if (section?.[0] === 'add-class') notFound();
-
-  return <AdminDashboardPageClient />;
+  const suffix = section?.length
+    ? `/${section.map(segment => encodeURIComponent(segment)).join('/')}`
+    : '';
+  redirect(`/faculty/dashboard${suffix}`);
 }

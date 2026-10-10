@@ -37,6 +37,14 @@ def text(value):
     return None if value is None else str(value)
 
 
+def student_profile(value):
+    profile = dict(value) if isinstance(value, dict) else {}
+    if profile.get("prn") is None and profile.get("rollNumber") is not None:
+        profile["prn"] = profile["rollNumber"]
+    profile.pop("rollNumber", None)
+    return profile
+
+
 def number(value):
     if value is None or value == "":
         return None
@@ -48,6 +56,10 @@ def number(value):
 
 def truth(value):
     return int(bool(value))
+
+
+def active_status(value):
+    return value if value in ("active", "inactive") else "active"
 
 
 def main():
@@ -137,7 +149,7 @@ def main():
                         db.execute(
                             """INSERT INTO users
                                (id, email, password_hash, name, role, metadata_json, created_at)
-                               VALUES (?, ?, ?, ?, ?, ?, ?)
+                               VALUES (?, ?, ?, ?, ?, ?, COALESCE(?, CURRENT_TIMESTAMP))
                                ON CONFLICT(id) DO NOTHING""",
                             (
                                 raw["id"], raw["email"], password_hash,
@@ -155,30 +167,49 @@ def main():
         }
         student_by_email = {}
         student_id_email = {}
-        used_usernames = set()
 
+        departments_by_name = {
+            row["name"].casefold(): row["id"]
+            for row in db.execute("SELECT id, name FROM departments")
+        }
+        department_ids = {row["id"] for row in db.execute("SELECT id FROM departments")}
         for key, teacher_id, value, _ in records_by_namespace.get("teacher", []):
             if teacher_id not in user_by_id:
                 mark_unresolved("teacher_profiles")
                 continue
             profile = value if isinstance(value, dict) else {}
+            requested_department_id = text(profile.get("departmentId"))
+            department_id = requested_department_id if requested_department_id in department_ids else None
+            if not department_id:
+                department_id = departments_by_name.get(
+                    (text(profile.get("department")) or "").casefold()
+                )
+            if (profile.get("department") or requested_department_id) and not department_id:
+                mark_unresolved("teacher_profiles_department")
+            profile_source = dict(profile)
+            profile_source.pop("department", None)
+            if not department_id:
+                profile_source.pop("departmentId", None)
+            else:
+                profile_source["departmentId"] = department_id
             db.execute(
                 """INSERT INTO teacher_profiles
-                   (user_id, department, specialization, qualification, experience,
+                   (user_id, department_id, specialization, qualification, experience,
                     phone, address, bio, join_date, source_json)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                   ON CONFLICT(user_id) DO UPDATE SET source_json = excluded.source_json""",
+                   ON CONFLICT(user_id) DO UPDATE SET
+                     department_id = excluded.department_id, source_json = excluded.source_json""",
                 (
-                    teacher_id, text(profile.get("department")),
+                    teacher_id, department_id,
                     text(profile.get("specialization")), text(profile.get("qualification")),
                     text(profile.get("experience")), text(profile.get("phone")),
                     text(profile.get("address")), text(profile.get("bio")),
-                    text(profile.get("joinDate")), json_text(profile),
+                    text(profile.get("joinDate")), json_text(profile_source),
                 ),
             )
         counts["teacher_profiles"] = db.execute("SELECT count(*) FROM teacher_profiles").fetchone()[0]
 
-        def ensure_student(email, student_id=None, name="", username=None, profile=None):
+        def ensure_student(email, student_id=None, name="", profile=None):
             email = text(email)
             if not email or not email.strip():
                 return None
@@ -188,19 +219,11 @@ def main():
                 existing_id = student_by_email[normalized]
                 if student_id and student_id not in student_id_email:
                     student_id_email[student_id] = normalized
-                source_profile = profile if isinstance(profile, dict) else {}
-                candidate_username = text(username)
-                if candidate_username and candidate_username.casefold() in used_usernames:
-                    candidate_username = None
-                    mark_unresolved("student_username")
-                if candidate_username:
-                    used_usernames.add(candidate_username.casefold())
+                source_profile = student_profile(profile)
                 db.execute(
                     """UPDATE students SET
                          name = CASE WHEN name = '' THEN ? ELSE name END,
-                         username = COALESCE(username, ?),
-                         roll_number = COALESCE(roll_number, ?),
-                         batch = COALESCE(batch, ?),
+                         prn = COALESCE(prn, ?),
                          current_level = CASE WHEN current_level = 1 THEN ? ELSE current_level END,
                          total_points = CASE WHEN total_points = 0 THEN ? ELSE total_points END,
                          game_progress = CASE WHEN game_progress = 0 THEN ? ELSE game_progress END,
@@ -208,9 +231,8 @@ def main():
                          profile_json = ?
                        WHERE id = ?""",
                     (
-                        text(name) or "", candidate_username,
-                        text(source_profile.get("rollNumber")),
-                        text(source_profile.get("batch")),
+                        text(name) or "",
+                        text(source_profile.get("prn")),
                         int(number(source_profile.get("currentLevel")) or 1),
                         int(number(source_profile.get("totalPoints")) or 0),
                         number(source_profile.get("gameProgress")) or 0,
@@ -227,24 +249,17 @@ def main():
             if not student_id or (student_id in student_id_email and student_id_email[student_id] != normalized):
                 student_id = str(uuid.uuid5(NAMESPACE_ID, "student:" + normalized))
             student_id_email[student_id] = normalized
-            username = text(username)
-            if username and username.casefold() in used_usernames:
-                username = None
-                mark_unresolved("student_username")
-            if username:
-                used_usernames.add(username.casefold())
-            source_profile = profile if isinstance(profile, dict) else {}
+            source_profile = student_profile(profile)
             db.execute(
                 """INSERT INTO students
-                   (id, user_id, email, name, username, roll_number, batch,
+                   (id, user_id, email, name, prn,
                     current_level, total_points, game_progress, last_active_at,
                     registered_at, profile_json)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     student_id, matching_user["id"] if matching_user else None, email,
                     text(name) or (matching_user["name"] if matching_user else "") or "",
-                    username, text(source_profile.get("rollNumber")),
-                    text(source_profile.get("batch")),
+                    text(source_profile.get("prn")),
                     int(number(source_profile.get("currentLevel")) or 1),
                     int(number(source_profile.get("totalPoints")) or 0),
                     number(source_profile.get("gameProgress")) or 0,
@@ -262,8 +277,7 @@ def main():
                 metadata, _ = parse_value(user["metadata_json"])
                 metadata = metadata if isinstance(metadata, dict) else {}
                 ensure_student(
-                    user["email"], user["id"], user["name"],
-                    metadata.get("username"), metadata,
+                    user["email"], user["id"], user["name"], metadata,
                 )
 
         profiles = {}
@@ -289,10 +303,107 @@ def main():
                     student_objects.append((email, student_id, merged))
         for email, student_id, profile in student_objects:
             ensure_student(
-                email, student_id, profile.get("name", ""),
-                profile.get("username"), profile,
+                email, student_id, profile.get("name", ""), profile,
             )
         counts["students"] = db.execute("SELECT count(*) FROM students").fetchone()[0]
+
+        # Catalog rows are imported only when their stable IDs and parent IDs
+        # are present in the snapshot; legacy class labels never create catalog
+        # entries on their own.
+        for namespace in ("degree", "degrees"):
+            for _, _, value, _ in records_by_namespace.get(namespace, []):
+                for item in object_list(value):
+                    degree_id = text(item.get("id"))
+                    name = text(item.get("name"))
+                    if not degree_id or not name:
+                        mark_unresolved("degrees")
+                        continue
+                    db.execute(
+                        """INSERT INTO degrees (id, name, status)
+                           VALUES (?, ?, ?)
+                           ON CONFLICT(id) DO NOTHING""",
+                        (degree_id, name, active_status(item.get("status"))),
+                    )
+        counts["degrees"] = db.execute("SELECT count(*) FROM degrees").fetchone()[0]
+
+        for namespace in ("program_year", "program_years"):
+            for _, _, value, _ in records_by_namespace.get(namespace, []):
+                for item in object_list(value):
+                    program_year_id = text(item.get("id"))
+                    degree_id = text(item.get("degreeId") or item.get("degree_id"))
+                    label = text(item.get("label"))
+                    degree = db.execute("SELECT id FROM degrees WHERE id = ?", (degree_id,)).fetchone()
+                    if not program_year_id or not label or not degree:
+                        mark_unresolved("program_years")
+                        continue
+                    db.execute(
+                        """INSERT INTO program_years (id, degree_id, label, status)
+                           VALUES (?, ?, ?, ?)
+                           ON CONFLICT(id) DO NOTHING""",
+                        (program_year_id, degree_id, label, active_status(item.get("status"))),
+                    )
+        counts["program_years"] = db.execute("SELECT count(*) FROM program_years").fetchone()[0]
+
+        for namespace in ("subject", "subjects"):
+            for _, _, value, _ in records_by_namespace.get(namespace, []):
+                for item in object_list(value):
+                    subject_id = text(item.get("id"))
+                    degree_id = text(item.get("degreeId") or item.get("degree_id"))
+                    program_year_id = text(item.get("programYearId") or item.get("program_year_id"))
+                    name = text(item.get("name"))
+                    program_year = db.execute(
+                        "SELECT id, degree_id FROM program_years WHERE id = ?",
+                        (program_year_id,),
+                    ).fetchone()
+                    if (
+                        not subject_id or not name or not degree_id
+                        or not program_year or program_year["degree_id"] != degree_id
+                    ):
+                        mark_unresolved("subjects")
+                        continue
+                    db.execute(
+                        """INSERT INTO subjects (id, degree_id, program_year_id, name)
+                           VALUES (?, ?, ?, ?)
+                           ON CONFLICT(id) DO NOTHING""",
+                        (subject_id, degree_id, program_year_id, name),
+                    )
+        counts["subjects"] = db.execute("SELECT count(*) FROM subjects").fetchone()[0]
+
+        def resolve_subject(item):
+            subject_id = text(item.get("subjectId") or item.get("subject_id"))
+            if subject_id:
+                row = db.execute("SELECT id FROM subjects WHERE id = ?", (subject_id,)).fetchone()
+                return row["id"] if row else None
+
+            subject_name = text(item.get("subject"))
+            if not subject_name:
+                return None
+            degree_id = text(item.get("degreeId") or item.get("degree_id"))
+            degree_name = text(item.get("degreeName") or item.get("degree_name") or item.get("degree"))
+            program_year_id = text(item.get("programYearId") or item.get("program_year_id"))
+            program_year_label = text(
+                item.get("programYearLabel") or item.get("program_year_label")
+                or item.get("grade")
+            )
+            query = """SELECT s.id FROM subjects s
+                       JOIN degrees d ON d.id = s.degree_id
+                       JOIN program_years p ON p.id = s.program_year_id
+                       WHERE s.name = ? COLLATE NOCASE"""
+            params = [subject_name]
+            if degree_id:
+                query += " AND s.degree_id = ?"
+                params.append(degree_id)
+            elif degree_name:
+                query += " AND d.name = ? COLLATE NOCASE"
+                params.append(degree_name)
+            if program_year_id:
+                query += " AND s.program_year_id = ?"
+                params.append(program_year_id)
+            elif program_year_label:
+                query += " AND p.label = ? COLLATE NOCASE"
+                params.append(program_year_label)
+            rows = db.execute(query, params).fetchall()
+            return rows[0]["id"] if len(rows) == 1 else None
 
         class_ids = set()
         for key, teacher_id, value, _ in records_by_namespace.get("classes", []):
@@ -305,14 +416,18 @@ def main():
                 if not class_id:
                     mark_unresolved("classes")
                     continue
+                subject_id = resolve_subject(item)
+                if not subject_id:
+                    mark_unresolved("classes_subject")
+                    continue
                 db.execute(
                     """INSERT INTO classes
-                       (id, teacher_id, name, subject, description, grade, capacity, created_at, source_json)
+                       (id, teacher_id, name, subject_id, description, grade, capacity, created_at, source_json)
                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                        ON CONFLICT(id) DO NOTHING""",
                     (
                         class_id, teacher_id, text(item.get("name")) or "Imported class",
-                        text(item.get("subject")), text(item.get("description")),
+                        subject_id, text(item.get("description")),
                         text(item.get("grade")), number(item.get("capacity")),
                         text(item.get("createdAt")), json_text(item),
                     ),
@@ -373,12 +488,15 @@ def main():
                 continue
             class_id = text(item.get("classId"))
             if class_id not in class_ids:
-                class_id = None
+                mark_unresolved("tasks_class")
+                continue
+            source = dict(item)
+            source.pop("subject", None)
             db.execute(
                 """INSERT INTO tasks
-                   (id, teacher_id, class_id, title, description, subject, due_at,
+                   (id, teacher_id, class_id, title, description, due_at,
                     priority, status, max_points, total_points, created_at, updated_at, source_json)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                    ON CONFLICT(id) DO UPDATE SET
                      teacher_id = COALESCE(tasks.teacher_id, excluded.teacher_id),
                      class_id = COALESCE(tasks.class_id, excluded.class_id),
@@ -386,11 +504,11 @@ def main():
                                         THEN tasks.source_json ELSE excluded.source_json END""",
                 (
                     task_id, teacher_id, class_id, text(item.get("title")) or "Imported task",
-                    text(item.get("description")), text(item.get("subject")),
+                    text(item.get("description")),
                     text(item.get("dueDate")), text(item.get("priority")),
                     text(item.get("status")), number(item.get("maxPoints")),
                     number(item.get("totalPoints")), text(item.get("createdAt")),
-                    text(item.get("updatedAt")), json_text(item),
+                    text(item.get("updatedAt")), json_text(source),
                 ),
             )
             task_ids.add(task_id)
@@ -444,6 +562,10 @@ def main():
                 for email, grade_value in value.items():
                     grade_rows.append(({"taskId": task_id, "grade": grade_value, "score": grade_value}, email, None))
 
+        task_class_ids = {
+            row["id"]: row["class_id"]
+            for row in db.execute("SELECT id, class_id FROM tasks")
+        }
         for item, email, graded_by in grade_rows:
             student_id = student_by_email.get(email.casefold()) if email else None
             if not student_id:
@@ -451,50 +573,67 @@ def main():
             if not student_id:
                 mark_unresolved("grades_student")
                 continue
-            task_id = text(item.get("taskId") or item.get("task_id"))
-            if task_id not in task_ids:
-                task_id = None
+            supplied_task_id = text(item.get("taskId") or item.get("task_id"))
+            task_id = supplied_task_id if supplied_task_id in task_ids else None
+            if supplied_task_id and not task_id:
                 mark_unresolved("grades_task")
+            class_id = text(item.get("classId") or item.get("class_id"))
+            if task_id:
+                task_class_id = task_class_ids[task_id]
+                if class_id and class_id not in class_ids:
+                    mark_unresolved("grades_class")
+                    continue
+                if class_id and class_id != task_class_id:
+                    mark_unresolved("grades_class_task_mismatch")
+                    continue
+                if not class_id:
+                    class_id = task_class_id
+            if class_id not in class_ids:
+                mark_unresolved("grades_class")
+                continue
             if graded_by not in user_by_id:
                 graded_by = None
-            grade_key = f"{student_id}:{task_id or json_text(item)}"
+            grade_key = f"{student_id}:{class_id}:{task_id or json_text(item)}"
             grade_id = text(item.get("id")) or str(uuid.uuid5(NAMESPACE_ID, "grade:" + grade_key))
-            existing_grade = db.execute(
-                """SELECT id FROM grades
-                   WHERE student_id = ? AND task_id IS ?""",
-                (student_id, task_id),
-            ).fetchone() if task_id else db.execute(
-                "SELECT id FROM grades WHERE id = ?", (grade_id,)
-            ).fetchone()
+            existing_grade = (
+                db.execute(
+                    "SELECT id FROM grades WHERE student_id = ? AND task_id = ?",
+                    (student_id, task_id),
+                ).fetchone() if task_id else
+                db.execute("SELECT id FROM grades WHERE id = ?", (grade_id,)).fetchone()
+            )
+            grade_source = dict(item)
+            grade_source.pop("studentEmail", None)
+            grade_source.pop("student_email", None)
+            grade_source.pop("subject", None)
             grade_values = (
-                email, graded_by, text(item.get("subject")),
-                text(item.get("assignment")),
+                graded_by, text(item.get("assignment")),
                 text(item.get("grade")) if isinstance(item.get("grade"), str) else None,
                 number(item.get("score", item.get("grade"))),
                 number(item.get("maxScore", item.get("maxPoints"))),
                 text(item.get("gradedAt") or item.get("date")),
                 json_text(item.get("answers")) if item.get("answers") is not None else None,
-                json_text(item),
+                json_text(grade_source),
             )
             if existing_grade:
                 db.execute(
                     """UPDATE grades SET
-                         student_email = ?, graded_by = COALESCE(?, graded_by),
-                         subject = COALESCE(?, subject), assignment = COALESCE(?, assignment),
-                         grade = COALESCE(?, grade), score = COALESCE(?, score),
+                         class_id = ?, task_id = ?, graded_by = COALESCE(?, graded_by),
+                         assignment = COALESCE(?, assignment), grade = COALESCE(?, grade),
+                         score = COALESCE(?, score),
                          max_score = COALESCE(?, max_score), graded_at = COALESCE(?, graded_at),
                          answers_json = COALESCE(?, answers_json), source_json = ?
                        WHERE id = ?""",
-                    (*grade_values, existing_grade["id"]),
+                    (class_id, task_id, *grade_values, existing_grade["id"]),
                 )
             else:
                 db.execute(
                     """INSERT INTO grades
-                       (id, student_id, student_email, task_id, graded_by, subject,
-                        assignment, grade, score, max_score, graded_at, answers_json, source_json)
-                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                       (id, student_id, class_id, task_id, graded_by, assignment,
+                        grade, score, max_score, graded_at, answers_json, source_json)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                     (
-                        grade_id, student_id, email, task_id, *grade_values[1:],
+                        grade_id, student_id, class_id, task_id, *grade_values,
                     ),
                 )
         counts["grades"] = db.execute("SELECT count(*) FROM grades").fetchone()[0]
@@ -616,7 +755,8 @@ def main():
                 "teacher", "student", "student_profile", "students", "teacher_students",
                 "classes", "tasks", "student_tasks", "dental_college_grades",
                 "student_grades", "task_grades", "notifications", "student_activity",
-                "student_streak", "daily_quest", "daily_quest_seen",
+                "student_streak", "daily_quest", "daily_quest_seen", "degree", "degrees",
+                "program_year", "program_years", "subject", "subjects",
             }:
                 entity_type = namespace
             else:
@@ -628,7 +768,8 @@ def main():
             "users", "teacher_profiles", "students", "classes", "teacher_students",
             "tasks", "task_assignments", "grades", "notifications",
             "student_activity", "student_activity_days", "daily_quests",
-            "daily_quest_views", "usernames", "legacy_record_map",
+            "daily_quest_views", "usernames", "legacy_record_map", "degrees",
+            "program_years", "subjects",
         ):
             counts[table] = db.execute(f"SELECT count(*) FROM {table}").fetchone()[0]
 

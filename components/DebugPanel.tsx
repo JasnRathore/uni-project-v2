@@ -182,7 +182,7 @@ export function DebugPanel({ accessToken }) {
 
           {loading && (
             <div className="flex items-center justify-center py-8">
-              <RefreshCw className="w-8 h-8 animate-spin text-blue-600" />
+              <RefreshCw className="size-8 animate-spin text-primary" />
             </div>
           )}
         </CardContent>

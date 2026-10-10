@@ -99,7 +99,7 @@ export function ConnectionTest() {
           >
             {testing ? (
               <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                <Loader2 className="w-4 h-4 mr-2 animate-spin text-primary-foreground" />
                 Testing Connection...
               </>
             ) : (

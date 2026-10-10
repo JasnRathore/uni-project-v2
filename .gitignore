@@ -43,3 +43,10 @@ next-env.d.ts
 
 # docs
 /plans
+discussion.md
+overhaul.md
+/docs
+
+*/__pycache__
+local.db
+kv_store_2fad19e1_rows.csv

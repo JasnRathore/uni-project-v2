@@ -1,5 +1,6 @@
-const { createHash } = require('node:crypto');
+const { createHash, randomUUID } = require('node:crypto');
 const { getDatabaseClient } = require('./dbService');
+const { normalizeLifecycleState } = require('../../lib/api/services/studentState');
 
 const parseJson = value => {
   if (typeof value !== 'string') return value;
@@ -11,6 +12,9 @@ const parseJson = value => {
 };
 
 const sourceOf = row => parseJson(row.source_json) || {};
+const withoutDepartment = value => Object.fromEntries(
+  Object.entries(value || {}).filter(([key]) => key !== 'department'),
+);
 const finiteNumber = value => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
@@ -29,6 +33,19 @@ const stableStudentId = email => {
 const parseArray = value => {
   if (!Array.isArray(value)) throw new TypeError('Expected an array value');
   return value;
+};
+const deprecatedStudentProfileFields = new Set([
+  'username', 'rollNumber', 'roll_number', 'batch', 'admissionYear',
+  'academicYear', 'degreeId', 'department', 'semester', 'specialization', 'qualification',
+  'studentStatus', 'lifecycleChangedAt',
+]);
+const cleanStudentProfile = profile => {
+  const cleanProfile = Object.fromEntries(
+    Object.entries(profile).filter(([key]) => !deprecatedStudentProfileFields.has(key)),
+  );
+  const prn = profile.prn ?? profile.rollNumber ?? profile.roll_number;
+  if (prn != null) cleanProfile.prn = prn;
+  return cleanProfile;
 };
 
 const readRows = async (sql, args = []) => {
@@ -68,30 +85,38 @@ const ensureStudent = async (executor, email, record = {}) => {
   const existing = await findStudent(executor, normalizedEmail);
   const id = existing?.id || record.id || user?.id || stableStudentId(normalizedEmail);
   const source = { ...record, email: normalizedEmail };
-  const username = asText(record.username) || null;
   const name = asText(record.name) || existing?.name || user?.name || normalizedEmail.split('@')[0];
-  const profile = { ...parseJson(existing?.profile_json), ...source };
+  const profile = cleanStudentProfile({ ...parseJson(existing?.profile_json), ...source });
+  const lifecycleState = record.lifecycleState == null
+    ? (existing ? normalizeLifecycleState(existing.lifecycle_state) : 'active')
+    : normalizeLifecycleState(record.lifecycleState);
   if (existing) {
     await run(executor, `UPDATE students SET
-      user_id = COALESCE(user_id, ?), name = ?, username = COALESCE(?, username),
-      roll_number = COALESCE(?, roll_number), batch = COALESCE(?, batch),
-      current_level = ?, total_points = ?, game_progress = ?, last_active_at = COALESCE(?, last_active_at),
+      user_id = COALESCE(user_id, ?), name = ?,
+      prn = COALESCE(?, prn),
+      current_level = ?,
+      cohort_id = COALESCE(?, cohort_id),
+      lifecycle_state = ?,
+      total_points = ?, game_progress = ?, last_active_at = COALESCE(?, last_active_at),
       registered_at = COALESCE(?, registered_at), profile_json = ?, updated_at = CURRENT_TIMESTAMP
       WHERE id = ?`, [
-      user?.id || null, name, username, asText(record.rollNumber), asText(record.batch),
+      user?.id || null, name, asText(record.prn ?? record.rollNumber),
       Math.trunc(finiteNumber(record.currentLevel) ?? finiteNumber(existing.current_level) ?? 1),
+      asText(record.cohortId), lifecycleState,
       Math.trunc(finiteNumber(record.totalPoints) ?? finiteNumber(existing.total_points) ?? 0),
       finiteNumber(record.gameProgress) ?? finiteNumber(existing.game_progress) ?? 0,
       asText(record.lastActive), asText(record.registeredAt), JSON.stringify(profile), id,
     ]);
   } else {
     await run(executor, `INSERT INTO students
-      (id, user_id, email, name, username, roll_number, batch, current_level,
+      (id, user_id, email, name, prn, current_level,
+       lifecycle_state, cohort_id,
        total_points, game_progress, last_active_at, registered_at, profile_json)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
-      id, user?.id || null, normalizedEmail, name, username,
-      asText(record.rollNumber), asText(record.batch),
+      id, user?.id || null, normalizedEmail, name,
+      asText(record.prn ?? record.rollNumber),
       Math.trunc(finiteNumber(record.currentLevel) ?? 1),
+      lifecycleState, asText(record.cohortId),
       Math.trunc(finiteNumber(record.totalPoints) ?? 0),
       finiteNumber(record.gameProgress) ?? 0,
       asText(record.lastActive), asText(record.registeredAt), JSON.stringify(profile),
@@ -100,21 +125,55 @@ const ensureStudent = async (executor, email, record = {}) => {
   return (await findStudent(executor, normalizedEmail));
 };
 
-const classToLegacy = row => ({ ...sourceOf(row), id: row.id, name: row.name, subject: row.subject, description: row.description, grade: row.grade, capacity: row.capacity, createdAt: row.created_at });
+const classToLegacy = row => ({
+  ...sourceOf(row),
+  id: row.id,
+  name: row.name,
+  subjectId: row.subject_id,
+  subject: row.subject_name || '',
+  degreeId: row.degree_id,
+  degreeName: row.degree_name,
+  programYearId: row.program_year_id,
+  programYearLabel: row.program_year_label,
+  description: row.description,
+  grade: row.program_year_label || row.grade,
+  capacity: row.capacity,
+  classStatus: row.class_status || 'active',
+  startsAt: row.starts_at,
+  endsAt: row.ends_at,
+  createdAt: row.created_at,
+});
 const taskToLegacy = row => ({
   ...sourceOf(row), id: row.id, title: row.title, description: row.description,
-  subject: row.subject, dueDate: row.due_at, classId: row.class_id,
+  subject: row.subject_name || '', subjectId: row.subject_id,
+  className: row.class_name, dueDate: row.due_at, classId: row.class_id,
   priority: row.priority, status: row.status, maxPoints: row.max_points,
   totalPoints: row.total_points, createdAt: row.created_at, updatedAt: row.updated_at,
   teacherId: row.teacher_id,
 });
-const studentToLegacy = row => ({ ...sourceOf(row), id: row.id, email: row.email, name: row.name, username: row.username || '', rollNumber: row.roll_number || '', batch: row.batch || '', currentLevel: row.current_level, totalPoints: row.total_points, gameProgress: row.game_progress, lastActive: row.last_active_at, registeredAt: row.registered_at });
+const studentToLegacy = row => ({
+  ...cleanStudentProfile(parseJson(row.profile_json) || {}),
+  id: row.id, email: row.email, name: row.name, prn: row.prn || '',
+  currentLevel: row.current_level, cohortId: row.cohort_id,
+  lifecycleState: normalizeLifecycleState(row.lifecycle_state),
+  totalPoints: row.total_points, gameProgress: row.game_progress,
+  lastActive: row.last_active_at, registeredAt: row.registered_at,
+});
 const assignmentToLegacy = row => ({
   ...sourceOf(row), id: row.task_id, taskId: row.task_id, teacherId: row.assigned_by,
   dueDate: row.due_at, status: row.status, completed: Boolean(row.completed),
   score: row.score, grade: row.grade,
 });
-const gradeToLegacy = row => ({ ...sourceOf(row), id: row.id, studentId: row.student_id, studentEmail: row.student_email, taskId: row.task_id, task_id: row.task_id, teacherId: row.graded_by, subject: row.subject, assignment: row.assignment, grade: row.grade ?? row.score, score: row.score, maxScore: row.max_score, gradedAt: row.graded_at });
+const gradeToLegacy = row => {
+  const { studentEmail: _studentEmail, subject: _subject, ...source } = sourceOf(row);
+  return {
+    ...source, id: row.id, studentId: row.student_id, taskId: row.task_id,
+    task_id: row.task_id, classId: row.class_id, className: row.class_name,
+    teacherId: row.graded_by, subject: row.subject_name || '',
+    assignment: row.assignment, grade: row.grade ?? row.score, score: row.score,
+    maxScore: row.max_score, gradedAt: row.graded_at,
+  };
+};
 const notificationToLegacy = row => ({ ...sourceOf(row), id: row.id, type: row.type, title: row.title, message: row.message, taskId: row.task_id, read: Boolean(row.is_read), createdAt: row.created_at });
 
 const readPortalData = async key => {
@@ -122,15 +181,20 @@ const readPortalData = async key => {
   let rows;
   switch (namespace) {
     case 'classes':
-      return (await readRows('SELECT * FROM classes WHERE teacher_id = ? ORDER BY rowid', [suffix])).map(classToLegacy);
+      return (await readRows(`SELECT c.*, s.name AS subject_name, s.degree_id,
+          s.program_year_id, d.name AS degree_name, p.label AS program_year_label
+        FROM classes c JOIN subjects s ON s.id = c.subject_id
+        JOIN degrees d ON d.id = s.degree_id
+        JOIN program_years p ON p.id = s.program_year_id
+        WHERE c.teacher_id = ? ORDER BY c.rowid`, [suffix])).map(classToLegacy);
     case 'students':
     case 'teacher_students':
       rows = await readRows(`SELECT s.*, ts.class_id AS membership_class_id,
         ts.status AS membership_status, ts.assigned_at, ts.source_json AS membership_json
         FROM teacher_students ts JOIN students s ON s.id = ts.student_id
-        WHERE ts.teacher_id = ? ORDER BY ts.rowid`, [suffix]);
+        WHERE ts.teacher_id = ? AND s.lifecycle_state = 'active' ORDER BY ts.rowid`, [suffix]);
       return Promise.all(rows.map(async row => {
-        const membership = parseJson(row.membership_json) || {};
+        const membership = cleanStudentProfile(parseJson(row.membership_json) || {});
         const memberships = await readRows(`SELECT cm.class_id, c.name AS class_name,
             cm.status, cm.assigned_at, cm.source_json
           FROM class_memberships cm
@@ -145,6 +209,7 @@ const readPortalData = async key => {
         }));
         return { ...studentToLegacy(row), ...membership, id: membership.id || row.id,
           email: row.email, name: membership.name || row.name,
+          lifecycleState: normalizeLifecycleState(row.lifecycle_state),
           // classId/className remain for older clients; classIds is authoritative.
           classId: classIds[0] || row.membership_class_id || membership.classId || null,
           className: classMemberships[0]?.className || membership.className || null,
@@ -155,24 +220,34 @@ const readPortalData = async key => {
         };
       }));
     case 'tasks':
-      return (await readRows('SELECT * FROM tasks WHERE teacher_id = ? ORDER BY rowid', [suffix])).map(taskToLegacy);
+      return (await readRows(`SELECT t.*, c.name AS class_name, c.subject_id,
+          sub.name AS subject_name
+        FROM tasks t JOIN classes c ON c.id = t.class_id
+        JOIN subjects sub ON sub.id = c.subject_id
+        WHERE t.teacher_id = ? ORDER BY t.rowid`, [suffix])).map(taskToLegacy);
     case 'student_tasks':
-      rows = await readRows(`SELECT ta.*, t.source_json AS task_json, t.title, t.description, t.subject,
-        t.class_id, t.priority, t.max_points, t.total_points, t.created_at AS task_created_at,
+      rows = await readRows(`SELECT ta.*, t.source_json AS task_json, t.title, t.description,
+        t.class_id, c.name AS class_name, c.subject_id, sub.name AS subject_name,
+        t.priority, t.max_points, t.total_points, t.created_at AS task_created_at,
         t.teacher_id
         FROM students s JOIN task_assignments ta ON ta.student_id = s.id
-        JOIN tasks t ON t.id = ta.task_id WHERE s.email = ? COLLATE NOCASE ORDER BY ta.rowid`, [suffix]);
+        JOIN tasks t ON t.id = ta.task_id
+        JOIN classes c ON c.id = t.class_id
+        JOIN subjects sub ON sub.id = c.subject_id
+        WHERE s.email = ? COLLATE NOCASE AND s.lifecycle_state = 'active'
+        ORDER BY ta.rowid`, [suffix]);
       return rows.map(row => ({
         ...parseJson(row.task_json), ...assignmentToLegacy(row), id: row.task_id,
-        title: row.title, description: row.description, subject: row.subject,
-        classId: row.class_id, priority: row.priority, maxPoints: row.max_points,
+        title: row.title, description: row.description, subject: row.subject_name,
+        subjectId: row.subject_id, classId: row.class_id, className: row.class_name,
+        priority: row.priority, maxPoints: row.max_points,
         totalPoints: row.total_points, createdAt: row.task_created_at,
         teacherId: row.assigned_by || row.teacher_id,
       }));
     case 'student_profile': {
       const student = await findStudent(getDatabaseClient(), suffix);
       if (!student) return null;
-      const profile = parseJson(student.profile_json) || {};
+      const profile = cleanStudentProfile(parseJson(student.profile_json) || {});
       const memberships = await readRows(`SELECT cm.teacher_id, cm.class_id, c.name AS class_name,
           cm.status, cm.assigned_at
         FROM class_memberships cm
@@ -181,9 +256,9 @@ const readPortalData = async key => {
         ORDER BY cm.updated_at DESC, cm.teacher_id, cm.class_id`, [student.id]);
       return {
         ...profile, id: student.id, email: student.email, name: student.name,
-        username: student.username || profile.username || '',
-        rollNumber: student.roll_number || profile.rollNumber || '',
-        batch: student.batch || profile.batch || '',
+        lifecycleState: normalizeLifecycleState(student.lifecycle_state),
+        cohortId: student.cohort_id || null,
+        prn: student.prn || profile.prn || '',
         currentLevel: student.current_level, totalPoints: student.total_points,
         gameProgress: student.game_progress,
         classIds: memberships.map(row => row.class_id),
@@ -200,26 +275,41 @@ const readPortalData = async key => {
       return result[0] ? studentToLegacy(result[0]) : null;
     }
     case 'teacher': {
-      const result = await readRows(`SELECT u.id, u.email, u.name, u.role, u.metadata_json, tp.source_json
-        FROM users u LEFT JOIN teacher_profiles tp ON tp.user_id = u.id WHERE u.id = ?`, [suffix]);
+      const result = await readRows(`SELECT u.id, u.email, u.name, u.role, u.metadata_json,
+          tp.source_json, tp.department_id, d.name AS department_name
+        FROM users u LEFT JOIN teacher_profiles tp ON tp.user_id = u.id
+        LEFT JOIN departments d ON d.id = tp.department_id WHERE u.id = ?`, [suffix]);
       if (!result[0]) return null;
       const storedMetadata = parseJson(result[0].metadata_json);
       const userMetadata = storedMetadata?.user_metadata || storedMetadata;
-      return { ...userMetadata, ...parseJson(result[0].source_json),
-        id: result[0].id, email: result[0].email, name: result[0].name, role: result[0].role };
+      const metadata = withoutDepartment(userMetadata);
+      const profile = withoutDepartment(parseJson(result[0].source_json));
+      return {
+        ...metadata, ...profile,
+        departmentId: result[0].department_id || null,
+        department: result[0].department_name || '',
+        id: result[0].id, email: result[0].email, name: result[0].name, role: result[0].role,
+      };
     }
     case 'student_grades': {
-      const result = await readRows('SELECT * FROM grades WHERE student_email = ? COLLATE NOCASE ORDER BY rowid', [suffix]);
+      const result = await readRows(`SELECT g.*, c.name AS class_name, sub.name AS subject_name
+        FROM grades g JOIN students st ON st.id = g.student_id
+        JOIN classes c ON c.id = g.class_id
+        JOIN subjects sub ON sub.id = c.subject_id
+        WHERE st.email = ? COLLATE NOCASE ORDER BY g.rowid`, [suffix]);
       return result.map(gradeToLegacy);
     }
     case 'dental_college_grades': {
-      const result = await readRows('SELECT * FROM grades WHERE graded_by = ? ORDER BY rowid', [suffix]);
+      const result = await readRows(`SELECT g.*, c.name AS class_name, sub.name AS subject_name
+        FROM grades g JOIN classes c ON c.id = g.class_id
+        JOIN subjects sub ON sub.id = c.subject_id
+        WHERE g.graded_by = ? ORDER BY g.rowid`, [suffix]);
       return result.map(gradeToLegacy);
     }
     case 'task_grades': {
-      const result = await readRows(`SELECT g.student_email, g.grade, g.score FROM grades g
+      const result = await readRows(`SELECT g.student_id, g.grade, g.score FROM grades g
         WHERE g.task_id = ? ORDER BY g.rowid`, [suffix]);
-      return Object.fromEntries(result.map(row => [row.student_email, row.grade ?? row.score]));
+      return Object.fromEntries(result.map(row => [row.student_id, row.grade ?? row.score]));
     }
     case 'notifications': {
       const result = await readRows('SELECT * FROM notifications WHERE student_email = ? COLLATE NOCASE ORDER BY rowid', [suffix]);
@@ -269,17 +359,28 @@ const writeClasses = async (tx, teacherId, records) => {
   if (!teacher.rows.length) throw new Error(`Cannot save classes: teacher ${teacherId} does not exist`);
   const ids = new Set();
   for (const item of parseArray(records)) {
-    if (!item?.id || !item.name) throw new Error('Every class requires an id and name');
+    if (!item?.id || !item.name || !item.subjectId) {
+      throw new Error('Every class requires an id, name, and catalog subject');
+    }
     ids.add(String(item.id));
+    const subject = await run(tx, `SELECT s.id FROM subjects s
+      JOIN degrees d ON d.id = s.degree_id
+      JOIN program_years p ON p.id = s.program_year_id AND p.degree_id = s.degree_id
+      WHERE s.id = ? AND d.status = 'active' AND p.status = 'active'`, [String(item.subjectId)]);
+    if (!subject.rows.length) throw new Error(`Active subject ${item.subjectId} was not found`);
+    const { subject: _subject, subjectName: _subjectName, ...classSource } = item;
     await run(tx, `INSERT INTO classes
-      (id, teacher_id, name, subject, description, grade, capacity, created_at, source_json)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(id) DO UPDATE SET name=excluded.name, subject=excluded.subject,
+      (id, teacher_id, name, subject_id, description, grade, capacity, created_at, source_json,
+       class_status, starts_at, ends_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET name=excluded.name, subject_id=excluded.subject_id,
       description=excluded.description, grade=excluded.grade, capacity=excluded.capacity,
+      class_status=excluded.class_status, starts_at=excluded.starts_at, ends_at=excluded.ends_at,
       created_at=excluded.created_at, source_json=excluded.source_json
       WHERE classes.teacher_id = excluded.teacher_id`, [
-      String(item.id), teacherId, String(item.name), asText(item.subject), asText(item.description),
-      asText(item.grade), finiteNumber(item.capacity), asText(item.createdAt), JSON.stringify(item),
+      String(item.id), teacherId, String(item.name), String(item.subjectId), asText(item.description),
+      null, finiteNumber(item.capacity), asText(item.createdAt), JSON.stringify(classSource),
+      asText(item.classStatus) || 'active', asText(item.startsAt), asText(item.endsAt),
     ]);
     const persisted = await run(tx, 'SELECT teacher_id FROM classes WHERE id=?', [String(item.id)]);
     if (persisted.rows[0]?.teacher_id !== teacherId) {
@@ -297,6 +398,9 @@ const writeRoster = async (tx, teacherId, records) => {
     if (!item?.email) throw new Error('Every roster student requires an email address');
     const email = String(item.email).trim();
     const student = await ensureStudent(tx, email, item);
+    if (student.lifecycle_state !== 'active') {
+      throw new Error('Inactive students cannot be added to an active roster');
+    }
     emails.add(email.toLowerCase());
     const requestedMemberships = Array.isArray(item.classMemberships)
       ? item.classMemberships
@@ -306,19 +410,19 @@ const writeRoster = async (tx, teacherId, records) => {
       asText(item.classId),
     ])];
     for (const classId of requestedClassIds) {
-      const classExists = await run(tx, 'SELECT id FROM classes WHERE id=? AND teacher_id=?', [classId, teacherId]);
+      const classExists = await run(tx, "SELECT id FROM classes WHERE id=? AND teacher_id=? AND class_status='active'", [classId, teacherId]);
       if (!classExists.rows.length) throw new Error(`Class ${classId} does not belong to teacher ${teacherId}`);
     }
     await run(tx, 'DELETE FROM class_memberships WHERE teacher_id=? AND student_id=?', [teacherId, student.id]);
     for (const classId of requestedClassIds) {
       const membership = requestedMemberships.find(entry => asText(entry?.classId || entry?.id) === classId) || {};
       await run(tx, `INSERT INTO class_memberships
-        (teacher_id, student_id, class_id, status, assigned_at, updated_at, source_json)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        (teacher_id, student_id, class_id, status, membership_status, created_by, assigned_at, updated_at, source_json)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(teacher_id, student_id, class_id) DO UPDATE SET
-        status=excluded.status, assigned_at=excluded.assigned_at,
+        status=excluded.status, membership_status=excluded.membership_status, assigned_at=excluded.assigned_at,
         updated_at=excluded.updated_at, source_json=excluded.source_json`, [
-        teacherId, student.id, classId, asText(membership.status || item.status),
+        teacherId, student.id, classId, asText(membership.status || item.status) || 'active', asText(membership.status || item.status) || 'active', teacherId,
         asText(membership.addedAt || membership.assignedAt || item.addedAt || item.assignedAt),
         new Date().toISOString(), JSON.stringify({ ...item, ...membership, classId }),
       ]);
@@ -334,9 +438,10 @@ const writeRoster = async (tx, teacherId, records) => {
       asText(item.addedAt || item.assignedAt), asText(item.updatedAt) || new Date().toISOString(), JSON.stringify(item),
     ]);
   }
-  const existing = await run(tx, `SELECT ts.student_id, s.email FROM teacher_students ts
+  const existing = await run(tx, `SELECT ts.student_id, s.email, s.lifecycle_state FROM teacher_students ts
     JOIN students s ON s.id=ts.student_id WHERE ts.teacher_id=?`, [teacherId]);
   for (const row of existing.rows) {
+    if (row.lifecycle_state !== 'active') continue;
     if (!emails.has(String(row.email).toLowerCase())) {
       await run(tx, 'DELETE FROM teacher_students WHERE teacher_id=? AND student_id=?', [teacherId, row.student_id]);
       await run(tx, 'DELETE FROM class_memberships WHERE teacher_id=? AND student_id=?', [teacherId, row.student_id]);
@@ -350,25 +455,25 @@ const writeTasks = async (tx, teacherId, records) => {
     if (!item?.id || !item.title) throw new Error('Every task requires an id and title');
     ids.add(String(item.id));
     const requestedClassId = asText(item.classId);
-    if (requestedClassId) {
-      const classExists = await run(tx, 'SELECT id FROM classes WHERE id=? AND teacher_id=?', [requestedClassId, teacherId]);
-      if (!classExists.rows.length) throw new Error(`Class ${requestedClassId} does not belong to teacher ${teacherId}`);
-    }
+    if (!requestedClassId) throw new Error('Every task requires a class');
+    const classExists = await run(tx, 'SELECT id FROM classes WHERE id=? AND teacher_id=?', [requestedClassId, teacherId]);
+    if (!classExists.rows.length) throw new Error(`Class ${requestedClassId} does not belong to teacher ${teacherId}`);
+    const { subject: _subject, subjectId: _subjectId, ...taskSource } = item;
     await run(tx, `INSERT INTO tasks
-      (id, teacher_id, class_id, title, description, subject, due_at, priority,
+      (id, teacher_id, class_id, title, description, due_at, priority,
        status, max_points, total_points, created_at, updated_at, source_json)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET class_id=excluded.class_id, title=excluded.title,
-      description=excluded.description, subject=excluded.subject, due_at=excluded.due_at,
+      description=excluded.description, due_at=excluded.due_at,
       priority=excluded.priority, status=excluded.status, max_points=excluded.max_points,
       total_points=excluded.total_points, created_at=excluded.created_at,
       updated_at=excluded.updated_at, source_json=excluded.source_json
       WHERE tasks.teacher_id=excluded.teacher_id`, [
       String(item.id), teacherId, asText(item.classId), String(item.title), asText(item.description),
-      asText(item.subject), asText(item.dueDate || item.date), asText(item.priority),
+      asText(item.dueDate || item.date), asText(item.priority),
       asText(item.status), finiteNumber(item.maxPoints || item.points),
       finiteNumber(item.totalPoints), asText(item.createdAt), asText(item.updatedAt),
-      JSON.stringify(item),
+      JSON.stringify(taskSource),
     ]);
     const persisted = await run(tx, 'SELECT teacher_id FROM tasks WHERE id=?', [String(item.id)]);
     if (persisted.rows[0]?.teacher_id !== teacherId) {
@@ -380,6 +485,9 @@ const writeTasks = async (tx, teacherId, records) => {
 
 const writeStudentTasks = async (tx, email, records) => {
   const student = await ensureStudent(tx, email);
+  if (student.lifecycle_state !== 'active') {
+    throw new Error('Inactive students cannot receive active task assignments');
+  }
   const taskIds = new Set();
   for (const item of parseArray(records)) {
     if (!item?.id || !item.title) throw new Error('Every assigned task requires an id and title');
@@ -394,18 +502,19 @@ const writeStudentTasks = async (tx, email, records) => {
     const classExists = requestedClassId
       ? (await run(tx, 'SELECT id, teacher_id FROM classes WHERE id=?', [requestedClassId])).rows[0]
       : null;
-    if (requestedClassId && (!classExists || (teacherId && classExists.teacher_id !== teacherId))) {
+    if (!requestedClassId || !classExists || (teacherId && classExists.teacher_id !== teacherId)) {
       throw new Error(`Class ${requestedClassId} does not belong to teacher ${teacherId || 'the assignment owner'}`);
     }
+    const { subject: _subject, subjectId: _subjectId, ...taskSource } = item;
     await run(tx, `INSERT INTO tasks
-      (id, teacher_id, class_id, title, description, subject, due_at, priority, status,
+      (id, teacher_id, class_id, title, description, due_at, priority, status,
        max_points, total_points, created_at, updated_at, source_json)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO NOTHING`, [
-      taskId, teacherId, classExists ? requestedClassId : null, String(item.title), asText(item.description),
-      asText(item.subject), asText(item.dueDate || item.date), asText(item.priority),
+      taskId, teacherId, requestedClassId, String(item.title), asText(item.description),
+      asText(item.dueDate || item.date), asText(item.priority),
       asText(item.status), finiteNumber(item.maxPoints || item.points), finiteNumber(item.totalPoints),
-      asText(item.createdAt), asText(item.updatedAt), JSON.stringify(item),
+      asText(item.createdAt), asText(item.updatedAt), JSON.stringify(taskSource),
     ]);
     await run(tx, `INSERT INTO task_assignments
       (task_id, student_id, assigned_by, assigned_at, due_at, status, completed, score, grade, source_json)
@@ -429,66 +538,76 @@ const writeStudentTasks = async (tx, email, records) => {
 
 const writeGrades = async (tx, namespace, suffix, records) => {
   const grades = namespace === 'task_grades'
-    ? Object.entries(records && typeof records === 'object' && !Array.isArray(records) ? records : {}).map(([email, value]) => ({ studentEmail: email, taskId: suffix, grade: value, score: finiteNumber(value) }))
+    ? Object.entries(records && typeof records === 'object' && !Array.isArray(records) ? records : {}).map(([studentId, value]) => ({ studentId, taskId: suffix, grade: value, score: finiteNumber(value) }))
     : parseArray(records);
-  let existingTaskGrades = [];
   if (namespace === 'student_grades') {
-    await run(tx, 'DELETE FROM grades WHERE student_email=? COLLATE NOCASE', [suffix]);
+    const student = await run(tx, 'SELECT id FROM students WHERE email=? COLLATE NOCASE', [suffix]);
+    if (!student.rows[0]) throw new Error(`Student ${suffix} does not exist`);
+    await run(tx, 'DELETE FROM grades WHERE student_id=?', [student.rows[0].id]);
   } else if (namespace === 'dental_college_grades') {
     await run(tx, 'DELETE FROM grades WHERE graded_by=?', [suffix]);
   } else if (namespace === 'task_grades') {
-    const existing = await run(tx, 'SELECT * FROM grades WHERE task_id=?', [suffix]);
-    existingTaskGrades = existing.rows;
-    const emails = new Set(grades.map(grade => String(grade.studentEmail).toLowerCase()));
-    for (const row of existingTaskGrades) {
-      if (!emails.has(String(row.student_email).toLowerCase())) {
+    const existing = await run(tx, 'SELECT id, student_id FROM grades WHERE task_id=?', [suffix]);
+    const studentIds = new Set(grades.map(grade => String(grade.studentId)));
+    for (const row of existing.rows) {
+      if (!studentIds.has(String(row.student_id))) {
         await run(tx, 'DELETE FROM grades WHERE id=?', [row.id]);
       }
     }
   }
   for (const grade of grades) {
-    const email = namespace === 'student_grades' ? suffix : grade.studentEmail;
-    if (!email) throw new Error('Grade records require a student email');
-    const student = await ensureStudent(tx, email, { id: grade.studentId, name: grade.studentName });
-    const existingTaskGrade = namespace === 'task_grades'
-      ? existingTaskGrades.find(row => row.student_email.toLowerCase() === String(email).toLowerCase())
-      : null;
+    const requestedStudentId = asText(grade.studentId);
+    const student = requestedStudentId
+      ? (await run(tx, "SELECT id FROM students WHERE id=? AND lifecycle_state='active'", [requestedStudentId])).rows[0]
+      : namespace === 'student_grades'
+        ? (await run(tx, "SELECT id FROM students WHERE email=? COLLATE NOCASE AND lifecycle_state='active'", [suffix])).rows[0]
+        : null;
+    if (!student) throw new Error('Grade records require an active student ID');
     const taskId = asText(grade.taskId || grade.task_id || (namespace === 'task_grades' ? suffix : null));
-    const taskExists = taskId
-      ? (await run(tx, 'SELECT id FROM tasks WHERE id=?', [taskId])).rows.length > 0
-      : false;
-    const gradeId = String(grade.id || existingTaskGrade?.id || `${taskId || 'grade'}:${email.toLowerCase()}`);
+    const task = taskId
+      ? (await run(tx, 'SELECT id, class_id, teacher_id FROM tasks WHERE id=?', [taskId])).rows[0]
+      : null;
+    if (taskId && !task) throw new Error(`Task ${taskId} was not found`);
+    const classId = asText(grade.classId || task?.class_id);
+    if (!classId) throw new Error('Every grade requires a class');
+    if (task && task.class_id !== classId) throw new Error('Grade class must match the task class');
     const teacherId = asText(
       grade.teacherId
       || (namespace === 'dental_college_grades' ? suffix : null)
-      || existingTaskGrade?.graded_by,
+      || task?.teacher_id,
     );
-    const params = [
-      gradeId, student.id, email, taskExists ? taskId : null, teacherId,
-      asText(grade.subject || existingTaskGrade?.subject),
-      asText(grade.assignment || existingTaskGrade?.assignment),
-      typeof grade.grade === 'string' ? grade.grade : null,
-      finiteNumber(grade.score ?? grade.grade) ?? finiteNumber(existingTaskGrade?.score),
-      finiteNumber(grade.maxScore ?? grade.maxPoints) ?? finiteNumber(existingTaskGrade?.max_score),
-      asText(grade.gradedAt || grade.date || existingTaskGrade?.graded_at),
-      grade.answers === undefined ? null : JSON.stringify(grade.answers),
-      JSON.stringify({ ...parseJson(existingTaskGrade?.source_json), ...grade }),
-    ];
-    const existingStudentTaskGrade = taskExists ? await run(tx, `SELECT id FROM grades
+    const classExists = await run(tx, 'SELECT id FROM classes WHERE id=?', [classId]);
+    if (!classExists.rows.length) throw new Error(`Class ${classId} was not found`);
+    if (teacherId) {
+      const ownedClass = await run(tx, 'SELECT id FROM classes WHERE id=? AND teacher_id=?', [classId, teacherId]);
+      if (!ownedClass.rows.length) throw new Error(`Class ${classId} does not belong to teacher ${teacherId}`);
+    }
+    const gradeId = String(grade.id || randomUUID());
+    const { studentEmail: _studentEmail, subject: _subject, ...gradeSource } = grade;
+    const sourceJson = JSON.stringify(gradeSource);
+    const existingStudentTaskGrade = taskId ? await run(tx, `SELECT id FROM grades
       WHERE student_id=? AND task_id=?`, [student.id, taskId]) : { rows: [] };
     if (existingStudentTaskGrade.rows[0] && existingStudentTaskGrade.rows[0].id !== gradeId) {
       await run(tx, 'DELETE FROM grades WHERE id=?', [existingStudentTaskGrade.rows[0].id]);
     }
     await run(tx, `INSERT INTO grades
-      (id, student_id, student_email, task_id, graded_by, subject, assignment, grade,
-       score, max_score, graded_at, answers_json, source_json)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(id) DO UPDATE SET grade=excluded.grade, score=excluded.score,
-      max_score=excluded.max_score, graded_at=excluded.graded_at,
+      (id, student_id, class_id, task_id, graded_by, assignment, grade, score,
+       max_score, graded_at, answers_json, source_json)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET class_id=excluded.class_id, task_id=excluded.task_id,
+      grade=excluded.grade, score=excluded.score, max_score=excluded.max_score,
+      graded_at=excluded.graded_at,
       graded_by=COALESCE(excluded.graded_by, grades.graded_by),
-      subject=COALESCE(excluded.subject, grades.subject),
-      assignment=COALESCE(excluded.assignment, grades.assignment),
-      source_json=excluded.source_json`, params);
+      assignment=excluded.assignment, source_json=excluded.source_json`, [
+      gradeId, student.id, classId, taskId, teacherId,
+      asText(grade.assignment),
+      typeof grade.grade === 'string' ? grade.grade : null,
+      finiteNumber(grade.score ?? grade.grade),
+      finiteNumber(grade.maxScore ?? grade.maxPoints),
+      asText(grade.gradedAt || grade.date),
+      grade.answers === undefined ? null : JSON.stringify(grade.answers),
+      sourceJson,
+    ]);
   }
 };
 
@@ -530,22 +649,21 @@ const writeActivity = async (tx, email, value) => {
 const writeProfile = async (tx, email, value) => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new TypeError('Student profile must be an object');
   const student = await ensureStudent(tx, email, value);
-  const profile = { ...value, email: String(email) };
-  const username = value.username === undefined ? student.username : (asText(value.username) || null);
+  const profile = cleanStudentProfile({ ...value, email: String(email) });
   await run(tx, `UPDATE students SET
-    name=?, username=?, roll_number=?, batch=?, current_level=?, total_points=?, game_progress=?,
+    name=?, prn=?, current_level=?, total_points=?, game_progress=?,
     registered_at=?, profile_json=?, updated_at=CURRENT_TIMESTAMP WHERE id=?`, [
-    asText(value.name) || student.name, username,
-    asText(value.rollNumber), asText(value.batch),
+    asText(value.name) || student.name,
+    asText(profile.prn),
     Math.trunc(finiteNumber(value.currentLevel) ?? student.current_level),
     Math.trunc(finiteNumber(value.totalPoints) ?? student.total_points),
     finiteNumber(value.gameProgress) ?? student.game_progress, asText(value.registeredAt),
     JSON.stringify(profile), student.id,
   ]);
-  if (student.user_id) {
-    if (username) {
+  if (student.user_id && Object.hasOwn(value, 'username')) {
+    if (value.username) {
       await run(tx, `INSERT INTO usernames (username, user_id) VALUES (?, ?)
-        ON CONFLICT(user_id) DO UPDATE SET username=excluded.username`, [username, student.user_id]);
+        ON CONFLICT(user_id) DO UPDATE SET username=excluded.username`, [asText(value.username), student.user_id]);
     } else {
       await run(tx, 'DELETE FROM usernames WHERE user_id=?', [student.user_id]);
     }
@@ -580,9 +698,11 @@ const writePortalData = (key, value) => {
         }
         const user = await run(tx, 'SELECT id FROM users WHERE id=? AND role != ?', [suffix, 'student']);
         if (!user.rows.length) throw new Error(`Teacher ${suffix} does not exist`);
-        await run(tx, `INSERT INTO teacher_profiles (user_id, source_json)
-          VALUES (?, ?) ON CONFLICT(user_id) DO UPDATE SET source_json=excluded.source_json`,
-        [suffix, JSON.stringify(value)]);
+        const profile = withoutDepartment(value);
+        await run(tx, `INSERT INTO teacher_profiles (user_id, department_id, source_json)
+          VALUES (?, ?, ?) ON CONFLICT(user_id) DO UPDATE SET
+          department_id=excluded.department_id, source_json=excluded.source_json`,
+        [suffix, asText(value.departmentId), JSON.stringify(profile)]);
         return;
       }
       case 'student_grades':
@@ -652,7 +772,8 @@ const deletePortalData = (key) => {
       case 'teacher':
         await run(tx, 'DELETE FROM teacher_profiles WHERE user_id=?', [suffix]); return;
       case 'student_grades':
-        await run(tx, 'DELETE FROM grades WHERE student_email=? COLLATE NOCASE', [suffix]); return;
+        await run(tx, `DELETE FROM grades WHERE student_id IN
+          (SELECT id FROM students WHERE email=? COLLATE NOCASE)`, [suffix]); return;
       case 'dental_college_grades':
         await run(tx, 'DELETE FROM grades WHERE graded_by=?', [suffix]); return;
       case 'task_grades':
@@ -693,7 +814,7 @@ const listPortalDataByPrefix = async prefix => {
     case 'student_activity':
     case 'student_profile':
       suffixes = (await readRows(`SELECT DISTINCT email AS suffix FROM students
-        ${namespace === 'student_tasks' ? 'WHERE id IN (SELECT student_id FROM task_assignments)' : ''}
+        ${namespace === 'student_tasks' ? "WHERE lifecycle_state='active' AND id IN (SELECT student_id FROM task_assignments)" : ''}
         ${namespace === 'student_grades' ? 'WHERE id IN (SELECT student_id FROM grades)' : ''}
         ${namespace === 'notifications' ? 'WHERE email COLLATE NOCASE IN (SELECT student_email COLLATE NOCASE FROM notifications)' : ''}
         ${namespace === 'student_streak' || namespace === 'student_activity' ? 'WHERE id IN (SELECT student_id FROM student_activity)' : ''}`)).map(row => row.suffix); break;

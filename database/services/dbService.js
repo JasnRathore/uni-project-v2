@@ -118,6 +118,7 @@ const getAuthService = () => {
           ...(user_metadata && typeof user_metadata === 'object' ? user_metadata : {}),
         };
         const role = metadata.role || 'student';
+        if (role === 'teacher') delete metadata.department;
         await withTransaction(async tx => {
           await tx.execute({
             sql: `INSERT INTO users (id, email, password_hash, name, role, metadata_json)
@@ -129,9 +130,9 @@ const getAuthService = () => {
             await require('./relationalDataService').ensureStudent(tx, email.trim(), {
               id: userId,
               name: metadata.name || '',
-              username: metadata.username || null,
-              rollNumber: metadata.rollNumber || null,
-              batch: metadata.batch || null,
+              prn: metadata.prn || metadata.rollNumber || null,
+              cohortId: metadata.cohortId || null,
+              lifecycleState: 'active',
               className: metadata.class || null,
               registeredAt: new Date().toISOString(),
             });
@@ -143,8 +144,8 @@ const getAuthService = () => {
             }
           } else if (role === 'teacher') {
             await tx.execute({
-              sql: 'INSERT INTO teacher_profiles (user_id, source_json) VALUES (?, ?)',
-              args: [userId, JSON.stringify(metadata)],
+              sql: 'INSERT INTO teacher_profiles (user_id, department_id, source_json) VALUES (?, ?, ?)',
+              args: [userId, metadata.departmentId || null, JSON.stringify(metadata)],
             });
           }
         });
@@ -167,6 +168,7 @@ const getAuthService = () => {
             ? { ...current.app_metadata, ...updates.app_metadata }
             : current.app_metadata;
           const role = userMetadata.role || row.role;
+          if (role === 'teacher') delete userMetadata.department;
           await tx.execute({
             sql: 'UPDATE users SET name=?, role=?, metadata_json=?, updated_at=CURRENT_TIMESTAMP WHERE id=?',
             args: [
@@ -190,9 +192,10 @@ const getAuthService = () => {
             }
           } else if (role === 'teacher') {
             await tx.execute({
-              sql: `INSERT INTO teacher_profiles (user_id, source_json) VALUES (?, ?)
-                ON CONFLICT(user_id) DO UPDATE SET source_json=excluded.source_json`,
-              args: [id, JSON.stringify(userMetadata)],
+              sql: `INSERT INTO teacher_profiles (user_id, department_id, source_json) VALUES (?, ?, ?)
+                ON CONFLICT(user_id) DO UPDATE SET
+                  department_id=excluded.department_id, source_json=excluded.source_json`,
+              args: [id, userMetadata.departmentId || null, JSON.stringify(userMetadata)],
             });
           }
         });
@@ -229,4 +232,5 @@ module.exports = {
   writePortalData,
   deletePortalData,
   listPortalDataByPrefix,
+  withTransaction,
 };

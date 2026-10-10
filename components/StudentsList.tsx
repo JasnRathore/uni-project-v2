@@ -1,19 +1,15 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, Eye, Flame, Plus, RefreshCw, Search, Trophy, Users } from 'lucide-react';
+import { CheckCircle2, Eye, Flame, RefreshCw, Search, Trophy, Users } from 'lucide-react';
 import { RoleAvatar } from './RoleAvatar';
-import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { AddStudent } from './AddStudent';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
 
-type RegistrationFilter = 'all' | 'portal' | 'roster';
 type AssignmentFilter = 'all' | 'assigned' | 'unassigned';
 
 interface StudentRecord {
@@ -21,12 +17,13 @@ interface StudentRecord {
   name?: string;
   email?: string;
   avatar?: string;
-  rollNumber?: string | number;
-  batch?: string;
+  prn?: string | number;
+  degreeName?: string | null;
+  cohortId?: string | null;
+  cohortLabel?: string | null;
   classId?: string | number | null;
   className?: string | null;
   class?: string | null;
-  isRegistered?: boolean;
   isAssigned?: boolean;
   currentLevel?: number;
   totalPoints?: number;
@@ -50,8 +47,6 @@ interface StudentsListProps {
   onSelectStudent: (student: StudentRecord) => void;
   classes: Array<{ id?: string | number; name?: string; className?: string; subject?: string }>;
   onRefresh?: () => void;
-  onAddStudent: (student: StudentRecord) => Promise<void>;
-  initialRegistrationFilter?: RegistrationFilter;
 }
 
 const emptyStreak = { currentStreak: 0, longestStreak: 0, dates: [] };
@@ -69,17 +64,38 @@ export function StudentsList({
   onSelectStudent,
   classes,
   onRefresh,
-  onAddStudent,
-  initialRegistrationFilter = 'all',
 }: StudentsListProps) {
   const [searchTerm, setSearchTerm] = useState('');
-  const [batchFilter, setBatchFilter] = useState('all');
+  const [cohortFilter, setCohortFilter] = useState('all');
+  const [cohorts, setCohorts] = useState<Array<{
+    id: string;
+    degree_id: string;
+    degree_name: string;
+    label: string;
+  }>>([]);
   const [classFilter, setClassFilter] = useState('all');
-  const [registrationFilter, setRegistrationFilter] = useState<RegistrationFilter>(initialRegistrationFilter);
   const [assignmentFilter, setAssignmentFilter] = useState<AssignmentFilter>('all');
   const [activityByEmail, setActivityByEmail] = useState<Record<string, StudentActivity>>({});
   const [isLoadingActivity, setIsLoadingActivity] = useState(false);
-  const [isAddStudentOpen, setIsAddStudentOpen] = useState(false);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch('/api/academic/cohorts', {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      cache: 'no-store',
+      signal: controller.signal,
+    })
+      .then(async response => {
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(result.error || `Cohort request failed (${response.status})`);
+        setCohorts(Array.isArray(result.cohorts) ? result.cohorts : []);
+      })
+      .catch(error => {
+        if (controller.signal.aborted) return;
+        console.error('Failed to load academic cohorts:', error);
+      });
+    return () => controller.abort();
+  }, [accessToken]);
 
   useEffect(() => {
     let isActive = true;
@@ -132,14 +148,6 @@ export function StudentsList({
     };
   }), [students, activityByEmail]);
 
-  const batches = useMemo(() => {
-    const values = new Set(['I BDS', 'II BDS', 'III BDS', 'IV BDS']);
-    students.forEach(student => {
-      if (student.batch) values.add(String(student.batch).trim());
-    });
-    return [...values].filter(Boolean).sort((a, b) => a.localeCompare(b));
-  }, [students]);
-
   const classNames = useMemo(() => {
     const values = new Set<string>();
     classes.forEach(classItem => {
@@ -161,18 +169,16 @@ export function StudentsList({
         student.name,
         student.email,
         className,
-        student.rollNumber,
+        student.prn,
       ].some(value => String(value || '').toLowerCase().includes(query));
-      const matchesBatch = batchFilter === 'all' || String(student.batch || '').trim() === batchFilter;
+      const matchesCohort = cohortFilter === 'all' || student.cohortId === cohortFilter;
       const matchesClass = classFilter === 'all' || String(className).trim() === classFilter;
-      const matchesRegistration = registrationFilter === 'all'
-        || (registrationFilter === 'portal' ? Boolean(student.isRegistered) : !student.isRegistered);
       const assigned = isAssigned(student);
       const matchesAssignment = assignmentFilter === 'all'
         || (assignmentFilter === 'assigned' ? assigned : !assigned);
-      return matchesSearch && matchesBatch && matchesClass && matchesRegistration && matchesAssignment;
+      return matchesSearch && matchesCohort && matchesClass && matchesAssignment;
     });
-  }, [studentsWithData, searchTerm, batchFilter, classFilter, registrationFilter, assignmentFilter]);
+  }, [studentsWithData, searchTerm, cohortFilter, classFilter, assignmentFilter]);
 
   const renderStudentCard = (student: StudentRecord) => {
     const assigned = isAssigned(student);
@@ -191,7 +197,7 @@ export function StudentsList({
             <div className="min-w-0 flex-1">
               <CardTitle className="truncate text-sm">{student.name || 'Unnamed student'}</CardTitle>
               <p className="mt-1 truncate text-xs text-muted-foreground">
-                {student.email}{student.rollNumber ? ` · Roll no. ${student.rollNumber}` : ''}
+                {student.email}{student.prn ? ` · PRN ${student.prn}` : ''}
               </p>
             </div>
             <TooltipProvider>
@@ -202,14 +208,14 @@ export function StudentsList({
                       variant="outline"
                       size="icon-sm"
                       className="shrink-0 rounded-full"
-                      aria-label="View in detail"
+                      aria-label={`View ${student.name || 'student'} details`}
                       onClick={() => onSelectStudent(student)}
                     />
                   }
                 >
                   <Eye aria-hidden="true" />
                 </TooltipTrigger>
-                <TooltipContent>View in detail</TooltipContent>
+                <TooltipContent>View student details</TooltipContent>
               </Tooltip>
             </TooltipProvider>
           </div>
@@ -272,11 +278,10 @@ export function StudentsList({
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-5 p-4 sm:p-6">
-      <div className="flex items-center justify-between gap-3">
-        <Button onClick={() => setIsAddStudentOpen(true)}>
-          <Plus data-icon="inline-start" />
-          Add student
-        </Button>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-muted-foreground">
+          Open a student record to review academic details, activity, and your class memberships.
+        </p>
         {onRefresh && (
           <Button onClick={onRefresh} variant="outline" className="shrink-0">
             <RefreshCw aria-hidden="true" />
@@ -285,33 +290,15 @@ export function StudentsList({
         )}
       </div>
 
-      <Dialog open={isAddStudentOpen} onOpenChange={setIsAddStudentOpen}>
-        <DialogContent className="sm:max-w-xl">
-          <DialogHeader>
-            <DialogTitle>Add a student</DialogTitle>
-            <DialogDescription>
-              Add a roster record and assign it to one of your classes.
-            </DialogDescription>
-          </DialogHeader>
-          <AddStudent
-            classes={classes.filter((classItem): classItem is typeof classItem & { id: string | number; name: string } =>
-              classItem.id !== undefined && Boolean(classItem.name)
-            )}
-            onAddStudent={onAddStudent}
-            onBack={() => setIsAddStudentOpen(false)}
-          />
-        </DialogContent>
-      </Dialog>
-
       <section aria-label="Student filters" className="rounded-2xl border bg-card p-4">
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <div className="space-y-1.5 sm:col-span-2 xl:col-span-1">
             <Label htmlFor="student-search">Search</Label>
             <div className="relative">
               <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 id="student-search"
-                placeholder="Name, email, roll no."
+                placeholder="Name, email, PRN"
                 value={searchTerm}
                 onChange={event => setSearchTerm(event.target.value)}
                 className="pl-9"
@@ -319,14 +306,18 @@ export function StudentsList({
             </div>
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="student-batch">BDS batch</Label>
-            <Select value={batchFilter} onValueChange={value => setBatchFilter(value ?? 'all')}>
-              <SelectTrigger id="student-batch" className="w-full">
-                <SelectValue placeholder="All batches" />
+            <Label htmlFor="student-cohort">Graduation cohort</Label>
+            <Select value={cohortFilter} onValueChange={value => setCohortFilter(value ?? 'all')}>
+              <SelectTrigger id="student-cohort" className="w-full">
+                <SelectValue placeholder="All cohorts" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All batches</SelectItem>
-                {batches.map(batch => <SelectItem key={batch} value={batch}>{batch}</SelectItem>)}
+                <SelectItem value="all">All cohorts</SelectItem>
+                {cohorts.map(cohort => (
+                  <SelectItem key={cohort.id} value={cohort.id}>
+                    {cohort.degree_name} · {cohort.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -339,22 +330,6 @@ export function StudentsList({
               <SelectContent>
                 <SelectItem value="all">All classes</SelectItem>
                 {classNames.map(className => <SelectItem key={className} value={className}>{className}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="student-registration">Registration</Label>
-            <Select
-              value={registrationFilter}
-              onValueChange={value => setRegistrationFilter((value ?? 'all') as RegistrationFilter)}
-            >
-              <SelectTrigger id="student-registration" className="w-full">
-                <SelectValue placeholder="Any type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All types</SelectItem>
-                <SelectItem value="portal">Portal accounts</SelectItem>
-                <SelectItem value="roster">Roster entries</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -395,7 +370,7 @@ export function StudentsList({
             <p className="mt-1 max-w-md text-sm text-muted-foreground">
               {students.length
                 ? 'Try changing your search or filter selections.'
-                : 'Students you add to the roster or who register through the portal will appear here.'}
+                : 'Students will appear here after they create a portal account.'}
             </p>
           </CardContent>
         </Card>

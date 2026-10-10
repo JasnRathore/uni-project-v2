@@ -52,7 +52,7 @@ export function Login({ onLogin, onSwitchToSignup, onBack }: LoginProps) {
             onClick={() => setShowConnectionTest(false)}
             className="mb-4"
           >
-            ← Back to Login
+            ? Back to Login
           </Button>
           <ConnectionTest />
         </div>
@@ -74,7 +74,7 @@ export function Login({ onLogin, onSwitchToSignup, onBack }: LoginProps) {
         )}
         {/* Logo/Header */}
         <div className="text-center mb-8">
-          <p className="text-muted-foreground mt-2">Admin Panel</p>
+          <p className="text-muted-foreground mt-2">Faculty Portal</p>
         </div>
 
         <Card className="border-border/80 shadow-sm">
@@ -135,7 +135,7 @@ export function Login({ onLogin, onSwitchToSignup, onBack }: LoginProps) {
               >
                 {isLoading ? (
                   <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin text-primary-foreground" />
                     Signing in...
                   </>
                 ) : (

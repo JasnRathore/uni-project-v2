@@ -35,7 +35,7 @@ export function TaskSubmissionsPage({ task, accessToken, onBack }: TaskSubmissio
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [savingEmails, setSavingEmails] = useState<string[]>([]);
+  const [savingStudentIds, setSavingStudentIds] = useState<string[]>([]);
 
   useEffect(() => {
     let isActive = true;
@@ -89,7 +89,7 @@ export function TaskSubmissionsPage({ task, accessToken, onBack }: TaskSubmissio
     return students.filter(student => {
       const matchesSearch = !query || [student.name, student.email]
         .some(value => String(value || "").toLowerCase().includes(query));
-      const grade = grades[student.email || ""] || student.grade;
+      const grade = grades[String(student.id)] || student.grade;
       const matchesStatus = statusFilter === "all"
         || (statusFilter === "graded" && Boolean(grade))
         || (statusFilter === "pending" && !grade);
@@ -98,11 +98,11 @@ export function TaskSubmissionsPage({ task, accessToken, onBack }: TaskSubmissio
   }, [grades, searchTerm, statusFilter, students]);
 
   const handleGradeChange = async (student: TaskStudent, grade: string | null) => {
-    if (!student.email || !grade) return;
-    const email = student.email;
-    const previousGrade = grades[email];
-    setSavingEmails(current => [...current, email]);
-    setGrades(current => ({ ...current, [email]: grade }));
+    if (!student.id || !grade) return;
+    const studentId = String(student.id);
+    const previousGrade = grades[studentId];
+    setSavingStudentIds(current => [...current, studentId]);
+    setGrades(current => ({ ...current, [studentId]: grade }));
 
     try {
       const response = await fetch("/api/teacher/task-grade", {
@@ -111,7 +111,7 @@ export function TaskSubmissionsPage({ task, accessToken, onBack }: TaskSubmissio
           Authorization: `Bearer ${accessToken}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ taskId: task.id, studentEmail: email, grade }),
+        body: JSON.stringify({ taskId: task.id, studentId: student.id, grade }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || `Failed to save grade (${response.status})`);
@@ -120,17 +120,17 @@ export function TaskSubmissionsPage({ task, accessToken, onBack }: TaskSubmissio
       console.error("Error saving student grade:", error);
       setGrades(current => {
         const next = { ...current };
-        if (previousGrade) next[email] = previousGrade;
-        else delete next[email];
+        if (previousGrade) next[studentId] = previousGrade;
+        else delete next[studentId];
         return next;
       });
       toast.error(error instanceof Error ? error.message : "Failed to save grade.");
     } finally {
-      setSavingEmails(current => current.filter(item => item !== email));
+      setSavingStudentIds(current => current.filter(item => item !== studentId));
     }
   };
 
-  const gradedCount = students.filter(student => Boolean(grades[student.email || ""] || student.grade)).length;
+  const gradedCount = students.filter(student => Boolean(grades[String(student.id)] || student.grade)).length;
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-5 p-4 sm:p-6">
@@ -184,8 +184,8 @@ export function TaskSubmissionsPage({ task, accessToken, onBack }: TaskSubmissio
       ) : filteredStudents.length ? (
         <div className="flex flex-col gap-2">
           {filteredStudents.map((student, index) => {
-            const grade = grades[student.email || ""] || student.grade || "";
-            const isSaving = Boolean(student.email && savingEmails.includes(student.email));
+            const grade = grades[String(student.id)] || student.grade || "";
+            const isSaving = Boolean(student.id && savingStudentIds.includes(String(student.id)));
             return (
               <Card key={student.email || student.id || index} className="gap-0 py-0 shadow-none">
                 <CardContent className="flex min-w-0 flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between">
@@ -205,7 +205,7 @@ export function TaskSubmissionsPage({ task, accessToken, onBack }: TaskSubmissio
                     </Badge>
                     <Select
                       value={grade}
-                      disabled={!student.email || isSaving}
+                      disabled={!student.id || isSaving}
                       onValueChange={value => void handleGradeChange(student, value)}
                     >
                       <SelectTrigger aria-label={`Grade ${student.name || "student"}`} className="w-28">

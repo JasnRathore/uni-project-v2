@@ -20,7 +20,6 @@ import { Textarea } from './ui/textarea';
 import { toast } from 'sonner';
 import { RoleAvatar } from './RoleAvatar';
 import { 
-  ArrowLeft, 
   Users, 
   BookOpen, 
   Award, 
@@ -37,22 +36,6 @@ import {
   ListTodo,
   Eye,
 } from 'lucide-react';
-
-// Dental college subjects
-const dentalSubjects = [
-  "Oral Pathology",
-  "Orthodontics",
-  "Conservative Dentistry",
-  "Prosthodontics",
-  "Periodontics",
-  "Oral Surgery",
-  "Pedodontics",
-  "Public Health Dentistry",
-  "Oral Medicine",
-  "Oral Anatomy",
-  "Endodontics",
-  "Oral Radiology"
-];
 
 // Letter grades with descriptions
 const letterGrades = [
@@ -72,7 +55,6 @@ const letterGrades = [
 interface ClassViewProps {
   classData: any;
   students: any[];
-  onBack: () => void;
   onAddTask: (task: any) => void;
   onAddQuiz: (quiz: any) => void;
   onStudentAssigned?: () => void;
@@ -81,7 +63,7 @@ interface ClassViewProps {
   projectId: string;
 }
 
-export function ClassView({ classData, students, onBack, onAddTask, onAddQuiz, onStudentAssigned, onViewStudent, accessToken, projectId }: ClassViewProps) {
+export function ClassView({ classData, students, onAddTask, onAddQuiz, onStudentAssigned, onViewStudent, accessToken, projectId }: ClassViewProps) {
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
   const [isAssignDialogOpen, setIsAssignDialogOpen] = useState(false);
   const [studentToAssign, setStudentToAssign] = useState('');
@@ -93,7 +75,6 @@ export function ClassView({ classData, students, onBack, onAddTask, onAddQuiz, o
   const [studentDataRefreshKey, setStudentDataRefreshKey] = useState(0);
   const [isLoadingStudentData, setIsLoadingStudentData] = useState(false);
   const [newGrade, setNewGrade] = useState({
-    subject: '',
     assignment: '',
     taskId: '',
     grade: '',
@@ -101,17 +82,17 @@ export function ClassView({ classData, students, onBack, onAddTask, onAddQuiz, o
     feedback: ''
   });
 
-  // Sort enrolled students by roll number
+  // Sort enrolled students by PRN
   const enrolledStudents = students
     .filter(student => student.classId === classData.id || student.classIds?.includes(classData.id))
     .sort((a, b) => {
-      // If both have roll numbers, sort numerically
-      if (a.rollNumber && b.rollNumber) {
-        return parseInt(a.rollNumber) - parseInt(b.rollNumber);
+      // Sort PRNs naturally, including alphanumeric identifiers.
+      if (a.prn && b.prn) {
+        return String(a.prn).localeCompare(String(b.prn), undefined, { numeric: true, sensitivity: 'base' });
       }
-      // If only one has a roll number, prioritize that one
-      if (a.rollNumber) return -1;
-      if (b.rollNumber) return 1;
+      // If only one has a PRN, prioritize that one
+      if (a.prn) return -1;
+      if (b.prn) return 1;
       // Otherwise sort by name
       return a.name.localeCompare(b.name);
     });
@@ -135,7 +116,7 @@ export function ClassView({ classData, students, onBack, onAddTask, onAddQuiz, o
 
       try {
         // OPTIMIZED: Fetch all student data in one API call
-        const studentEmails = enrolledStudents.map(s => s.email);
+        const studentIds = enrolledStudents.map(s => s.id);
         
         const response = await fetch(
           `/api/teacher/students-batch-data`,
@@ -145,7 +126,7 @@ export function ClassView({ classData, students, onBack, onAddTask, onAddQuiz, o
               'Authorization': `Bearer ${accessToken}`,
               'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ studentEmails })
+            body: JSON.stringify({ studentIds })
           }
         );
 
@@ -153,12 +134,12 @@ export function ClassView({ classData, students, onBack, onAddTask, onAddQuiz, o
           const result = await response.json();
           const studentsData = result.studentsData || {};
 
-          const studentsWithEnhancedData = enrolledStudents.map(student => ({
+          const studentsWithEnhancedData = enrolledStudents.map((student: ClassViewProps['students'][number]) => ({
             ...student,
-            streakData: studentsData[student.email]?.streakData || { currentStreak: 0, longestStreak: 0, dates: [] },
-            taskData: studentsData[student.email]?.taskData || { completedCount: 0, totalCount: 0 },
-            averageGrade: Number.isFinite(Number(studentsData[student.email]?.averageGrade))
-              ? Number(studentsData[student.email].averageGrade)
+            streakData: studentsData[student.id]?.streakData || { currentStreak: 0, longestStreak: 0, dates: [] },
+            taskData: studentsData[student.id]?.taskData || { completedCount: 0, totalCount: 0 },
+            averageGrade: Number.isFinite(Number(studentsData[student.id]?.averageGrade))
+              ? Number(studentsData[student.id].averageGrade)
               : Number(student.averageGrade) || 0,
           }));
 
@@ -185,7 +166,7 @@ export function ClassView({ classData, students, onBack, onAddTask, onAddQuiz, o
   // Use studentsWithData instead of enrolledStudents for display
   const displayStudents = studentsWithData.length > 0 ? studentsWithData : enrolledStudents;
 
-  const handleGradeDialogOpen = async (student) => {
+  const handleGradeDialogOpen = async (student: ClassViewProps['students'][number]) => {
     setSelectedStudent(student);
     setIsLoadingTasks(true);
     setIsGradeDialogOpen(true);
@@ -243,14 +224,13 @@ export function ClassView({ classData, students, onBack, onAddTask, onAddQuiz, o
     console.log('=== END FETCH ===');
   };
 
-  const handleTaskSelect = (taskId) => {
+  const handleTaskSelect = (taskId: string) => {
     const selectedTask = studentAttemptedTasks.find(t => t.id === taskId);
     if (selectedTask) {
       setNewGrade({
         ...newGrade,
         taskId: taskId,
         assignment: selectedTask.title,
-        subject: selectedTask.subject || ''
       });
     }
   };
@@ -270,7 +250,7 @@ export function ClassView({ classData, students, onBack, onAddTask, onAddQuiz, o
         },
         body: JSON.stringify({
           taskId: newGrade.taskId,
-          studentEmail: selectedStudent.email,
+          studentId: selectedStudent.id,
           grade: Number(newGrade.grade),
         }),
       });
@@ -284,7 +264,6 @@ export function ClassView({ classData, students, onBack, onAddTask, onAddQuiz, o
 
     // Reset form
     setNewGrade({
-      subject: '',
       assignment: '',
       taskId: '',
       grade: '',
@@ -312,7 +291,7 @@ export function ClassView({ classData, students, onBack, onAddTask, onAddQuiz, o
     const id = String(student.id || student.email);
     return {
       id,
-      searchValue: [id, student.name, student.email, student.rollNumber]
+      searchValue: [id, student.name, student.email, student.prn]
         .filter(Boolean)
         .join(' '),
       student,
@@ -324,7 +303,7 @@ export function ClassView({ classData, students, onBack, onAddTask, onAddQuiz, o
     if (!student) return;
     setIsAssigning(true);
     try {
-      const response = await fetch('/api/teacher/assign-student', {
+      const response = await fetch(`/api/teacher/classes/${encodeURIComponent(String(classData.id))}/memberships`, {
         method: 'POST',
         headers: {
           Authorization: ['Bearer', accessToken].join(' '),
@@ -332,9 +311,6 @@ export function ClassView({ classData, students, onBack, onAddTask, onAddQuiz, o
         },
         body: JSON.stringify({
           studentId: student.id,
-          studentEmail: student.email,
-          classId: classData.id,
-          className: classData.name,
         }),
       });
       const result = await response.json().catch(() => ({}));
@@ -358,7 +334,6 @@ export function ClassView({ classData, students, onBack, onAddTask, onAddQuiz, o
     setSelectedStudent(null);
     setIsGradeDialogOpen(false);
     setNewGrade({
-      subject: '',
       assignment: '',
       taskId: '',
       grade: '',
@@ -383,14 +358,7 @@ export function ClassView({ classData, students, onBack, onAddTask, onAddQuiz, o
 
   return (
     <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <Button
-          onClick={onBack}
-          variant="ghost"
-        >
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Back to Classes
-        </Button>
+      <div className="mb-6 flex justify-end">
         <div className="flex flex-wrap justify-end gap-3">
           <Dialog open={isAssignDialogOpen} onOpenChange={setIsAssignDialogOpen}>
             <DialogTrigger render={<Button size="lg" />}>
@@ -417,7 +385,7 @@ export function ClassView({ classData, students, onBack, onAddTask, onAddQuiz, o
                       item => item.searchValue === searchValue,
                     )?.student;
                     return student
-                      ? [student.name || student.email, student.email, student.rollNumber]
+                      ? [student.name || student.email, student.email, student.prn]
                           .filter(Boolean)
                           .join(' · ')
                       : searchValue;
@@ -441,7 +409,7 @@ export function ClassView({ classData, students, onBack, onAddTask, onAddQuiz, o
                             <span className="flex min-w-0 flex-col">
                               <span className="truncate">{student.name || student.email}</span>
                               <span className="truncate text-xs text-muted-foreground">
-                                {[student.email, student.rollNumber].filter(Boolean).join(' · ')}
+                                {[student.email, student.prn].filter(Boolean).join(' · ')}
                               </span>
                             </span>
                           </ComboboxItem>
@@ -670,7 +638,7 @@ export function ClassView({ classData, students, onBack, onAddTask, onAddQuiz, o
                 <Label htmlFor="task">Select Task/Quiz *</Label>
                 <Select
                   value={newGrade.taskId}
-                  onValueChange={handleTaskSelect}
+                  onValueChange={value => { if (value) handleTaskSelect(value); }}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Choose a task or quiz to grade" />
@@ -694,29 +662,17 @@ export function ClassView({ classData, students, onBack, onAddTask, onAddQuiz, o
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="subject">Subject *</Label>
-                <Select
-                  value={newGrade.subject}
-                  onValueChange={(value) => setNewGrade({ ...newGrade, subject: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select subject" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {dentalSubjects.map(subject => (
-                      <SelectItem key={subject} value={subject}>
-                        {subject}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label>Subject</Label>
+                <p className="rounded-md border px-3 py-2 text-sm text-muted-foreground">
+                  {classData.subject}
+                </p>
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="grade">Letter Grade *</Label>
                 <Select
                   value={newGrade.grade}
-                  onValueChange={(value) => setNewGrade({ ...newGrade, grade: value })}
+                  onValueChange={(value) => setNewGrade({ ...newGrade, grade: value ?? '' })}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select grade" />
@@ -766,7 +722,7 @@ export function ClassView({ classData, students, onBack, onAddTask, onAddQuiz, o
                 <Button
                   onClick={handleAddGrade}
 
-                  disabled={!newGrade.taskId || !newGrade.grade || !newGrade.subject}
+                  disabled={!newGrade.taskId || !newGrade.grade}
                 >
                   <CheckCircle className="w-4 h-4 mr-2" />
                   Add Grade

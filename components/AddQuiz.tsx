@@ -42,7 +42,6 @@ export function AddQuiz({ classData, onBack, onAddQuiz, students, accessToken, e
     description: '',
     dueDate: '',
     duration: '30', // duration in minutes
-    subject: classData.subject || '',
     totalPoints: '100',
     questionCount: '1',
   });
@@ -219,18 +218,7 @@ export function AddQuiz({ classData, onBack, onAddQuiz, students, accessToken, e
                 />
               </div>
 
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-4 lg:col-span-2">
-                <div>
-                  <Label htmlFor="subject">Subject</Label>
-                  <Input
-                    id="subject"
-                    placeholder="Subject name"
-                    value={quizData.subject}
-                    onChange={(e) => setQuizData({ ...quizData, subject: e.target.value })}
-                    className="mt-2"
-                  />
-                </div>
-
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 lg:col-span-2">
                 <div>
                   <Label htmlFor="duration">Duration (minutes) *</Label>
                   <Input

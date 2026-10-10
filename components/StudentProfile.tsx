@@ -7,46 +7,31 @@ import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
 import { RoleAvatar } from "./RoleAvatar";
 import {
-  ArrowLeft,
   User,
   Mail,
   Phone,
-  Calendar,
   MapPin,
-  BookOpen,
   Save,
   Camera,
-  Bell,
-  Zap,
-  Clock,
-  GraduationCap,
 } from "lucide-react";
 import { toast } from "sonner";
+import { LoadingSpinner } from "./ui/loading";
 
 interface StudentProfileProps {
   student: any;
-  onBack: () => void;
   accessToken: string;
   projectId: string;
   onUpdate: (data: any) => void;
   isTeacherEditing?: boolean;
 }
 
-export function StudentProfile({ student, onBack, accessToken, projectId, onUpdate, isTeacherEditing = false }: StudentProfileProps) {
+export function StudentProfile({ student, accessToken, projectId, onUpdate, isTeacherEditing = false }: StudentProfileProps) {
   const [isUpdating, setIsUpdating] = useState(false);
   const [profileData, setProfileData] = useState({
     name: student?.name || "",
     email: student?.email || "",
-    username: student?.username || "",
-    rollNumber: student?.rollNumber || "",
-    batch: student?.batch || "",
-    class: student?.class || "",
+    prn: student?.prn || "",
     phone: student?.phone || "",
-    department: student?.department || "",
-    semester: student?.semester || "",
-    specialization: student?.specialization || "",
-    qualification: student?.qualification || "",
-    joinDate: student?.joinDate || "January 2024",
     address: student?.address || "",
     bio: student?.bio || "",
   });
@@ -84,52 +69,46 @@ export function StudentProfile({ student, onBack, accessToken, projectId, onUpda
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-12">
-      {/* Back Button */}
-      <div className="flex items-center gap-3 mb-2">
-        <Button onClick={onBack} variant="ghost" size="sm" className="gap-2">
-          <ArrowLeft className="w-4 h-4" />
-          {isTeacherEditing ? "Back to Students" : "Back to Dashboard"}
-        </Button>
-      </div>
-
-      <Card>
+    <div className="mx-auto max-w-4xl space-y-6 pb-12">
+      <Card className="shadow-none">
         <CardHeader>
-          <CardTitle>Profile Information</CardTitle>
-          <CardDescription>Update your personal and professional details</CardDescription>
+          <CardTitle className="text-base">Profile information</CardTitle>
+          <CardDescription>Update your personal and contact details.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-8">
           {/* Avatar Section */}
-          <div className="flex items-center gap-6">
+          <div className="flex flex-wrap items-center gap-5 border-b pb-6">
             <div className="relative">
               <RoleAvatar
                 role="student"
                 identifier={student?.id || student?.email}
                 name={profileData.name}
-                className="size-24 border-4 border-background shadow-xl"
+                className="size-20 border-4 border-background"
                 fallbackClassName="text-2xl font-bold"
               />
               <Button
+                type="button"
+                aria-label="Change profile photo"
                 size="sm"
-                className="absolute -bottom-2 -right-2 size-8 rounded-full border-2 border-background p-0"
+                className="absolute -bottom-1 -right-1 size-9 rounded-full border-2 border-background p-0"
               >
-                <Camera className="w-4 h-4" />
+                <Camera aria-hidden="true" className="size-4" />
               </Button>
             </div>
-            <div>
-              <h3 className="text-xl font-bold text-foreground">{profileData.name}</h3>
-              <p className="text-sm text-muted-foreground mb-3">{profileData.department || "General Dentistry"}</p>
-              <Button variant="outline" size="sm" className="h-8">Change Photo</Button>
+            <div className="min-w-0">
+              <h3 className="truncate text-lg font-semibold">{profileData.name}</h3>
+              <p className="mt-1 text-sm text-muted-foreground">Student account</p>
+              <Button type="button" variant="outline" size="sm" className="mt-3 min-h-9">Change Photo</Button>
             </div>
           </div>
 
           <form onSubmit={handleSave} className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
               {/* Full Name */}
               <div className="space-y-2">
                 <Label htmlFor="name" className="text-sm font-semibold">Full Name</Label>
                 <div className="relative">
-                  <User className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
+                  <User aria-hidden="true" className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     id="name"
                     value={profileData.name}
@@ -144,7 +123,7 @@ export function StudentProfile({ student, onBack, accessToken, projectId, onUpda
               <div className="space-y-2">
                 <Label htmlFor="email" className="text-sm font-semibold">Email Address</Label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
+                  <Mail aria-hidden="true" className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     id="email"
                     value={profileData.email}
@@ -158,7 +137,7 @@ export function StudentProfile({ student, onBack, accessToken, projectId, onUpda
               <div className="space-y-2">
                 <Label htmlFor="phone" className="text-sm font-semibold">Phone Number</Label>
                 <div className="relative">
-                  <Phone className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
+                  <Phone aria-hidden="true" className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     id="phone"
                     value={profileData.phone}
@@ -169,80 +148,13 @@ export function StudentProfile({ student, onBack, accessToken, projectId, onUpda
                 </div>
               </div>
 
-              {/* Department */}
-              <div className="space-y-2">
-                <Label htmlFor="department" className="text-sm font-semibold">Department</Label>
-                <div className="relative">
-                  <BookOpen className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
-                  <Input
-                    id="department"
-                    value={profileData.department}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setProfileData(prev => ({ ...prev, department: e.target.value }))}
-                    className="h-11 pl-10"
-                    placeholder="e.g. Oral Pathology"
-                  />
-                </div>
-              </div>
-
-              {/* Specialization */}
-              <div className="space-y-2">
-                <Label htmlFor="specialization" className="text-sm font-semibold">Specialization</Label>
-                <div className="relative">
-                  <GraduationCap className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
-                  <Input
-                    id="specialization"
-                    value={profileData.specialization || ""}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setProfileData(prev => ({ ...prev, specialization: e.target.value }))}
-                    className="h-11 pl-10"
-                    placeholder="e.g. Oral Medicine and Radiology"
-                  />
-                </div>
-              </div>
-
-              {/* Qualification */}
-              <div className="space-y-2">
-                <Label htmlFor="qualification" className="text-sm font-semibold">Qualification</Label>
-                <Input
-                  id="qualification"
-                  value={profileData.qualification || ""}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setProfileData(prev => ({ ...prev, qualification: e.target.value }))}
-                  className="h-11"
-                  placeholder="e.g. BDS, MDS"
-                />
-              </div>
-
-              {/* Academic Year */}
-              <div className="space-y-2">
-                <Label htmlFor="batch" className="text-sm font-semibold">Academic Year / Batch</Label>
-                <Input
-                  id="batch"
-                  value={profileData.batch || ""}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setProfileData(prev => ({ ...prev, batch: e.target.value }))}
-                  className="h-11"
-                  placeholder="e.g. 2024 Batch"
-                />
-              </div>
-
-              {/* Join Date */}
-              <div className="space-y-2">
-                <Label htmlFor="joinDate" className="text-sm font-semibold">Join Date</Label>
-                <div className="relative">
-                  <Calendar className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
-                  <Input
-                    id="joinDate"
-                    value={profileData.joinDate || "January 2024"}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setProfileData(prev => ({ ...prev, joinDate: e.target.value }))}
-                    className="h-11 pl-10"
-                  />
-                </div>
-              </div>
             </div>
 
             {/* Address */}
             <div className="space-y-2">
               <Label htmlFor="address" className="text-sm font-semibold">Address</Label>
               <div className="relative">
-                <MapPin className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
+                <MapPin aria-hidden="true" className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   id="address"
                   value={profileData.address || ""}
@@ -266,15 +178,15 @@ export function StudentProfile({ student, onBack, accessToken, projectId, onUpda
               />
             </div>
 
-            <div className="flex pt-4">
+            <div className="flex justify-end border-t pt-5">
               <Button
                 type="submit"
                 disabled={isUpdating}
-                className="h-11 px-10"
+                className="min-h-11 px-8"
               >
                 {isUpdating ? (
                   <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <LoadingSpinner className="size-4 text-primary-foreground" />
                     Saving...
                   </div>
                 ) : (

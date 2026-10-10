@@ -11,11 +11,11 @@ export function PortalLanding() {
       <div className="w-full max-w-5xl">
         <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
           <PortalLink
-            href="/admin/login"
+            href="/faculty/login"
             icon={<Users aria-hidden="true" className="size-5" />}
-            title="Teacher and admin"
+            title="Faculty portal"
             description="Manage classes, student records, grades, and assignments."
-            action="Open the admin portal"
+            action="Open the faculty portal"
           />
           <PortalLink
             href="/student/login"

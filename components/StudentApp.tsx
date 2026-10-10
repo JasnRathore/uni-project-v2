@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { supabase } from './utils/supabase/client';
 import { reactivateIfNeeded } from './services/account';
 import { DASHBOARD_LOGOUT_EVENT } from '../lib/dashboard-events';
+import { LoadingScreen } from './ui/loading';
 
 interface StudentAppProps {
   onBackToLanding?: () => void;
@@ -116,7 +117,7 @@ export function StudentApp({ onBackToLanding }: StudentAppProps) {
         const userRole = data.session.user?.user_metadata?.role;
 
         if (userRole === 'teacher') {
-          toast.error('This account is registered as a teacher. Please use the Admin Portal to login.');
+          toast.error('This account is registered as a teacher. Please use the Faculty Portal to login.');
           await supabase.auth.signOut();
           throw new Error('Wrong portal');
         }
@@ -144,7 +145,7 @@ export function StudentApp({ onBackToLanding }: StudentAppProps) {
           }
 
           if (response.status === 403) {
-            toast.error('Access denied. This account is not registered as a student. Please use the Admin Portal.');
+            toast.error('Access denied. This account is not registered as a student. Please use the Faculty Portal.');
           } else {
             toast.error(errorMessage);
           }
@@ -188,7 +189,7 @@ export function StudentApp({ onBackToLanding }: StudentAppProps) {
     }
   };
 
-  const handleSwitchToAdmin = () => {
+  const handleSwitchToFaculty = () => {
     if (onBackToLanding) {
       onBackToLanding();
     } else {
@@ -197,14 +198,7 @@ export function StudentApp({ onBackToLanding }: StudentAppProps) {
   };
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading...</p>
-        </div>
-      </div>
-    );
+    return <LoadingScreen />;
   }
 
   if (!isAuthenticated) {
@@ -225,7 +219,7 @@ export function StudentApp({ onBackToLanding }: StudentAppProps) {
         <StudentLogin 
           onLogin={handleLogin}
           onSwitchToSignup={() => router.push('/student/signup')}
-          onSwitchToAdmin={handleSwitchToAdmin}
+          onSwitchToFaculty={handleSwitchToFaculty}
         />
         <Toaster />
       </>

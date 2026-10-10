@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -13,8 +13,13 @@ export interface SignupCredentials {
   email: string;
   password: string;
   confirmPassword: string;
-  department: string;
+  departmentId: string;
   qualification: string;
+}
+
+interface Department {
+  id: string;
+  name: string;
 }
 
 interface SignupProps {
@@ -29,17 +34,36 @@ export function Signup({ onSignup, onSwitchToLogin, onBack }: SignupProps) {
     email: '',
     password: '',
     confirmPassword: '',
-    department: '',
+    departmentId: '',
     qualification: ''
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [departmentsLoading, setDepartmentsLoading] = useState(true);
+
+  useEffect(() => {
+    const loadDepartments = async () => {
+      try {
+        const response = await fetch('/api/academic/departments');
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Failed to load departments');
+        setDepartments(data.departments);
+      } catch (error) {
+        console.error('Department lookup failed:', error);
+        toast.error('Could not load departments. Please refresh and try again.');
+      } finally {
+        setDepartmentsLoading(false);
+      }
+    };
+    void loadDepartments();
+  }, []);
 
   const handleSignup = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    if (!formData.name || !formData.email || !formData.password || !formData.department) {
+    if (!formData.name || !formData.email || !formData.password || !formData.departmentId) {
       toast.error('Please fill in all required fields');
       return;
     }
@@ -84,7 +108,7 @@ export function Signup({ onSignup, onSwitchToLogin, onBack }: SignupProps) {
           <h1 className="text-3xl font-semibold tracking-tight text-foreground">
             Dental College Portal
           </h1>
-          <p className="text-muted-foreground mt-2">Create Your Teacher Account</p>
+          <p className="text-muted-foreground mt-2">Create Your Faculty Account</p>
         </div>
 
         <Card className="border-border/80 shadow-sm">
@@ -131,23 +155,17 @@ export function Signup({ onSignup, onSwitchToLogin, onBack }: SignupProps) {
               <div className="space-y-2">
                 <Label htmlFor="department">Department *</Label>
                 <Select 
-                  value={formData.department} 
-                  onValueChange={(value) => setFormData({ ...formData, department: value ?? '' })}
-                  disabled={isLoading}
+                  value={formData.departmentId}
+                  onValueChange={(value) => setFormData({ ...formData, departmentId: value ?? '' })}
+                  disabled={isLoading || departmentsLoading}
                 >
                   <SelectTrigger id="department">
                     <SelectValue placeholder="Select your department" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Oral Pathology">Oral Pathology</SelectItem>
-                    <SelectItem value="Orthodontics">Orthodontics</SelectItem>
-                    <SelectItem value="Conservative Dentistry">Conservative Dentistry</SelectItem>
-                    <SelectItem value="Prosthodontics">Prosthodontics</SelectItem>
-                    <SelectItem value="Periodontics">Periodontics</SelectItem>
-                    <SelectItem value="Oral Surgery">Oral Surgery</SelectItem>
-                    <SelectItem value="Pedodontics">Pedodontics</SelectItem>
-                    <SelectItem value="Public Health Dentistry">Public Health Dentistry</SelectItem>
-                    <SelectItem value="Oral Medicine">Oral Medicine</SelectItem>
+                    {departments.map(department => (
+                      <SelectItem key={department.id} value={department.id}>{department.name}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -227,7 +245,7 @@ export function Signup({ onSignup, onSwitchToLogin, onBack }: SignupProps) {
               >
                 {isLoading ? (
                   <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin text-primary-foreground" />
                     Creating account...
                   </>
                 ) : (

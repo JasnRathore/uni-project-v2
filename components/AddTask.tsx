@@ -24,7 +24,6 @@ export function AddTask({ classData, onBack, onAddTask, students, accessToken, e
     description: '',
     dueDate: '',
     priority: 'medium',
-    subject: classData.subject || '',
     maxPoints: ''
   });
 
@@ -113,17 +112,9 @@ export function AddTask({ classData, onBack, onAddTask, students, accessToken, e
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="subject">Subject</Label>
-                <Input
-                  id="subject"
-                  placeholder="Subject name"
-                  value={taskData.subject}
-                  onChange={(e) => setTaskData({ ...taskData, subject: e.target.value })}
-                  className="mt-2"
-                />
+              <div className="text-sm text-muted-foreground">
+                Subject: <span className="font-medium text-foreground">{classData.subject}</span>
               </div>
-
               <div>
                 <Label htmlFor="maxPoints" className="flex items-center gap-2">
                   <Zap className="w-4 h-4 text-primary" />

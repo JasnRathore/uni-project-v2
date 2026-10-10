@@ -15,6 +15,7 @@ import {
 } from './ui/select';
 import { ArrowLeft, Sparkles, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import { LoadingSpinner } from './ui/loading';
 interface AddDailyTaskProps {
   selectedClass?: any;
   classes?: any[];
@@ -38,8 +39,8 @@ export function AddDailyTask({ selectedClass, classes = [], students = [], onBac
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!taskTitle.trim() || !taskDescription.trim() || !dueDate) {
-      toast.error('Please fill in all required fields');
+    if (!taskTitle.trim() || !taskDescription.trim() || !dueDate || !activeClass) {
+      toast.error('Choose a class and fill in all required fields');
       return;
     }
 
@@ -57,8 +58,7 @@ export function AddDailyTask({ selectedClass, classes = [], students = [], onBac
         description: taskDescription.trim(),
         points: pts,
         date: dueDate,
-        class_id: activeClass?.id || null,
-        subject: activeClass?.name || 'General',
+        class_id: activeClass.id,
         priority: priority,
         type: 'task',
       };
@@ -77,9 +77,9 @@ export function AddDailyTask({ selectedClass, classes = [], students = [], onBac
           points: pts,
           dueDate,
           date: dueDate,
-          classId: activeClass?.id || null,
-          className: activeClass?.name || null,
-          subject: taskPayload.subject,
+          classId: activeClass.id,
+          className: activeClass.name,
+          subjectId: activeClass.subjectId,
           priority,
           type: 'task',
           status: 'active',
@@ -94,13 +94,11 @@ export function AddDailyTask({ selectedClass, classes = [], students = [], onBac
       const result = await response.json();
       const createdTask = result.task || result;
 
-      const assignedCount = result.assignedCount ?? (activeClass
-        ? students.filter((s: any) => s.classId === activeClass.id).length
-        : students.length);
+      const assignedCount = result.assignedCount ?? students.filter((s: any) =>
+        s.classId === activeClass.id || s.classIds?.includes(activeClass.id),
+      ).length;
 
-      const assignMsg = activeClass
-        ? `Task created and assigned to ${assignedCount} student(s) in ${activeClass.name}!`
-        : `Task created and assigned to ${assignedCount} student(s)!`;
+      const assignMsg = `Task created and assigned to ${assignedCount} student(s) in ${activeClass.name}!`;
       toast.success(assignMsg);
 
       if (onTaskCreated) onTaskCreated(createdTask);
@@ -128,7 +126,7 @@ export function AddDailyTask({ selectedClass, classes = [], students = [], onBac
           <AlertDescription className="ml-2 text-foreground">
             {activeClass
               ? `This task will be automatically assigned to all students enrolled in ${activeClass.name}.`
-              : 'This task will be assigned to all registered students.'}
+              : 'Tasks must be assigned to a class.'}
           </AlertDescription>
         </Alert>
 
@@ -164,19 +162,18 @@ export function AddDailyTask({ selectedClass, classes = [], students = [], onBac
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <Label className="text-base font-semibold">Class / Subject</Label>
+                  <Label htmlFor="task-class" className="text-base font-semibold">Class *</Label>
                   {selectedClass ? (
                     <Input value={selectedClass.name} disabled className="text-base" />
                   ) : (
-                    <Select value={selectedClassId} onValueChange={setSelectedClassId}>
-                      <SelectTrigger className="text-base">
-                        <SelectValue placeholder="All students (no specific class)" />
+                    <Select value={selectedClassId} onValueChange={value => setSelectedClassId(value ?? '')}>
+                      <SelectTrigger id="task-class" className="text-base">
+                        <SelectValue placeholder="Choose a class" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">All Students</SelectItem>
                         {classes.map((cls) => (
                           <SelectItem key={cls.id} value={cls.id}>
-                            {cls.name}
+                            {cls.name} · {cls.subject}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -199,7 +196,7 @@ export function AddDailyTask({ selectedClass, classes = [], students = [], onBac
 
                 <div className="space-y-2">
                   <Label htmlFor="priority" className="text-base font-semibold">Priority</Label>
-                  <Select value={priority} onValueChange={setPriority}>
+                  <Select value={priority} onValueChange={value => setPriority(value ?? 'Medium')}>
                     <SelectTrigger id="priority">
                       <SelectValue />
                     </SelectTrigger>
@@ -233,11 +230,11 @@ export function AddDailyTask({ selectedClass, classes = [], students = [], onBac
                 </Button>
                 <Button
                   type="submit"
-                  disabled={loading}
+                  disabled={loading || !activeClass}
                 >
                   {loading ? (
                     <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                      <LoadingSpinner className="mr-2 size-4 text-primary-foreground" />
                       Creating...
                     </>
                   ) : (

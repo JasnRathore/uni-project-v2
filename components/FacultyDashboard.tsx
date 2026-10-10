@@ -1,12 +1,10 @@
 "use client";
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { StudentsList } from './StudentsList';
 import { StudentProfile } from './StudentProfile';
 import { MarksManagement } from './MarksManagement';
-import { AddStudent } from './AddStudent';
 import { ClassManagement } from './ClassManagement';
 import { ClassView } from './ClassView';
 import { AddQuiz } from './AddQuiz';
@@ -14,10 +12,12 @@ import { TasksAndQuizzesManagement } from './TasksAndQuizzesManagement';
 import { TaskSubmissionsPage } from './TaskSubmissionsPage';
 import { EditTask } from './EditTask';
 import { Settings } from './Settings';
-import { AssignStudent } from './AssignStudent';
+import { StudentDetails } from './StudentDetails';
 import { RoleAvatar } from './RoleAvatar';
 import { DebugPanel } from './DebugPanel';
+import { AcademicCatalogManagement } from './AcademicCatalogManagement';
 import { AddDailyTask } from './AddDailyTask';
+import { LoadingScreen } from './ui/loading';
 import { 
   Users, 
   BookOpen, 
@@ -26,20 +26,20 @@ import {
 import { toast } from 'sonner';
 import { projectId } from './utils/supabase/info';
 
-interface AdminDashboardProps {
+interface FacultyDashboardProps {
   currentUser: any;
   onLogout: () => void;
   accessToken: string;
 }
 
-export function AdminDashboard({ currentUser: initialUser, onLogout, accessToken }: AdminDashboardProps) {
+export function FacultyDashboard({ currentUser: initialUser, onLogout, accessToken }: FacultyDashboardProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [currentUser, setCurrentUser] = useState<any>(initialUser);
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
   const [selectedClass, setSelectedClass] = useState<any>(null);
   const [selectedTask, setSelectedTask] = useState<any>(null);
-  const dashboardSegments = pathname.slice('/admin/dashboard'.length).split('/').filter(Boolean);
+  const dashboardSegments = pathname.slice('/faculty/dashboard'.length).split('/').filter(Boolean);
   const activeView = dashboardSegments[0] || 'dashboard';
   const detailId = dashboardSegments[1]
     ? decodeURIComponent(dashboardSegments[1])
@@ -50,13 +50,13 @@ export function AdminDashboard({ currentUser: initialUser, onLogout, accessToken
         ? selectedClass?.id
         : view === 'edit-task'
           ? selectedTask?.id
-          : view === 'profile' || view === 'assign-student'
+          : view === 'profile' || view === 'student-details'
             ? selectedStudent?.email || selectedStudent?.id
             : undefined
     );
     const route = view === 'dashboard'
-      ? '/admin/dashboard'
-      : `/admin/dashboard/${view}${selectedId ? `/${encodeURIComponent(String(selectedId))}` : ''}`;
+      ? '/faculty/dashboard'
+      : `/faculty/dashboard/${view}${selectedId ? `/${encodeURIComponent(String(selectedId))}` : ''}`;
     router.push(route);
   };
   const [tasks, setTasks] = useState<any[]>([]);
@@ -77,20 +77,24 @@ export function AdminDashboard({ currentUser: initialUser, onLogout, accessToken
   }, [accessToken]);
 
   useEffect(() => {
+    if (activeView === 'assign-student' && detailId) {
+      router.replace(`/faculty/dashboard/student-details/${encodeURIComponent(detailId)}`);
+      return;
+    }
     if (!detailId) return;
 
     if (activeView === 'class-view' || activeView === 'add-task' || activeView === 'add-quiz') {
       setSelectedClass(classes.find(item => String(item.id) === detailId) || null);
     } else if (activeView === 'edit-task' || activeView === 'task-submissions') {
       setSelectedTask(tasks.find(item => String(item.id) === detailId) || null);
-    } else if (activeView === 'profile' || activeView === 'assign-student') {
+    } else if (activeView === 'profile' || activeView === 'student-details') {
       const allStudents = [...registeredStudents, ...students];
       setSelectedStudent(allStudents.find(item =>
         String(item.id) === detailId ||
         String(item.email).toLowerCase() === detailId.toLowerCase()
       ) || null);
     }
-  }, [activeView, classes, detailId, registeredStudents, students, tasks]);
+  }, [activeView, classes, detailId, registeredStudents, router, students, tasks]);
 
   // Save students to backend whenever they change
   useEffect(() => {
@@ -322,55 +326,31 @@ export function AdminDashboard({ currentUser: initialUser, onLogout, accessToken
 
   const getDefaultClasses = () => [];
 
-  const handleAddStudent = async (newStudent: any) => {
-    if (allStudents.some(student => student.email?.toLowerCase() === newStudent.email?.toLowerCase())) {
-      throw new Error('A student with this email already exists.');
-    }
-
-    const nextStudents = [...students, newStudent];
-    const response = await fetch('/api/teacher/students', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: ['Bearer', accessToken].join(' '),
-      },
-      body: JSON.stringify({ students: nextStudents }),
-    });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      throw new Error(data.error || `Failed to save student (${response.status})`);
-    }
-
-    setStudents(nextStudents);
-    // Update class student count
-    setClasses((prev: any[]) => prev.map((cls: any) => 
-      cls.id === newStudent.classId 
-        ? { ...cls, studentCount: (Number(cls.studentCount) || 0) + 1 }
-        : cls
-    ));
-  };
-
-  const handleAddClass = (newClass: any) => {
+  const handleAddClass = async (newClass: any) => {
     if (classes.some(classItem => classItem.id === newClass.id)) {
       toast.error('This curriculum class has already been added.');
       return false;
     }
-    setClasses(prev => [...prev, newClass]);
+    const response = await fetch('/api/teacher/classes/create', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({ class: newClass }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || `Class creation failed (${response.status})`);
+    setClasses(prev => [...prev, data.class || newClass]);
     return true;
   };
 
   const handleViewClass = (classToView: any) => {
-    // Calculate actual student count for this class
-    // Count manual students in this class
-    const manualStudentCount = students.filter((s: any) => s.classId === classToView.id).length;
-    // Count registered students assigned to this class
     const registeredStudentCount = registeredStudents.filter((s: any) => s.classId === classToView.id).length;
-    // Total students
-    const totalStudents = manualStudentCount + registeredStudentCount;
     
     setSelectedClass({
       ...classToView,
-      studentCount: totalStudents
+      studentCount: registeredStudentCount
     });
     setActiveView('class-view', classToView.id);
   };
@@ -528,21 +508,19 @@ export function AdminDashboard({ currentUser: initialUser, onLogout, accessToken
     }
   };
 
-  // Registered portal records take precedence when an email appears in both data sources.
   const allStudents = useMemo(() => {
     const teacherEmail = currentUser?.email?.toLowerCase();
     const emailsSeen = new Set<string>();
-    return [...registeredStudents, ...students]
-      .filter(s => {
-        if (!s?.email) return false;
-        const email = s.email.toLowerCase();
-        if (email === teacherEmail) return false;
-        if (s.role === 'teacher' || s.isTeacher) return false;
-        if (emailsSeen.has(email)) return false;
-        emailsSeen.add(email);
-        return true;
-      });
-  }, [registeredStudents, students, currentUser?.email]);
+    return registeredStudents.filter(student => {
+      if (!student?.email) return false;
+      const email = student.email.toLowerCase();
+      if (email === teacherEmail) return false;
+      if (student.role === 'teacher' || student.isTeacher) return false;
+      if (emailsSeen.has(email)) return false;
+      emailsSeen.add(email);
+      return true;
+    });
+  }, [registeredStudents, currentUser?.email]);
 
   const renderContent = () => {
     switch (activeView) {
@@ -550,28 +528,20 @@ export function AdminDashboard({ currentUser: initialUser, onLogout, accessToken
       case 'portal-students':
         return (
           <StudentsList
-            key={activeView}
             accessToken={accessToken}
             onSelectStudent={(student) => {
               setSelectedStudent(student);
-              if (student.isRegistered) {
-                setActiveView('assign-student', student.email || student.id);
-              } else {
-                setActiveView('profile', student.email || student.id);
-              }
+              setActiveView('student-details', student.email || student.id);
             }}
             students={allStudents}
             classes={classes}
             onRefresh={loadRegisteredStudents}
-            onAddStudent={handleAddStudent}
-            initialRegistrationFilter={activeView === 'portal-students' ? 'portal' : 'all'}
           />
         );
       case 'profile':
         return (
           <StudentProfile 
             student={selectedStudent}
-            onBack={() => setActiveView('students')}
             accessToken={accessToken}
             projectId={projectId}
             isTeacherEditing
@@ -583,7 +553,7 @@ export function AdminDashboard({ currentUser: initialUser, onLogout, accessToken
             }}
           />
         );
-      case 'assign-student':
+      case 'student-details':
         if (!selectedStudent) {
           const isResolvingStudent = isLoadingData || isLoadingRegisteredStudents;
           return (
@@ -591,20 +561,15 @@ export function AdminDashboard({ currentUser: initialUser, onLogout, accessToken
               <p className="text-muted-foreground">
                 {isResolvingStudent ? 'Loading student...' : 'This student could not be found.'}
               </p>
-              {!isResolvingStudent && (
-                <Button className="mt-4" onClick={() => setActiveView('students')}>
-                  Back to Students
-                </Button>
-              )}
             </div>
           );
         }
         return (
-          <AssignStudent
+          <StudentDetails
             student={selectedStudent}
             classes={classes}
-            onBack={() => setActiveView('students')}
             onAssignSuccess={() => {
+              loadTeacherData();
               loadRegisteredStudents();
             }}
             accessToken={accessToken}
@@ -613,11 +578,19 @@ export function AdminDashboard({ currentUser: initialUser, onLogout, accessToken
       case 'classes':
         return (
           <ClassManagement
+            accessToken={accessToken}
             classes={classes}
             students={allStudents}
             onAddClass={handleAddClass}
             onViewClass={handleViewClass}
             onDeleteClass={handleDeleteClass}
+          />
+        );
+      case 'catalog':
+        return (
+          <AcademicCatalogManagement
+            accessToken={accessToken}
+            canManage={['admin', 'administrator'].includes(currentUser?.role)}
           />
         );
       case 'class-view':
@@ -627,11 +600,6 @@ export function AdminDashboard({ currentUser: initialUser, onLogout, accessToken
               <p className="text-muted-foreground">
                 {isLoadingData ? 'Loading class...' : 'This class could not be found.'}
               </p>
-              {!isLoadingData && (
-                <Button className="mt-4" onClick={() => setActiveView('classes')}>
-                  Back to Classes
-                </Button>
-              )}
             </div>
           );
         }
@@ -639,13 +607,12 @@ export function AdminDashboard({ currentUser: initialUser, onLogout, accessToken
           <ClassView
             classData={selectedClass}
             students={allStudents}
-            onBack={() => setActiveView('classes')}
             onAddTask={() => setActiveView('add-task')}
             onAddQuiz={() => setActiveView('add-quiz')}
             onStudentAssigned={loadTeacherData}
             onViewStudent={(student) => {
               setSelectedStudent(student);
-              setActiveView('assign-student', student.email || student.id);
+              setActiveView('student-details', student.email || student.id);
             }}
             accessToken={accessToken}
             projectId={projectId}
@@ -671,11 +638,6 @@ export function AdminDashboard({ currentUser: initialUser, onLogout, accessToken
               <p className="text-muted-foreground">
                 {isLoadingData ? 'Loading class...' : 'Select a class before creating a quiz.'}
               </p>
-              {!isLoadingData && (
-                <Button className="mt-4" onClick={() => setActiveView('classes')}>
-                  Back to Classes
-                </Button>
-              )}
             </div>
           );
         }
@@ -703,11 +665,6 @@ export function AdminDashboard({ currentUser: initialUser, onLogout, accessToken
               <p className="text-muted-foreground">
                 {isLoadingData ? 'Loading task...' : 'The requested task could not be found.'}
               </p>
-              {!isLoadingData && (
-                <Button className="w-fit" onClick={() => setActiveView('tasks-quizzes')}>
-                  Back to tasks and quizzes
-                </Button>
-              )}
             </div>
           );
         }
@@ -729,14 +686,6 @@ export function AdminDashboard({ currentUser: initialUser, onLogout, accessToken
             onCreateTask={newTask => setTasks(prev => [newTask, ...prev])}
             onManageStudents={task => setActiveView('task-submissions', task.id)}
             accessToken={accessToken}
-          />
-        );
-      case 'add-student':
-        return (
-          <AddStudent
-            onBack={() => setActiveView('students')}
-            classes={classes}
-            onAddStudent={handleAddStudent}
           />
         );
       case 'grades':
@@ -784,8 +733,8 @@ export function AdminDashboard({ currentUser: initialUser, onLogout, accessToken
                   <CardTitle className="text-base">Students on record</CardTitle>
                   <CardDescription>
                     {allStudents.length
-                      ? 'A sample of student records from your workspace.'
-                      : 'Students you add or assign will appear here.'}
+                      ? 'Students with portal accounts in your workspace.'
+                      : 'Students with portal accounts will appear here after signing up.'}
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -797,10 +746,7 @@ export function AdminDashboard({ currentUser: initialUser, onLogout, accessToken
                             type="button"
                             onClick={() => {
                               setSelectedStudent(student);
-                              setActiveView(
-                                student.isRegistered ? 'assign-student' : 'profile',
-                                student.email || student.id,
-                              );
+                              setActiveView('student-details', student.email || student.id);
                             }}
                             className="flex min-h-14 w-full items-center gap-3 rounded-lg px-3 py-3 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                           >
@@ -820,7 +766,7 @@ export function AdminDashboard({ currentUser: initialUser, onLogout, accessToken
                     </ul>
                   ) : (
                     <p className="rounded-lg bg-muted/50 px-4 py-6 text-sm text-muted-foreground">
-                      No student records yet. Add a student or invite an existing portal account.
+                      No student accounts yet. Students can sign up through the portal.
                     </p>
                   )}
                 </CardContent>
@@ -828,15 +774,11 @@ export function AdminDashboard({ currentUser: initialUser, onLogout, accessToken
 
               <Card className="shadow-none">
                 <CardHeader>
-                  <CardTitle className="text-base">Quick actions</CardTitle>
-                  <CardDescription>Add a roster student. Other destinations are in the sidebar.</CardDescription>
+                  <CardTitle className="text-base">Student onboarding</CardTitle>
+                  <CardDescription>
+                    Students create their own portal accounts. You can assign them to classes from the Students page.
+                  </CardDescription>
                 </CardHeader>
-                <CardContent className="flex flex-col gap-2">
-                  <Button className="justify-start" onClick={() => setActiveView('add-student')}>
-                    <Users aria-hidden="true" />
-                    Add a student
-                  </Button>
-                </CardContent>
               </Card>
             </div>
           </div>
@@ -845,14 +787,7 @@ export function AdminDashboard({ currentUser: initialUser, onLogout, accessToken
   };
 
   if (isLoadingData) {
-    return (
-      <div className="flex min-h-full items-center justify-center bg-background p-6">
-        <div className="text-center">
-          <div className="mx-auto mb-4 size-9 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-          <p className="text-muted-foreground">Loading your data...</p>
-        </div>
-      </div>
-    );
+    return <LoadingScreen label="Loading your data..." className="min-h-full" />;
   }
 
   return <div className="min-h-full">{renderContent()}</div>;

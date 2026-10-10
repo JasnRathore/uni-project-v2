@@ -2,15 +2,17 @@ import { NextRequest } from 'next/server';
 import authController from '@/lib/api/controllers/authController.js';
 import studentController from '@/lib/api/controllers/studentController.js';
 import teacherController from '@/lib/api/controllers/teacherController.js';
+import adminController from '@/lib/api/controllers/adminController.js';
+import gameController from '@/lib/api/controllers/gameController.js';
 import { getUser } from '@/lib/api/middleware/authMiddleware.js';
-import { ensureDatabaseReady, readPortalData } from '@/database/services/dbService';
+import { ensureDatabaseReady, getDatabaseClient, readPortalData } from '@/database/services/dbService';
 import { createRouteRegistry, findRoute } from '@/lib/api/routeRegistry';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Origin': process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
@@ -31,7 +33,7 @@ async function dispatch(request: NextRequest, segments: string[]) {
   if (path === '/health') return response({ status: 'ok' });
 
   const method = request.method;
-  const route = findRoute(createRouteRegistry(authController, studentController, teacherController), method, path);
+  const route = findRoute(createRouteRegistry(authController, studentController, teacherController, adminController, gameController), method, path);
   const params = route?.params || {};
 
   if (!route && method === 'GET' && path === '/debug/students') {
@@ -53,8 +55,23 @@ async function dispatch(request: NextRequest, segments: string[]) {
     if (studentOnly && user.user_metadata?.role !== 'student') {
       return response({ error: 'Student access required' }, 403);
     }
+    if (path.startsWith('/game') && user.user_metadata?.role !== 'student') {
+      return response({ error: 'Student access required' }, 403);
+    }
+    if (studentOnly || path.startsWith('/game')) {
+      const activeStudent = await getDatabaseClient().execute({
+        sql: "SELECT id FROM students WHERE (user_id = ? OR email = ? COLLATE NOCASE) AND lifecycle_state = 'active'",
+        args: [user.id, user.email],
+      });
+      if (!activeStudent.rows.length) {
+        return response({ error: 'An active student account is required' }, 403);
+      }
+    }
     if (!studentOnly && path.startsWith('/teacher') && user.user_metadata?.role === 'student') {
       return response({ error: 'Teacher access required' }, 403);
+    }
+    if (path.startsWith('/admin') && !['admin', 'administrator'].includes(user.user_metadata?.role)) {
+      return response({ error: 'Administrator access required' }, 403);
     }
   }
 

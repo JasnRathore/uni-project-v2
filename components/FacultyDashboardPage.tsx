@@ -3,13 +3,14 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { AdminDashboard } from "./AdminDashboard";
+import { FacultyDashboard } from "./FacultyDashboard";
 import { Toaster } from "./ui/sonner";
+import { LoadingScreen } from "./ui/loading";
 import { supabase } from "./utils/supabase/client";
 import { reactivateIfNeeded } from "./services/account";
 import { DASHBOARD_LOGOUT_EVENT } from "../lib/dashboard-events";
 
-export function AdminDashboardPage() {
+export function FacultyDashboardPage() {
   const router = useRouter();
   const [currentUser, setCurrentUser] = useState<unknown>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
@@ -69,23 +70,16 @@ export function AdminDashboardPage() {
   }, [handleLogout]);
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) router.replace("/admin/login");
+    if (!isLoading && !isAuthenticated) router.replace("/faculty/login");
   }, [isAuthenticated, isLoading, router]);
 
   if (isLoading || !isAuthenticated || !accessToken) {
-    return (
-      <div className="flex min-h-dvh items-center justify-center bg-background">
-        <div className="text-center">
-          <div className="mx-auto mb-4 size-10 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-          <p className="text-muted-foreground">Loading...</p>
-        </div>
-      </div>
-    );
+    return <LoadingScreen />;
   }
 
   return (
     <>
-      <AdminDashboard currentUser={currentUser} onLogout={handleLogout} accessToken={accessToken} />
+      <FacultyDashboard currentUser={currentUser} onLogout={handleLogout} accessToken={accessToken} />
       <Toaster />
     </>
   );

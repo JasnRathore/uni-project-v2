@@ -23,22 +23,6 @@ import {
   UserPlus
 } from 'lucide-react';
 
-// Dental college subjects
-const dentalSubjects = [
-  "Oral Pathology",
-  "Orthodontics",
-  "Conservative Dentistry",
-  "Prosthodontics",
-  "Periodontics",
-  "Oral Surgery",
-  "Pedodontics",
-  "Public Health Dentistry",
-  "Oral Medicine",
-  "Oral Anatomy",
-  "Endodontics",
-  "Oral Radiology"
-];
-
 // Letter grades with descriptions
 const letterGrades = [
   { value: 'A+', label: 'A+', percentage: 97, description: 'Outstanding' },
@@ -66,7 +50,6 @@ export function MarksManagement({ students, classes, accessToken, projectId }: {
   const [newGrade, setNewGrade] = useState({
     studentId: '',
     classId: '',
-    subject: '',
     assignment: '',
     grade: '',
     date: new Date().toISOString().split('T')[0],
@@ -139,7 +122,8 @@ export function MarksManagement({ students, classes, accessToken, projectId }: {
     const matchesSearch = student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          grade.assignment.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          grade.subject.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesSubject = selectedSubject === 'all' || grade.subject === selectedSubject;
+    const gradeClass = classes.find((classItem: any) => String(classItem.id) === String(grade.classId));
+    const matchesSubject = selectedSubject === 'all' || gradeClass?.subject === selectedSubject;
     const matchesClass = selectedClass === 'all' || grade.classId === selectedClass;
     return matchesSearch && matchesSubject && matchesClass;
   });
@@ -161,8 +145,8 @@ export function MarksManagement({ students, classes, accessToken, projectId }: {
   };
 
   const handleAddGrade = async () => {
-    if (!newGrade.studentId || !newGrade.subject || !newGrade.assignment || !newGrade.grade) {
-      toast.error('Please fill in all required fields');
+    if (!newGrade.studentId || !newGrade.classId || !newGrade.assignment || !newGrade.grade) {
+      toast.error('Choose a class and student, then complete the grade details');
       return;
     }
 
@@ -177,12 +161,12 @@ export function MarksManagement({ students, classes, accessToken, projectId }: {
     
     const grade = {
       id: Date.now(),
-      studentId: student.id,
+      studentId: String(student.id),
       studentName: student.name,
-      studentEmail: student.email, // Store student email for backend matching
-      classId: newGrade.classId || student.classId,
-      subject: newGrade.subject,
+      classId: newGrade.classId,
+      subject: getClassById(newGrade.classId)?.subject,
       assignment: newGrade.assignment,
+      taskId: null,
       grade: gradeValue ? newGrade.grade : null, // Store letter grade if applicable
       score: gradeValue ? gradeValue.percentage : parseFloat(newGrade.grade),
       maxScore: 100,
@@ -201,7 +185,6 @@ export function MarksManagement({ students, classes, accessToken, projectId }: {
     setNewGrade({
       studentId: '',
       classId: '',
-      subject: '',
       assignment: '',
       grade: '',
       date: new Date().toISOString().split('T')[0],
@@ -319,7 +302,7 @@ export function MarksManagement({ students, classes, accessToken, projectId }: {
             </DialogHeader>
                 <div className="space-y-4">
                   <div>
-                    <Label htmlFor="classFilter">Class Filter (Optional)</Label>
+                    <Label htmlFor="classFilter">Class *</Label>
                     <Select 
                       value={newGrade.classId} 
                       onValueChange={(value) => {
@@ -331,13 +314,12 @@ export function MarksManagement({ students, classes, accessToken, projectId }: {
                       }}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="All classes" />
+                        <SelectValue placeholder="Select a class" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">All Classes</SelectItem>
                         {classes.map((cls) => (
                           <SelectItem key={cls.id} value={cls.id}>
-                            {cls.name}
+                            {cls.name} · {cls.subject}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -352,11 +334,10 @@ export function MarksManagement({ students, classes, accessToken, projectId }: {
                           setNewGrade({ ...newGrade, studentId: '' });
                           return;
                         }
-                        const student = students.find(s => String(s.id) === value);
                         setNewGrade({
                           ...newGrade, 
                           studentId: value,
-                          classId: student?.classId || newGrade.classId
+                          classId: newGrade.classId,
                         });
                       }}
                     >
@@ -364,72 +345,27 @@ export function MarksManagement({ students, classes, accessToken, projectId }: {
                         <SelectValue placeholder="Select student" />
                       </SelectTrigger>
                       <SelectContent>
-                        {/* Group students by class */}
-                        {newGrade.classId && newGrade.classId !== 'all' ? (
-                          // Show only students from selected class
-                          students
-                            .filter(s => s.classId === newGrade.classId)
-                            .map((student) => (
-                              <SelectItem key={student.id} value={student.id.toString()}>
-                                {student.name} - {student.className}
-                              </SelectItem>
-                            ))
-                        ) : (
-                          // Show all students grouped by class
-                          classes.map((cls) => {
-                            const classStudents = students.filter(s => s.classId === cls.id);
-                            if (classStudents.length === 0) return null;
-                            return (
-                              <React.Fragment key={cls.id}>
-                                <SelectItem value={`header-${cls.id}`} disabled className="font-semibold text-foreground">
-                                  {cls.name} ({classStudents.length} students)
-                                </SelectItem>
-                                {classStudents.map((student) => (
-                                  <SelectItem key={student.id} value={student.id.toString()} className="pl-6">
-                                    {student.name}
-                                  </SelectItem>
-                                ))}
-                              </React.Fragment>
-                            );
-                          })
-                        )}
-                        {/* Show unassigned students */}
-                        {students.filter(s => !s.classId).length > 0 && (
-                          <React.Fragment>
-                            <SelectItem value="header-unassigned" disabled className="font-semibold text-muted-foreground">
-                              Unassigned ({students.filter(s => !s.classId).length} students)
+                        {newGrade.classId && students
+                          .filter(student => String(student.classId) === newGrade.classId
+                            || student.classIds?.map(String).includes(newGrade.classId))
+                          .map(student => (
+                            <SelectItem key={student.id} value={String(student.id)}>
+                              {student.name}
                             </SelectItem>
-                            {students
-                              .filter(s => !s.classId)
-                              .map((student) => (
-                                <SelectItem key={student.id} value={student.id.toString()} className="pl-6">
-                                  {student.name}
-                                </SelectItem>
-                              ))}
-                          </React.Fragment>
-                        )}
+                          ))}
                       </SelectContent>
                     </Select>
-                    {newGrade.classId && newGrade.classId !== 'all' && (
+                    {newGrade.classId && (
                       <p className="text-xs text-muted-foreground mt-1">
                         Showing students from {classes.find(c => c.id === newGrade.classId)?.name}
                       </p>
                     )}
                   </div>
                   <div>
-                    <Label htmlFor="subject">Subject *</Label>
-                    <Select value={newGrade.subject} onValueChange={(value) => setNewGrade({...newGrade, subject: value ?? ''})}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select subject" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {dentalSubjects.map((subject) => (
-                          <SelectItem key={subject} value={subject}>
-                            {subject}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Label>Subject</Label>
+                    <p className="rounded-md border px-3 py-2 text-sm text-muted-foreground">
+                      {getClassById(newGrade.classId)?.subject || "Choose a class to see its subject"}
+                    </p>
                   </div>
                   <div>
                     <Label htmlFor="assignment">Assignment/Exam Name *</Label>
@@ -545,7 +481,7 @@ export function MarksManagement({ students, classes, accessToken, projectId }: {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Subjects</SelectItem>
-                  {dentalSubjects.map((subject) => (
+                  {[...new Set(classes.map((classItem: any) => classItem.subject).filter(Boolean))].map((subject) => (
                     <SelectItem key={subject} value={subject}>
                       {subject}
                     </SelectItem>

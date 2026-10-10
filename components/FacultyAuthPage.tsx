@@ -8,11 +8,11 @@ import { supabase } from "./utils/supabase/client";
 import { reactivateIfNeeded } from "./services/account";
 import { Toaster } from "./ui/sonner";
 
-type AdminAuthPageProps = {
+type FacultyAuthPageProps = {
   mode: "login" | "signup";
 };
 
-export function AdminAuthPage({ mode }: AdminAuthPageProps) {
+export function FacultyAuthPage({ mode }: FacultyAuthPageProps) {
   const router = useRouter();
 
   const handleLogin = async (email: string, password: string) => {
@@ -56,7 +56,7 @@ export function AdminAuthPage({ mode }: AdminAuthPageProps) {
 
     const userData = await response.json();
     toast.success(`Welcome back, ${userData.teacher.name}!`);
-    router.replace("/admin/dashboard");
+    router.replace("/faculty/dashboard");
   };
 
   const handleSignup = async (formData: SignupCredentials) => {
@@ -72,7 +72,7 @@ export function AdminAuthPage({ mode }: AdminAuthPageProps) {
       throw new Error(message);
     }
     toast.success("Account created successfully! Please sign in.");
-    router.replace("/admin/login");
+    router.replace("/faculty/login");
   };
 
   return (
@@ -80,13 +80,13 @@ export function AdminAuthPage({ mode }: AdminAuthPageProps) {
       {mode === "signup" ? (
         <Signup
           onSignup={handleSignup}
-          onSwitchToLogin={() => router.push("/admin/login")}
+          onSwitchToLogin={() => router.push("/faculty/login")}
           onBack={() => router.push("/")}
         />
       ) : (
         <Login
           onLogin={handleLogin}
-          onSwitchToSignup={() => router.push("/admin/signup")}
+          onSwitchToSignup={() => router.push("/faculty/signup")}
           onBack={() => router.push("/")}
         />
       )}

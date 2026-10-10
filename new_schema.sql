@@ -1,5 +1,4 @@
--- Proposed normalized SQLite/Turso schema for the dental-college portal.
--- This file only defines the target schema; it does not migrate existing data.
+-- Canonical SQLite/Turso schema for the dental-college portal.
 
 PRAGMA foreign_keys = ON;
 
@@ -14,9 +13,27 @@ CREATE TABLE IF NOT EXISTS users (
     updated_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS departments (
+    id              TEXT PRIMARY KEY,
+    name            TEXT NOT NULL COLLATE NOCASE UNIQUE,
+    created_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+INSERT OR IGNORE INTO departments (id, name) VALUES
+    ('oral-pathology', 'Oral Pathology'),
+    ('orthodontics', 'Orthodontics'),
+    ('conservative-dentistry', 'Conservative Dentistry'),
+    ('prosthodontics', 'Prosthodontics'),
+    ('periodontics', 'Periodontics'),
+    ('oral-surgery', 'Oral Surgery'),
+    ('pedodontics', 'Pedodontics'),
+    ('public-health-dentistry', 'Public Health Dentistry'),
+    ('oral-medicine', 'Oral Medicine');
+
 CREATE TABLE IF NOT EXISTS teacher_profiles (
     user_id         TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-    department      TEXT,
+    department_id   TEXT REFERENCES departments(id) ON DELETE RESTRICT,
     specialization  TEXT,
     qualification   TEXT,
     experience      TEXT,
@@ -34,10 +51,11 @@ CREATE TABLE IF NOT EXISTS students (
     user_id             TEXT UNIQUE REFERENCES users(id) ON DELETE SET NULL,
     email               TEXT NOT NULL COLLATE NOCASE UNIQUE,
     name                TEXT NOT NULL DEFAULT '',
-    username            TEXT COLLATE NOCASE UNIQUE,
-    roll_number         TEXT,
-    batch               TEXT,
+    prn                 TEXT,
     current_level       INTEGER NOT NULL DEFAULT 1,
+    cohort_id           TEXT REFERENCES graduation_cohorts(id) ON DELETE SET NULL,
+    lifecycle_state     TEXT NOT NULL DEFAULT 'active'
+        CHECK (lifecycle_state IN ('active', 'inactive')),
     total_points        INTEGER NOT NULL DEFAULT 0,
     game_progress       REAL NOT NULL DEFAULT 0,
     last_active_at      TEXT,
@@ -47,22 +65,28 @@ CREATE TABLE IF NOT EXISTS students (
     updated_at          TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS idx_students_batch ON students(batch);
+CREATE INDEX IF NOT EXISTS idx_students_lifecycle ON students(lifecycle_state);
+CREATE INDEX IF NOT EXISTS idx_students_cohort ON students(cohort_id);
 
 CREATE TABLE IF NOT EXISTS classes (
     id              TEXT PRIMARY KEY,
     teacher_id      TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     name            TEXT NOT NULL,
-    subject         TEXT,
+    subject_id      TEXT NOT NULL REFERENCES subjects(id) ON DELETE RESTRICT,
     description     TEXT,
     grade           TEXT,
     capacity        INTEGER,
+    class_status    TEXT NOT NULL DEFAULT 'active'
+        CHECK (class_status IN ('active', 'completed', 'archived')),
+    starts_at       TEXT,
+    ends_at         TEXT,
     created_at      TEXT,
     source_json     TEXT NOT NULL DEFAULT '{}',
     UNIQUE (id, teacher_id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_classes_teacher ON classes(teacher_id);
+CREATE INDEX IF NOT EXISTS idx_classes_status ON classes(class_status);
 
 -- Replaces each teacher's students:<teacherId> and teacher_students:<teacherId>
 -- arrays. class_id is nullable for students who have not been assigned to a class.
@@ -71,6 +95,8 @@ CREATE TABLE IF NOT EXISTS teacher_students (
     student_id      TEXT NOT NULL REFERENCES students(id) ON DELETE CASCADE,
     class_id        TEXT REFERENCES classes(id) ON DELETE SET NULL,
     status          TEXT,
+    started_at      TEXT,
+    ended_at        TEXT,
     assigned_at     TEXT,
     created_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -90,6 +116,11 @@ CREATE TABLE IF NOT EXISTS class_memberships (
     student_id      TEXT NOT NULL REFERENCES students(id) ON DELETE CASCADE,
     class_id        TEXT NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
     status          TEXT,
+    membership_status TEXT NOT NULL DEFAULT 'active'
+        CHECK (membership_status IN ('active', 'ended', 'withdrawn')),
+    created_by      TEXT REFERENCES users(id) ON DELETE SET NULL,
+    started_at      TEXT,
+    ended_at        TEXT,
     assigned_at     TEXT,
     created_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -101,14 +132,80 @@ CREATE INDEX IF NOT EXISTS idx_class_memberships_student
     ON class_memberships(student_id);
 CREATE INDEX IF NOT EXISTS idx_class_memberships_class
     ON class_memberships(class_id);
+CREATE INDEX IF NOT EXISTS idx_class_memberships_active
+    ON class_memberships(class_id, student_id, membership_status);
+
+CREATE TABLE IF NOT EXISTS degrees (
+    id              TEXT PRIMARY KEY,
+    name            TEXT NOT NULL COLLATE NOCASE UNIQUE,
+    status          TEXT NOT NULL DEFAULT 'active'
+        CHECK (status IN ('active', 'inactive')),
+    created_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS graduation_cohorts (
+    id              TEXT PRIMARY KEY,
+    degree_id       TEXT NOT NULL REFERENCES degrees(id) ON DELETE RESTRICT,
+    label           TEXT NOT NULL,
+    status          TEXT NOT NULL DEFAULT 'active'
+        CHECK (status IN ('active', 'inactive')),
+    created_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (degree_id, label)
+);
+
+CREATE INDEX IF NOT EXISTS idx_cohorts_degree ON graduation_cohorts(degree_id);
+
+CREATE TABLE IF NOT EXISTS program_years (
+    id              TEXT PRIMARY KEY,
+    degree_id       TEXT NOT NULL REFERENCES degrees(id) ON DELETE RESTRICT,
+    label           TEXT NOT NULL,
+    status          TEXT NOT NULL DEFAULT 'active'
+        CHECK (status IN ('active', 'inactive')),
+    created_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (degree_id, label),
+    UNIQUE (id, degree_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_program_years_degree ON program_years(degree_id);
+
+CREATE TABLE IF NOT EXISTS subjects (
+    id              TEXT PRIMARY KEY,
+    degree_id       TEXT NOT NULL REFERENCES degrees(id) ON DELETE RESTRICT,
+    program_year_id TEXT NOT NULL,
+    name            TEXT NOT NULL COLLATE NOCASE,
+    created_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (program_year_id, degree_id)
+        REFERENCES program_years(id, degree_id) ON DELETE RESTRICT,
+    UNIQUE (name, degree_id, program_year_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_subjects_program_year
+    ON subjects(program_year_id);
+CREATE INDEX IF NOT EXISTS idx_subjects_degree
+    ON subjects(degree_id);
+
+CREATE TABLE IF NOT EXISTS academic_identity_events (
+    id              TEXT PRIMARY KEY,
+    student_id      TEXT NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+    old_degree_id   TEXT REFERENCES degrees(id) ON DELETE SET NULL,
+    new_degree_id   TEXT REFERENCES degrees(id) ON DELETE SET NULL,
+    old_cohort_id   TEXT REFERENCES graduation_cohorts(id) ON DELETE SET NULL,
+    new_cohort_id   TEXT REFERENCES graduation_cohorts(id) ON DELETE SET NULL,
+    actor_id        TEXT REFERENCES users(id) ON DELETE SET NULL,
+    reason          TEXT NOT NULL,
+    created_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
 
 CREATE TABLE IF NOT EXISTS tasks (
     id              TEXT PRIMARY KEY,
     teacher_id      TEXT REFERENCES users(id) ON DELETE SET NULL,
-    class_id        TEXT REFERENCES classes(id) ON DELETE SET NULL,
+    class_id        TEXT NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
     title           TEXT NOT NULL,
     description     TEXT,
-    subject         TEXT,
     due_at          TEXT,
     priority        TEXT,
     status          TEXT,
@@ -148,11 +245,10 @@ CREATE INDEX IF NOT EXISTS idx_task_assignments_assigned_by
 -- mirrored teacher, student, and task grade stores before upserting here.
 CREATE TABLE IF NOT EXISTS grades (
     id                  TEXT PRIMARY KEY,
-    student_id          TEXT REFERENCES students(id) ON DELETE SET NULL,
-    student_email       TEXT NOT NULL COLLATE NOCASE,
+    student_id          TEXT NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+    class_id            TEXT NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
     task_id             TEXT REFERENCES tasks(id) ON DELETE SET NULL,
     graded_by           TEXT REFERENCES users(id) ON DELETE SET NULL,
-    subject             TEXT,
     assignment          TEXT,
     grade               TEXT,
     score               REAL,
@@ -166,8 +262,6 @@ CREATE TABLE IF NOT EXISTS grades (
 CREATE UNIQUE INDEX IF NOT EXISTS idx_grades_student_task
     ON grades(student_id, task_id)
     WHERE student_id IS NOT NULL AND task_id IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_grades_student_email
-    ON grades(student_email);
 CREATE INDEX IF NOT EXISTS idx_grades_graded_by
     ON grades(graded_by);
 
@@ -201,6 +295,31 @@ CREATE TABLE IF NOT EXISTS student_activity_days (
     student_id      TEXT NOT NULL REFERENCES students(id) ON DELETE CASCADE,
     activity_date   TEXT NOT NULL,
     PRIMARY KEY (student_id, activity_date)
+);
+
+CREATE TABLE IF NOT EXISTS xp_events (
+    id                  TEXT PRIMARY KEY,
+    student_id          TEXT NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+    source_application   TEXT NOT NULL CHECK (source_application IN ('portal', 'game', 'admin')),
+    source_type         TEXT NOT NULL CHECK (source_type IN ('task', 'quiz', 'grade', 'streak', 'achievement', 'bonus', 'reversal')),
+    source_id           TEXT,
+    points              INTEGER NOT NULL,
+    ruleset_version     TEXT NOT NULL DEFAULT 'v1',
+    idempotency_key     TEXT NOT NULL UNIQUE,
+    created_by          TEXT REFERENCES users(id) ON DELETE SET NULL,
+    created_at          TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    reversal_of         TEXT REFERENCES xp_events(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_xp_events_student ON xp_events(student_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_xp_events_source ON xp_events(source_type, source_id);
+
+CREATE TABLE IF NOT EXISTS progression_states (
+    student_id          TEXT PRIMARY KEY REFERENCES students(id) ON DELETE CASCADE,
+    progression_xp      INTEGER NOT NULL DEFAULT 0,
+    tier                TEXT NOT NULL DEFAULT 'novice',
+    buff_entitlement    TEXT,
+    updated_at          TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS daily_quests (

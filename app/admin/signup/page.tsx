@@ -1,5 +1,5 @@
-import { AdminAuthPage } from "@/components/AdminAuthPage";
+import { redirect } from 'next/navigation';
 
 export default function AdminSignupPage() {
-  return <AdminAuthPage mode="signup" />;
+  redirect('/faculty/signup');
 }

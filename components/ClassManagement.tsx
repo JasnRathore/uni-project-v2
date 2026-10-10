@@ -6,8 +6,7 @@ import { Input } from './ui/input';
 import { Badge } from './ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Search, Users, BookOpen, Plus, Eye, Trash2 } from 'lucide-react';
-import { AddClass } from './AddClass';
-import type { DentalClass } from './utils/dentalClasses';
+import { AddClass, type ManagedClass } from './AddClass';
 import {
   Dialog,
   DialogContent,
@@ -17,20 +16,16 @@ import {
 } from './ui/dialog';
 
 interface ClassManagementProps {
+  accessToken: string;
   classes: ManagedClass[];
-  onAddClass: (newClass: ManagedClass) => boolean;
+  onAddClass: (newClass: ManagedClass) => Promise<boolean>;
   onViewClass: (classItem: ManagedClass) => void;
   onDeleteClass: (classId: string) => void;
   students?: { classId?: string | null; classIds?: string[] }[];
 }
 
-interface ManagedClass extends DentalClass {
-  capacity?: number;
-  studentCount?: number;
-  createdAt?: string;
-}
-
 export function ClassManagement({
+  accessToken,
   classes,
   onAddClass,
   onViewClass,
@@ -80,7 +75,7 @@ export function ClassManagement({
             />
           </div>
           <Select value={gradeFilter} onValueChange={value => setGradeFilter(value || 'all')}>
-            <SelectTrigger className="w-full sm:w-40" aria-label="Filter classes by BDS year">
+            <SelectTrigger className="w-full sm:w-40" aria-label="Filter classes by program year">
               <SelectValue placeholder="All years" />
             </SelectTrigger>
             <SelectContent>
@@ -101,11 +96,11 @@ export function ClassManagement({
           <DialogHeader>
             <DialogTitle>Add a class</DialogTitle>
             <DialogDescription>
-              Choose a course from the dental curriculum and set its capacity.
+              Choose a subject from the academic catalog and set its class details.
             </DialogDescription>
           </DialogHeader>
           <AddClass
-            existingClasses={classes}
+            accessToken={accessToken}
             onBack={closeAddDialog}
             onAddClass={newClass => {
               return onAddClass(newClass);

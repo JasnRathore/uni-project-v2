@@ -20,6 +20,7 @@ import {
 } from "./ui/select";
 import { Sparkles, Send } from "lucide-react";
 import { toast } from "sonner";
+import { LoadingSpinner } from "./ui/loading";
 
 interface QuestDialogProps {
   isOpen: boolean;
@@ -176,7 +177,7 @@ export function QuestDialog({
             >
               {loading ? (
                 <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  <LoadingSpinner className="mr-2 size-4 text-white" />
                   Assigning...
                 </>
               ) : (

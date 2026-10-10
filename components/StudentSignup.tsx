@@ -1,12 +1,13 @@
 "use client";
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { GraduationCap, Mail, Lock, User, ArrowLeft, UserPlus, Hash, Calendar, School } from 'lucide-react';
+import { GraduationCap, Mail, Lock, User, ArrowLeft, UserPlus, Hash, Calendar } from 'lucide-react';
 import { toast } from 'sonner';
+import { LoadingSpinner } from './ui/loading';
 
 interface StudentSignupProps {
   onSignup: (credentials: StudentSignupCredentials) => void | Promise<void>;
@@ -18,10 +19,20 @@ interface StudentSignupCredentials {
   name: string;
   username: string;
   email: string;
-  rollNumber: string;
-  batch: string;
-  class: string;
+  prn: string;
+  degreeId: string;
+  cohortId: string;
   password: string;
+}
+
+interface DegreeOption {
+  id: string;
+  name: string;
+}
+
+interface CohortOption {
+  id: string;
+  label: string;
 }
 
 export function StudentSignup({ onSignup, onSwitchToLogin, onBack }: StudentSignupProps) {
@@ -29,13 +40,46 @@ export function StudentSignup({ onSignup, onSwitchToLogin, onBack }: StudentSign
     name: '',
     username: '',
     email: '',
-    rollNumber: '',
-    batch: '',
-    class: '',
+    prn: '',
+    degreeId: '',
+    cohortId: '',
     password: '',
     confirmPassword: ''
   });
+  const [degrees, setDegrees] = useState<DegreeOption[]>([]);
+  const [cohorts, setCohorts] = useState<CohortOption[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/academic/degrees', { cache: 'no-store' })
+      .then(async response => {
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.error || 'Unable to load degrees');
+        setDegrees(Array.isArray(data.degrees) ? data.degrees : []);
+      })
+      .catch(error => {
+        console.error('Failed to load degrees:', error);
+        toast.error('Unable to load degree options');
+      });
+  }, []);
+
+  useEffect(() => {
+    if (!formData.degreeId) {
+      setCohorts([]);
+      return;
+    }
+    fetch(`/api/academic/degrees/${encodeURIComponent(formData.degreeId)}/cohorts`, { cache: 'no-store' })
+      .then(async response => {
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.error || 'Unable to load cohorts');
+        setCohorts(Array.isArray(data.cohorts) ? data.cohorts : []);
+      })
+      .catch(error => {
+        console.error('Failed to load cohorts:', error);
+        setCohorts([]);
+        toast.error('Unable to load graduation cohorts');
+      });
+  }, [formData.degreeId]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -56,18 +100,18 @@ export function StudentSignup({ onSignup, onSwitchToLogin, onBack }: StudentSign
       return;
     }
 
-    if (!formData.rollNumber.trim()) {
-      toast.error('Please enter your roll number');
+    if (!formData.prn.trim()) {
+      toast.error('Please enter your PRN');
       return;
     }
 
-    if (!formData.batch) {
-      toast.error('Please select your batch');
+    if (!formData.degreeId) {
+      toast.error('Please select your degree');
       return;
     }
 
-    if (!formData.class) {
-      toast.error('Please select your class');
+    if (!formData.cohortId) {
+      toast.error('Please select your graduation cohort');
       return;
     }
 
@@ -87,9 +131,9 @@ export function StudentSignup({ onSignup, onSwitchToLogin, onBack }: StudentSign
         name: formData.name.trim(),
         username: formData.username.trim(),
         email: formData.email.trim(),
-        rollNumber: formData.rollNumber.trim(),
-        batch: formData.batch,
-        class: formData.class,
+        prn: formData.prn.trim(),
+        degreeId: formData.degreeId,
+        cohortId: formData.cohortId,
         password: formData.password
       });
     } catch (error) {
@@ -178,16 +222,16 @@ export function StudentSignup({ onSignup, onSwitchToLogin, onBack }: StudentSign
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="rollNumber" className="flex items-center gap-2">
+                <Label htmlFor="prn" className="flex items-center gap-2">
                   <Hash className="w-4 h-4" />
-                  Roll Number
+                  PRN
                 </Label>
                 <Input
-                  id="rollNumber"
+                  id="prn"
                   type="text"
-                  placeholder="123456"
-                  value={formData.rollNumber}
-                  onChange={(e) => setFormData({...formData, rollNumber: e.target.value})}
+                  placeholder="Enter your PRN"
+                  value={formData.prn}
+                  onChange={(e) => setFormData({...formData, prn: e.target.value})}
                   required
                   className="h-11"
                 />
@@ -195,50 +239,42 @@ export function StudentSignup({ onSignup, onSwitchToLogin, onBack }: StudentSign
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="batch" className="flex items-center gap-2">
+                  <Label htmlFor="degreeId" className="flex items-center gap-2">
                     <Calendar className="w-4 h-4" />
-                    Batch
+                    Degree
                   </Label>
                   <Select
-                    value={formData.batch}
-                    onValueChange={(value) => setFormData({...formData, batch: value ?? ''})}
+                    value={formData.degreeId}
+                    onValueChange={(value) => setFormData({...formData, degreeId: value ?? '', cohortId: ''})}
                   >
-                    <SelectTrigger id="batch" className="h-11">
-                      <SelectValue placeholder="Batch" />
+                    <SelectTrigger id="degreeId" className="h-11">
+                      <SelectValue placeholder="Degree" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="I BDS">I BDS</SelectItem>
-                      <SelectItem value="II BDS">II BDS</SelectItem>
-                      <SelectItem value="III BDS">III BDS</SelectItem>
-                      <SelectItem value="IV BDS">IV BDS</SelectItem>
+                      {degrees.map((degree) => (
+                        <SelectItem key={degree.id} value={degree.id}>{degree.name}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="class" className="flex items-center gap-2">
-                    <School className="w-4 h-4" />
-                    Class
+                  <Label htmlFor="cohortId" className="flex items-center gap-2">
+                    <Calendar className="w-4 h-4" />
+                    Graduation Cohort
                   </Label>
                   <Select
-                    value={formData.class}
-                    onValueChange={(value) => setFormData({...formData, class: value ?? ''})}
+                    value={formData.cohortId}
+                    onValueChange={(value) => setFormData({...formData, cohortId: value ?? ''})}
+                    disabled={!formData.degreeId || cohorts.length === 0}
                   >
-                    <SelectTrigger id="class" className="h-11">
-                      <SelectValue placeholder="Class" />
+                    <SelectTrigger id="cohortId" className="h-11">
+                      <SelectValue placeholder="Graduation cohort" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Oral Anatomy">Oral Anatomy</SelectItem>
-                      <SelectItem value="Dental Materials">Dental Materials</SelectItem>
-                      <SelectItem value="Oral Pathology">Oral Pathology</SelectItem>
-                      <SelectItem value="Pharmacology">Pharmacology</SelectItem>
-                      <SelectItem value="General Surgery">General Surgery</SelectItem>
-                      <SelectItem value="General Medicine">General Medicine</SelectItem>
-                      <SelectItem value="Oral Surgery">Oral Surgery</SelectItem>
-                      <SelectItem value="Prosthodontics">Prosthodontics</SelectItem>
-                      <SelectItem value="Orthodontics">Orthodontics</SelectItem>
-                      <SelectItem value="Periodontics">Periodontics</SelectItem>
-                      <SelectItem value="Pedodontics">Pedodontics</SelectItem>
+                      {cohorts.map((cohort) => (
+                        <SelectItem key={cohort.id} value={cohort.id}>{cohort.label}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -283,7 +319,7 @@ export function StudentSignup({ onSignup, onSwitchToLogin, onBack }: StudentSign
               >
                 {isLoading ? (
                   <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <LoadingSpinner className="size-4 text-primary-foreground" />
                     Creating account...
                   </div>
                 ) : (

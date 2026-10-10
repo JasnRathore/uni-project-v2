@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useTheme } from 'next-themes';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
 import { Button } from './ui/button';
@@ -24,7 +24,6 @@ import {
   Eye,
   EyeOff,
   Save,
-  BookOpen,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from './utils/supabase/client';
@@ -46,13 +45,18 @@ interface UserPreferences {
   [key: string]: unknown;
 }
 
+interface Department {
+  id: string;
+  name: string;
+}
+
 export function Settings({ currentUser, accessToken, onUpdateProfile, onLogout }: SettingsProps) {
   const { theme, setTheme } = useTheme();
   const [profileData, setProfileData] = useState({
     name: currentUser.name || '',
     email: currentUser.email || '',
     phone: currentUser.phone || '',
-    department: currentUser.department || '',
+    departmentId: currentUser.departmentId || '',
     specialization: currentUser.specialization || '',
     qualification: currentUser.qualification || '',
     experience: currentUser.experience || '',
@@ -84,6 +88,25 @@ export function Settings({ currentUser, accessToken, onUpdateProfile, onLogout }
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [departmentsLoading, setDepartmentsLoading] = useState(true);
+
+  useEffect(() => {
+    const loadDepartments = async () => {
+      try {
+        const response = await fetch('/api/academic/departments');
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Failed to load departments');
+        setDepartments(data.departments);
+      } catch (error) {
+        console.error('Department lookup failed:', error);
+        toast.error('Could not load departments. Please refresh and try again.');
+      } finally {
+        setDepartmentsLoading(false);
+      }
+    };
+    void loadDepartments();
+  }, []);
 
   const [passwordData, setPasswordData] = useState({
     currentPassword: '',
@@ -219,7 +242,9 @@ export function Settings({ currentUser, accessToken, onUpdateProfile, onLogout }
                 </div>
                 <div>
                   <h3 className="font-medium mb-1">{profileData.name}</h3>
-                  <p className="text-sm text-muted-foreground mb-2">{profileData.department}</p>
+                  <p className="text-sm text-muted-foreground mb-2">
+                    {departments.find(department => department.id === profileData.departmentId)?.name || ''}
+                  </p>
                 </div>
               </div>
 
@@ -267,15 +292,20 @@ export function Settings({ currentUser, accessToken, onUpdateProfile, onLogout }
 
                 <div className="space-y-2">
                   <Label htmlFor="department">Department</Label>
-                  <div className="relative">
-                    <BookOpen className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
-                    <Input
-                      id="department"
-                      value={profileData.department}
-                      onChange={(e) => setProfileData({ ...profileData, department: e.target.value })}
-                      className="pl-10"
-                    />
-                  </div>
+                  <Select
+                    value={profileData.departmentId}
+                    onValueChange={(value) => setProfileData({ ...profileData, departmentId: value ?? '' })}
+                    disabled={departmentsLoading}
+                  >
+                    <SelectTrigger id="department">
+                      <SelectValue placeholder="Select your department" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {departments.map(department => (
+                        <SelectItem key={department.id} value={department.id}>{department.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="space-y-2">

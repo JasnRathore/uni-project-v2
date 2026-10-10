@@ -1,127 +1,230 @@
 "use client";
-import React, { useState } from 'react';
-import { Button } from './ui/button';
-import { Input } from './ui/input';
-import { Label } from './ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Save } from 'lucide-react';
-import { toast } from 'sonner';
-import { dentalClasses, getClassesByYear, type DentalClass } from './utils/dentalClasses';
 
-interface ManagedClass extends DentalClass {
+import React, { useEffect, useState } from "react";
+import { Save } from "lucide-react";
+import { toast } from "sonner";
+import { Button } from "./ui/button";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
+
+interface DegreeOption {
+  id: string;
+  name: string;
+}
+
+interface ProgramYearOption {
+  id: string;
+  label: string;
+}
+
+interface SubjectOption {
+  id: string;
+  name: string;
+  degree_id: string;
+  program_year_id: string;
+  degree_name: string;
+  program_year_label: string;
+}
+
+export interface ManagedClass {
+  id: string;
+  name: string;
+  subjectId: string;
+  subject: string;
+  degreeId: string;
+  degreeName: string;
+  programYearId: string;
+  programYearLabel: string;
+  grade: string;
+  description?: string;
   capacity?: number;
   studentCount?: number;
   createdAt?: string;
 }
 
 interface AddClassProps {
-  existingClasses: ManagedClass[];
+  accessToken: string;
   onBack: () => void;
-  onAddClass: (newClass: ManagedClass) => boolean;
+  onAddClass: (newClass: ManagedClass) => Promise<boolean>;
 }
 
-export function AddClass({ existingClasses, onBack, onAddClass }: AddClassProps) {
-  const [selectedDentalClass, setSelectedDentalClass] = useState('');
-  const [customCapacity, setCustomCapacity] = useState('');
-  const classesByYear = getClassesByYear();
+async function fetchOptions<T>(url: string, accessToken: string, key: string): Promise<T[]> {
+  const response = await fetch(url, {
+    cache: "no-store",
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || `Unable to load ${key}`);
+  return Array.isArray(data[key]) ? data[key] : [];
+}
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (!selectedDentalClass) {
-      toast.error('Please select a class');
+export function AddClass({ accessToken, onBack, onAddClass }: AddClassProps) {
+  const [degrees, setDegrees] = useState<DegreeOption[]>([]);
+  const [programYears, setProgramYears] = useState<ProgramYearOption[]>([]);
+  const [subjects, setSubjects] = useState<SubjectOption[]>([]);
+  const [degreeId, setDegreeId] = useState("");
+  const [programYearId, setProgramYearId] = useState("");
+  const [subjectId, setSubjectId] = useState("");
+  const [className, setClassName] = useState("");
+  const [capacity, setCapacity] = useState("30");
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    void fetchOptions<DegreeOption>("/api/academic/degrees", accessToken, "degrees")
+      .then(result => { if (active) setDegrees(result); })
+      .catch(error => { if (active) toast.error(error.message); })
+      .finally(() => { if (active) setIsLoading(false); });
+    return () => { active = false; };
+  }, [accessToken]);
+
+  useEffect(() => {
+    let active = true;
+    if (!degreeId) return () => { active = false; };
+    void fetchOptions<ProgramYearOption>(
+      `/api/academic/degrees/${encodeURIComponent(degreeId)}/program-years`,
+      accessToken,
+      "programYears",
+    ).then(result => { if (active) setProgramYears(result); })
+      .catch(error => { if (active) toast.error(error.message); });
+    return () => { active = false; };
+  }, [accessToken, degreeId]);
+
+  useEffect(() => {
+    let active = true;
+    if (!programYearId) return () => { active = false; };
+    void fetchOptions<SubjectOption>(
+      `/api/academic/program-years/${encodeURIComponent(programYearId)}/subjects`,
+      accessToken,
+      "subjects",
+    ).then(result => { if (active) setSubjects(result); })
+      .catch(error => { if (active) toast.error(error.message); });
+    return () => { active = false; };
+  }, [accessToken, programYearId]);
+
+  const selectedSubject = subjects.find(subject => subject.id === subjectId);
+  const selectedProgramYear = programYears.find(programYear => programYear.id === programYearId);
+
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!selectedSubject || !selectedProgramYear) {
+      toast.error("Choose a degree, program year, and subject.");
       return;
     }
-
-    const selectedClass = dentalClasses.find(c => c.id === selectedDentalClass);
-    if (!selectedClass) {
-      toast.error('Class not found');
-      return;
+    const name = className.trim() || `${selectedSubject.name} · ${selectedProgramYear.label}`;
+    setIsSaving(true);
+    try {
+      const added = await onAddClass({
+        id: `class-${crypto.randomUUID()}`,
+        name,
+        subjectId: selectedSubject.id,
+        subject: selectedSubject.name,
+        degreeId: selectedSubject.degree_id,
+        degreeName: selectedSubject.degree_name,
+        programYearId: selectedProgramYear.id,
+        programYearLabel: selectedProgramYear.label,
+        grade: selectedProgramYear.label,
+        capacity: Number(capacity) || 30,
+        studentCount: 0,
+        createdAt: new Date().toISOString(),
+      });
+      if (!added) return;
+      toast.success("Class created.");
+      onBack();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to create class.");
+    } finally {
+      setIsSaving(false);
     }
-
-    const newClass = {
-      id: selectedClass.id,
-      name: selectedClass.name,
-      grade: selectedClass.grade,
-      subject: selectedClass.subject,
-      description: selectedClass.description,
-      capacity: customCapacity ? parseInt(customCapacity) : 30,
-      studentCount: 0,
-      createdAt: new Date().toISOString()
-    };
-
-    if (!onAddClass(newClass)) return;
-    toast.success('Class added successfully!');
-    setSelectedDentalClass('');
-    setCustomCapacity('');
-    onBack();
   };
-
-  const selectedClassData = dentalClasses.find(c => c.id === selectedDentalClass);
-  const alreadyAdded = existingClasses.some(classItem => classItem.id === selectedDentalClass);
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
       <div className="space-y-2">
-        <Label htmlFor="class">Select Dental Class *</Label>
-        <Select value={selectedDentalClass} onValueChange={value => setSelectedDentalClass(value ?? '')}>
-          <SelectTrigger>
-            <SelectValue placeholder="Choose a dental class" />
+        <Label htmlFor="class-degree">Degree *</Label>
+        <Select value={degreeId} onValueChange={value => {
+          setDegreeId(value ?? "");
+          setProgramYears([]);
+          setSubjects([]);
+          setProgramYearId("");
+          setSubjectId("");
+        }}>
+          <SelectTrigger id="class-degree">
+            <SelectValue placeholder={isLoading ? "Loading degrees…" : "Choose a degree"} />
           </SelectTrigger>
-          <SelectContent className="max-h-[400px]">
-            {Object.entries(classesByYear).map(([year, yearClasses]) => (
-              <React.Fragment key={year}>
-                <div className="sticky top-0 bg-muted/50 px-2 py-1.5 text-sm font-semibold text-muted-foreground">
-                  {year}
-                </div>
-                {yearClasses.map(classItem => {
-                  const isExisting = existingClasses.some(existing => existing.id === classItem.id);
-                  return (
-                    <SelectItem key={classItem.id} value={classItem.id} disabled={isExisting}>
-                      {classItem.subject}{isExisting ? ' (added)' : ''}
-                    </SelectItem>
-                  );
-                })}
-              </React.Fragment>
-            ))}
+          <SelectContent>
+            {degrees.map(degree => <SelectItem key={degree.id} value={degree.id}>{degree.name}</SelectItem>)}
           </SelectContent>
         </Select>
-        <p className="text-sm text-muted-foreground">
-          Choose from BDS (1st-5th Year) or MDS (1st-3rd Year) programs
-        </p>
       </div>
 
-      {selectedClassData && (
+      <div className="space-y-2">
+        <Label htmlFor="class-program-year">Program year *</Label>
+        <Select value={programYearId} onValueChange={value => {
+          setProgramYearId(value ?? "");
+          setSubjects([]);
+          setSubjectId("");
+        }} disabled={!degreeId}>
+          <SelectTrigger id="class-program-year">
+            <SelectValue placeholder="Choose a program year" />
+          </SelectTrigger>
+          <SelectContent>
+            {programYears.map(year => <SelectItem key={year.id} value={year.id}>{year.label}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="class-subject">Subject *</Label>
+        <Select value={subjectId} onValueChange={value => setSubjectId(value ?? "")} disabled={!programYearId}>
+          <SelectTrigger id="class-subject">
+            <SelectValue placeholder="Choose a catalog subject" />
+          </SelectTrigger>
+          <SelectContent>
+            {subjects.map(subject => <SelectItem key={subject.id} value={subject.id}>{subject.name}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        {programYearId && subjects.length === 0 && (
+          <p role="status" className="text-sm text-muted-foreground">No subjects are registered for this program year yet.</p>
+        )}
+      </div>
+
+      {selectedSubject && selectedProgramYear && (
         <div className="rounded-lg bg-muted/60 p-4 text-sm">
-          <p className="font-medium">{selectedClassData.name} · {selectedClassData.grade}</p>
-          <p className="mt-1 text-muted-foreground">{selectedClassData.description}</p>
+          <p className="font-medium">{selectedSubject.name} · {selectedProgramYear.label}</p>
+          <p className="mt-1 text-muted-foreground">{selectedSubject.degree_name}</p>
         </div>
       )}
 
-      {alreadyAdded && (
-        <p role="status" className="text-sm text-destructive">
-          This curriculum class has already been added.
-        </p>
-      )}
+      <div className="space-y-2">
+        <Label htmlFor="class-name">Class name (optional)</Label>
+        <Input
+          id="class-name"
+          value={className}
+          onChange={event => setClassName(event.target.value)}
+          placeholder={selectedSubject && selectedProgramYear ? `${selectedSubject.name} · ${selectedProgramYear.label}` : "e.g. Monday morning seminar"}
+          maxLength={100}
+        />
+        <p className="text-sm text-muted-foreground">You can create multiple classes for the same catalog subject.</p>
+      </div>
 
       <div className="space-y-2">
-        <Label htmlFor="capacity">Class Capacity (Optional)</Label>
+        <Label htmlFor="capacity">Class capacity</Label>
         <Input
           id="capacity"
           type="number"
-          value={customCapacity}
-          onChange={(e) => setCustomCapacity(e.target.value)}
-          placeholder="Default: 30 students"
+          value={capacity}
+          onChange={event => setCapacity(event.target.value)}
           min="1"
-          max="60"
+          max="1000"
         />
-        <p className="text-sm text-muted-foreground">
-          Set the maximum number of students for this class
-        </p>
       </div>
 
-      <Button type="submit" className="w-full" disabled={!selectedDentalClass || alreadyAdded}>
-        <Save className="w-4 h-4 mr-2" />
-        Add Class
+      <Button type="submit" className="w-full" disabled={!selectedSubject || isSaving}>
+        <Save aria-hidden="true" className="mr-2 size-4" />
+        {isSaving ? "Creating class…" : "Create class"}
       </Button>
     </form>
   );

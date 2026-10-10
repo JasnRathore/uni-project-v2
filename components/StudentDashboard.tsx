@@ -9,6 +9,15 @@ import {
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { Progress } from "./ui/progress";
+import { Skeleton } from "./ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "./ui/table";
 import { RoleAvatar } from "./RoleAvatar";
 import {
   Dialog,
@@ -24,13 +33,16 @@ import { StudentLeaderboard } from "./StudentLeaderboard";
 import {
   Trophy,
   Star,
-  Bell,
   Zap,
   CheckCircle2,
   Clock,
   Flame,
   GraduationCap,
   Info,
+  AlertCircle,
+  BookOpen,
+  Loader2,
+  RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -48,6 +60,8 @@ export function StudentDashboard({
   const pathname = usePathname();
   const router = useRouter();
   const [grades, setGrades] = useState<any[]>([]);
+  const [isGradesLoading, setIsGradesLoading] = useState(true);
+  const [gradesError, setGradesError] = useState("");
   const [tasks, setTasks] = useState<any[]>([]);
   const [selectedQuiz, setSelectedQuiz] = useState<any>(null);
   const activeView = pathname.split("/").filter(Boolean).at(-1) || "dashboard";
@@ -57,19 +71,13 @@ export function StudentDashboard({
   const [dailyQuest, setDailyQuest] = useState<any>(null);
   const [showDailyQuestDialog, setShowDailyQuestDialog] = useState(false);
   const [adminMessage, setAdminMessage] = useState<any>(null);
-  const [notifications, setNotifications] = useState<any[]>([]);
-  const [showNotifications, setShowNotifications] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0);
   const profileData = {
     name: student?.name || "",
     email: student?.email || "",
-    username: student?.username || "",
-    rollNumber: student?.rollNumber || "",
-    batch: student?.batch || "",
-    class: "",
-    phone: "",
-    department: "",
-    semester: "",
+    prn: student?.prn || "",
+    phone: student?.phone || "",
+    address: student?.address || "",
+    bio: student?.bio || "",
   };
   const [stats, setStats] = useState({
     totalEXP: 0,
@@ -80,14 +88,23 @@ export function StudentDashboard({
     totalAssignments: 0,
     completedAssignments: 0,
   });
+  const scoredGrades = grades.filter(
+    (grade) => typeof grade.score === "number" && Number.isFinite(grade.score),
+  );
+  const averageGradeScore = scoredGrades.length
+    ? Math.round(
+        scoredGrades.reduce((total, grade) => total + grade.score, 0) / scoredGrades.length,
+      )
+    : null;
 
   useEffect(() => {
     loadStudentData();
     checkDailyQuest();
-    loadNotifications();
   }, []);
 
   const loadStudentData = async () => {
+    setIsGradesLoading(true);
+    setGradesError("");
     try {
       const response = await fetch(`/api/student/data`, {
         headers: {
@@ -110,33 +127,15 @@ export function StudentDashboard({
             data.streakData || { currentStreak: 0, longestStreak: 0 },
           );
         }
+      } else {
+        setGradesError("We couldn’t load your grades. Check your connection and try again.");
       }
     } catch (error) {
       console.error("Error loading student data:", error);
+      setGradesError("We couldn’t load your grades. Check your connection and try again.");
       toast.error("Failed to load data");
-    }
-  };
-
-  const loadNotifications = async () => {
-    try {
-      const response = await fetch(
-        `/api/student/notifications`,
-        {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
-        },
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        console.log("Notifications loaded:", data.notifications);
-        setNotifications(data.notifications || []);
-        const unread = (data.notifications || []).filter((n) => !n.read).length;
-        setUnreadCount(unread);
-      }
-    } catch (error) {
-      console.error("Error loading notifications:", error);
+    } finally {
+      setIsGradesLoading(false);
     }
   };
 
@@ -241,41 +240,8 @@ export function StudentDashboard({
     }
   };
 
-  const markNotificationAsRead = async (notificationId: any) => {
-    try {
-      const response = await fetch(`/api/student/notifications/read`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ notificationId }),
-      });
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data.error || `Failed to mark notification read (${response.status})`);
-      }
-
-      setNotifications((prev) =>
-        prev.map((n) => (n.id === notificationId ? { ...n, read: true } : n)),
-      );
-      setUnreadCount((prev) => Math.max(0, prev - 1));
-    } catch (error) {
-      console.error("Error marking notification as read:", error);
-      toast.error("Failed to mark notification as read");
-    }
-  };
-
   const startQuiz = (quiz: any) => {
     setSelectedQuiz(quiz);
-  };
-
-  const handleNotificationClick = (notif: any) => {
-    if (notif.type === "task") {
-      setActiveView("tasks");
-    } else if (notif.type === "grade") {
-      setActiveView("grades");
-    }
   };
 
   const markDailyQuestSeen = () => {
@@ -359,20 +325,6 @@ export function StudentDashboard({
               <span className="text-sm font-semibold">Student portal</span>
             </div>
             <div className="flex items-center gap-1">
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={() => setShowNotifications(true)}
-                className="relative"
-                aria-label={`Notifications${unreadCount > 0 ? `, ${unreadCount} unread` : ''}`}
-              >
-                <Bell aria-hidden="true" />
-                {unreadCount > 0 && (
-                  <span className="absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full bg-destructive text-[10px] font-medium text-destructive-foreground">
-                    {unreadCount}
-                  </span>
-                )}
-              </Button>
               <RoleAvatar
                 role="student"
                 identifier={student?.id || student?.email}
@@ -390,7 +342,6 @@ export function StudentDashboard({
                 {activeView === "profile" && (
                   <StudentProfile
                     student={{ ...student, ...profileData }}
-                    onBack={() => setActiveView("dashboard")}
                     accessToken={accessToken}
                     projectId={projectId}
                     onUpdate={loadStudentData}
@@ -399,10 +350,10 @@ export function StudentDashboard({
 
                 {/* Admin Broadcast Message - only show on dashboard */}
                 {activeView === "dashboard" && adminMessage && (
-                  <Alert className="mb-6">
+                  <Alert className="mb-6" aria-labelledby="student-admin-message-heading">
                     <Info aria-hidden="true" />
                     <AlertDescription>
-                      <span className="mb-1 block font-medium text-foreground">
+                      <span id="student-admin-message-heading" className="mb-1 block font-medium text-foreground">
                         Message from administration
                       </span>
                       {adminMessage}
@@ -413,24 +364,33 @@ export function StudentDashboard({
                 {/* View Content based on activeView */}
                 {activeView === "dashboard" && (
                   <div className="flex flex-col gap-8">
-                    <section aria-labelledby="student-overview-heading">
-                      <h2 id="student-overview-heading" className="text-2xl font-semibold tracking-tight">
-                        Your learning overview
-                      </h2>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        Check your progress and see what needs attention.
-                      </p>
+                    <section
+                      aria-labelledby="student-overview-heading"
+                      className="flex flex-wrap items-end justify-between gap-4"
+                    >
+                      <div className="min-w-0">
+                        <h2
+                          id="student-overview-heading"
+                          className="text-2xl font-semibold tracking-tight [text-wrap:balance]"
+                        >
+                          {profileData.name ? `Welcome back, ${profileData.name}` : "Your learning overview"}
+                        </h2>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          Check your progress and see what needs attention.
+                        </p>
+                      </div>
                     </section>
-                    {/* Stats Grid */}
-                    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                      <Card className="shadow-none">
+                    <section aria-label="Learning progress" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                      <Card className="border-primary/20 bg-primary/[0.035] shadow-none">
                         <CardContent className="p-5">
                           <div className="flex items-start justify-between gap-3">
                             <div>
                               <p className="text-sm text-muted-foreground">Level</p>
                               <p className="mt-2 text-3xl font-semibold tabular-nums">{stats.level}</p>
                             </div>
-                            <Trophy aria-hidden="true" className="size-5 text-muted-foreground" />
+                            <span className="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                              <Trophy aria-hidden="true" className="size-4" />
+                            </span>
                           </div>
                           <div className="mt-5">
                             <div className="mb-2 flex justify-between text-xs text-muted-foreground">
@@ -449,7 +409,9 @@ export function StudentDashboard({
                               <p className="text-sm text-muted-foreground">Experience points</p>
                               <p className="mt-2 text-3xl font-semibold tabular-nums">{stats.totalEXP}</p>
                             </div>
-                            <Star aria-hidden="true" className="size-5 text-muted-foreground" />
+                            <span className="flex size-9 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                              <Star aria-hidden="true" className="size-4" />
+                            </span>
                           </div>
                           <p className="mt-5 text-xs text-muted-foreground">Earn points from graded work.</p>
                         </CardContent>
@@ -462,7 +424,9 @@ export function StudentDashboard({
                               <p className="text-sm text-muted-foreground">Learning streak</p>
                               <p className="mt-2 text-3xl font-semibold tabular-nums">{stats.streak} <span className="text-base font-normal text-muted-foreground">days</span></p>
                             </div>
-                            <Flame aria-hidden="true" className="size-5 text-muted-foreground" />
+                            <span className="flex size-9 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                              <Flame aria-hidden="true" className="size-4" />
+                            </span>
                           </div>
                           <p className="mt-5 text-xs text-muted-foreground">Keep a steady study routine.</p>
                         </CardContent>
@@ -477,7 +441,9 @@ export function StudentDashboard({
                                 {stats.completedAssignments}<span className="text-base font-normal text-muted-foreground"> / {stats.totalAssignments}</span>
                               </p>
                             </div>
-                            <CheckCircle2 aria-hidden="true" className="size-5 text-muted-foreground" />
+                            <span className="flex size-9 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                              <CheckCircle2 aria-hidden="true" className="size-4" />
+                            </span>
                           </div>
                           <div className="mt-5">
                             <div className="mb-2 flex justify-between text-xs text-muted-foreground">
@@ -488,12 +454,14 @@ export function StudentDashboard({
                           </div>
                         </CardContent>
                       </Card>
-                    </div>
+                    </section>
 
-                    <section className="flex flex-col gap-4">
+                    <section aria-labelledby="student-upcoming-heading" className="flex flex-col gap-4">
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <div>
-                          <h3 className="text-lg font-semibold">Upcoming work</h3>
+                          <h3 id="student-upcoming-heading" className="text-lg font-semibold">
+                            Upcoming work
+                          </h3>
                           <p className="mt-1 text-sm text-muted-foreground">
                             {ongoingTasks.length
                               ? `${ongoingTasks.length} task${ongoingTasks.length === 1 ? '' : 's'} awaiting completion`
@@ -571,101 +539,150 @@ export function StudentDashboard({
                 {activeView === "grades" && (
                   <div className="flex flex-col gap-6">
                     <div className="flex flex-wrap items-end justify-between gap-4">
-                      <div className="rounded-lg border bg-card px-4 py-2">
-                        <p className="text-xs text-muted-foreground">Average score</p>
-                        <p className="text-lg font-semibold tabular-nums">
-                          {grades.length > 0
-                            ? Math.round(
-                                grades.reduce(
-                                  (a, b) =>
-                                    a +
-                                    (typeof b.score === "number" ? b.score : 0),
-                                  0,
-                                ) / grades.length,
-                              )
-                            : 0}
-                          %
+                      <div>
+                        <h2 className="text-2xl font-semibold tracking-tight">Your grades</h2>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          Results for assignments and quizzes that have been reviewed.
                         </p>
                       </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={loadStudentData}
+                        disabled={isGradesLoading}
+                      >
+                        {isGradesLoading ? (
+                          <Loader2 aria-hidden="true" data-icon="inline-start" className="animate-spin text-primary" />
+                        ) : (
+                          <RefreshCw aria-hidden="true" data-icon="inline-start" />
+                        )}
+                        Refresh grades
+                      </Button>
                     </div>
 
-                    <Card className="shadow-none">
-                      <CardContent className="p-0">
-                        <div className="overflow-x-auto">
-                          <table className="w-full">
-                            <thead className="border-b bg-muted/50">
-                              <tr>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground sm:px-6">
-                                  Assignment
-                                </th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground sm:px-6">
-                                  Subject
-                                </th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground sm:px-6">
-                                  Date
-                                </th>
-                                <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground sm:px-6">
-                                  Result
-                                </th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y">
-                              {grades.map((grade, index) => (
-                                  <tr
-                                    key={grade.id || `${grade.assignment}-${grade.date}-${index}`}
-                                    className="transition-colors hover:bg-muted/40"
-                                  >
-                                    <td className="max-w-64 px-4 py-4 sm:px-6">
-                                      <span className="block truncate text-sm font-medium">
-                                          {grade.assignment}
-                                      </span>
-                                    </td>
-                                    <td className="px-4 py-4 sm:px-6">
-                                      <Badge
-                                        variant="outline"
-                                      >
-                                        {grade.subject}
-                                      </Badge>
-                                    </td>
-                                    <td className="whitespace-nowrap px-4 py-4 text-sm text-muted-foreground sm:px-6">
-                                      {new Date(
-                                        grade.date,
-                                      ).toLocaleDateString()}
-                                    </td>
-                                    <td className="whitespace-nowrap px-4 py-4 text-right">
-                                      <div className="flex flex-col items-end gap-0.5">
-                                        <span className="font-semibold tabular-nums">
-                                          {grade.grade || "—"}
-                                        </span>
-                                        {typeof grade.score === "number" && (
-                                          <span className="text-xs text-muted-foreground">
-                                            {grade.score}%
-                                          </span>
-                                        )}
-                                      </div>
-                                    </td>
-                                  </tr>
-                              ))}
-                              {grades.length === 0 && (
-                                <tr>
-                                  <td
-                                    colSpan={4}
-                                    className="px-6 py-16 text-center"
-                                  >
-                                    <div className="mx-auto max-w-sm">
-                                      <h4 className="font-medium">No grades yet</h4>
-                                      <p className="mt-1 text-sm text-muted-foreground">
-                                        Grades will appear here after your work has been reviewed.
-                                      </p>
-                                    </div>
-                                  </td>
-                                </tr>
-                              )}
-                            </tbody>
-                          </table>
+                    {isGradesLoading ? (
+                      <div aria-busy="true" aria-label="Loading grades" className="space-y-3" role="status">
+                        {Array.from({ length: 4 }, (_, index) => (
+                          <Skeleton key={index} className="h-16 rounded-lg" />
+                        ))}
+                      </div>
+                    ) : gradesError ? (
+                      <Card className="shadow-none">
+                        <CardContent className="flex flex-col items-start gap-4 p-6">
+                          <AlertCircle aria-hidden="true" className="size-5 text-destructive" />
+                          <p className="text-sm">{gradesError}</p>
+                          <Button type="button" variant="outline" size="sm" onClick={loadStudentData}>
+                            <RefreshCw aria-hidden="true" data-icon="inline-start" />
+                            Try again
+                          </Button>
+                        </CardContent>
+                      </Card>
+                    ) : grades.length === 0 ? (
+                      <Card className="shadow-none">
+                        <CardContent className="flex flex-col items-center px-6 py-12 text-center">
+                          <span className="flex size-10 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                            <BookOpen aria-hidden="true" className="size-5" />
+                          </span>
+                          <h3 className="mt-4 font-medium">No grades yet</h3>
+                          <p className="mt-1 max-w-sm text-sm text-muted-foreground">
+                            Reviewed assignment and quiz results will appear here.
+                          </p>
+                        </CardContent>
+                      </Card>
+                    ) : (
+                      <>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <Card className="shadow-none">
+                            <CardContent className="p-4">
+                              <p className="text-sm text-muted-foreground">Average score</p>
+                              <p className="mt-1 text-2xl font-semibold tabular-nums">
+                                {averageGradeScore === null ? "—" : `${averageGradeScore}%`}
+                              </p>
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                {averageGradeScore === null
+                                  ? "Scores aren’t available for your graded work yet."
+                                  : `Across ${scoredGrades.length} scored result${scoredGrades.length === 1 ? "" : "s"}`}
+                              </p>
+                            </CardContent>
+                          </Card>
+                          <Card className="shadow-none">
+                            <CardContent className="p-4">
+                              <p className="text-sm text-muted-foreground">Reviewed work</p>
+                              <p className="mt-1 text-2xl font-semibold tabular-nums">{grades.length}</p>
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                Assignment{grades.length === 1 ? "" : "s"} and quiz results
+                              </p>
+                            </CardContent>
+                          </Card>
                         </div>
-                      </CardContent>
-                    </Card>
+
+                        <Card className="shadow-none">
+                          <CardContent className="p-0">
+                            <div className="hidden md:block">
+                              <Table>
+                                <caption className="sr-only">Your graded assignments and quiz results</caption>
+                                <TableHeader className="bg-muted/50">
+                                  <TableRow>
+                                    <TableHead>Assignment</TableHead>
+                                    <TableHead>Subject</TableHead>
+                                    <TableHead>Date</TableHead>
+                                    <TableHead className="text-right">Result</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {grades.map((grade, index) => (
+                                    <TableRow key={grade.id || `${grade.assignment}-${grade.date}-${index}`}>
+                                      <TableCell className="max-w-64">
+                                        <span className="block truncate font-medium">{grade.assignment}</span>
+                                      </TableCell>
+                                      <TableCell>
+                                        <Badge variant="outline">{grade.subject}</Badge>
+                                      </TableCell>
+                                      <TableCell className="text-muted-foreground">
+                                        {new Date(grade.date).toLocaleDateString()}
+                                      </TableCell>
+                                      <TableCell className="text-right">
+                                        <span className="font-semibold tabular-nums">{grade.grade || "—"}</span>
+                                        {typeof grade.score === "number" && (
+                                          <span className="ml-2 text-xs text-muted-foreground">{grade.score}%</span>
+                                        )}
+                                      </TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            </div>
+                            <ul className="divide-y md:hidden" aria-label="Graded assignments and quizzes">
+                              {grades.map((grade, index) => (
+                                <li
+                                  key={grade.id || `${grade.assignment}-${grade.date}-${index}`}
+                                  className="space-y-3 p-4"
+                                >
+                                  <div className="flex items-start justify-between gap-3">
+                                    <p className="min-w-0 flex-1 text-sm font-medium">
+                                      {grade.assignment}
+                                    </p>
+                                    <div className="shrink-0 text-right">
+                                      <p className="font-semibold tabular-nums">{grade.grade || "—"}</p>
+                                      {typeof grade.score === "number" && (
+                                        <p className="text-xs text-muted-foreground">{grade.score}%</p>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <Badge variant="outline">{grade.subject}</Badge>
+                                    <time className="text-xs text-muted-foreground" dateTime={grade.date}>
+                                      {new Date(grade.date).toLocaleDateString()}
+                                    </time>
+                                  </div>
+                                </li>
+                              ))}
+                            </ul>
+                          </CardContent>
+                        </Card>
+                      </>
+                    )}
                   </div>
                 )}
 
@@ -808,75 +825,6 @@ export function StudentDashboard({
                 )}
               </div>
         </div>
-
-          {/* Notifications Dialog */}
-          <Dialog open={showNotifications} onOpenChange={setShowNotifications}>
-            <DialogContent className="max-w-md p-0">
-              <DialogHeader className="border-b p-5">
-                <DialogTitle className="flex items-center gap-2 text-base">
-                  <Bell aria-hidden="true" className="size-4" />
-                  Notifications
-                </DialogTitle>
-                <DialogDescription>
-                  {unreadCount === 0
-                    ? "You are all caught up."
-                    : `${unreadCount} unread notification${unreadCount === 1 ? "" : "s"}.`}
-                </DialogDescription>
-              </DialogHeader>
-              <div className="max-h-[60vh] overflow-y-auto">
-                {notifications.length > 0 ? (
-                  <ul className="divide-y">
-                    {notifications.map((notif) => (
-                      <li key={notif.id}>
-                        <button
-                          type="button"
-                          className={`w-full px-5 py-4 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset ${
-                            !notif.read ? "bg-muted/40" : ""
-                          }`}
-                          onClick={() => {
-                            markNotificationAsRead(notif.id);
-                            handleNotificationClick(notif);
-                          }}
-                        >
-                          <div className="mb-2 flex items-center justify-between gap-3">
-                            <Badge variant={notif.read ? "outline" : "secondary"}>
-                              {notif.type}
-                            </Badge>
-                            <span className="text-xs text-muted-foreground">
-                              {new Date(notif.createdAt).toLocaleDateString()}
-                            </span>
-                          </div>
-                          <h5 className="text-sm font-medium">{notif.title}</h5>
-                          <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-                            {notif.message}
-                          </p>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <div className="p-8 text-center">
-                    <Bell aria-hidden="true" className="mx-auto size-5 text-muted-foreground" />
-                    <p className="mt-3 text-sm font-medium">
-                      No notifications
-                    </p>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      New messages will appear here.
-                    </p>
-                  </div>
-                )}
-              </div>
-              <div className="border-t p-4">
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => setShowNotifications(false)}
-                >
-                  Close
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
 
           {/* Daily Quest Dialog */}
           <Dialog

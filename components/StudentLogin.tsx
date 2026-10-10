@@ -5,14 +5,15 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { GraduationCap, Mail, Lock, LogIn, UserPlus, ArrowLeft } from 'lucide-react';
+import { LoadingSpinner } from './ui/loading';
 
 interface StudentLoginProps {
   onLogin: (email: string, password: string) => Promise<void>;
   onSwitchToSignup: () => void;
-  onSwitchToAdmin: () => void;
+  onSwitchToFaculty: () => void;
 }
 
-export function StudentLogin({ onLogin, onSwitchToSignup, onSwitchToAdmin }: StudentLoginProps) {
+export function StudentLogin({ onLogin, onSwitchToSignup, onSwitchToFaculty }: StudentLoginProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -33,7 +34,7 @@ export function StudentLogin({ onLogin, onSwitchToSignup, onSwitchToAdmin }: Stu
     <main className="flex min-h-dvh items-center justify-center bg-muted/40 p-4">
       <div className="w-full max-w-md">
         <Button
-          onClick={onSwitchToAdmin}
+          onClick={onSwitchToFaculty}
           variant="ghost"
           className="mb-4"
         >
@@ -96,7 +97,7 @@ export function StudentLogin({ onLogin, onSwitchToSignup, onSwitchToAdmin }: Stu
               >
                 {isLoading ? (
                   <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <LoadingSpinner className="size-4 text-primary-foreground" />
                     Signing in...
                   </div>
                 ) : (
@@ -133,10 +134,10 @@ export function StudentLogin({ onLogin, onSwitchToSignup, onSwitchToAdmin }: Stu
               <Button
                 type="button"
                 variant="ghost"
-                onClick={onSwitchToAdmin}
+                onClick={onSwitchToFaculty}
                 className="w-full text-sm text-muted-foreground hover:text-foreground"
               >
-                Are you a teacher? Switch to Admin Portal →
+                Are you a faculty member? Switch to Faculty Portal ?
               </Button>
             </div>
           </CardContent>

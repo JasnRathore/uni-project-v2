@@ -93,6 +93,9 @@ export function TakeQuiz({ quiz, onBack, onSubmit }: TakeQuizProps) {
     const pointsEarned = Math.round((correctAnswers / totalQuestions) * quiz.totalPoints);
 
     const submission = {
+      taskId: quiz.id,
+      score: pointsEarned,
+      maxScore: quiz.totalPoints,
       quizId: quiz.id,
       answers: answers,
       correctAnswers: correctAnswers,
@@ -118,9 +121,9 @@ export function TakeQuiz({ quiz, onBack, onSubmit }: TakeQuizProps) {
 
   const getTimerColor = () => {
     const percentage = (timeRemaining / (quiz.duration * 60)) * 100;
-    if (percentage > 50) return 'text-green-600';
-    if (percentage > 25) return 'text-yellow-600';
-    return 'text-red-600';
+    if (percentage > 50) return 'text-primary';
+    if (percentage > 25) return 'text-amber-600 dark:text-amber-400';
+    return 'text-destructive';
   };
 
   const answeredCount = Object.keys(answers).length;
@@ -138,51 +141,51 @@ export function TakeQuiz({ quiz, onBack, onSubmit }: TakeQuizProps) {
           Back
         </Button>
 
-        <Card className="border-0 shadow-xl">
-          <CardHeader className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white">
-            <CardTitle className="text-2xl">{quiz.title}</CardTitle>
-            <p className="text-white/90 mt-2">{quiz.description}</p>
+        <Card className="shadow-none">
+          <CardHeader className="border-b bg-muted/30">
+            <CardTitle className="text-xl tracking-tight">{quiz.title}</CardTitle>
+            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{quiz.description}</p>
           </CardHeader>
           <CardContent className="p-8 space-y-6">
             <div className="grid grid-cols-2 gap-4">
-              <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                <div className="flex items-center gap-2 text-blue-700 mb-1">
+              <div className="rounded-lg border bg-card p-4">
+                <div className="mb-1 flex items-center gap-2 text-muted-foreground">
                   <Clock className="w-4 h-4" />
-                  <span className="font-medium">Duration</span>
+                  <span className="text-sm font-medium">Duration</span>
                 </div>
-                <p className="text-2xl font-bold text-blue-900">{quiz.duration} min</p>
+                <p className="text-2xl font-semibold tabular-nums">{quiz.duration} min</p>
               </div>
 
-              <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
-                <div className="flex items-center gap-2 text-purple-700 mb-1">
+              <div className="rounded-lg border bg-card p-4">
+                <div className="mb-1 flex items-center gap-2 text-muted-foreground">
                   <CheckCircle2 className="w-4 h-4" />
-                  <span className="font-medium">Total Points</span>
+                  <span className="text-sm font-medium">Total Points</span>
                 </div>
-                <p className="text-2xl font-bold text-purple-900">{quiz.totalPoints}</p>
+                <p className="text-2xl font-semibold tabular-nums">{quiz.totalPoints}</p>
               </div>
 
-              <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-                <div className="flex items-center gap-2 text-green-700 mb-1">
+              <div className="rounded-lg border bg-card p-4">
+                <div className="mb-1 flex items-center gap-2 text-muted-foreground">
                   <AlertCircle className="w-4 h-4" />
-                  <span className="font-medium">Questions</span>
+                  <span className="text-sm font-medium">Questions</span>
                 </div>
-                <p className="text-2xl font-bold text-green-900">{totalQuestions}</p>
+                <p className="text-2xl font-semibold tabular-nums">{totalQuestions}</p>
               </div>
 
-              <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
-                <div className="flex items-center gap-2 text-orange-700 mb-1">
+              <div className="rounded-lg border bg-card p-4">
+                <div className="mb-1 flex items-center gap-2 text-muted-foreground">
                   <AlertCircle className="w-4 h-4" />
-                  <span className="font-medium">Due Date</span>
+                  <span className="text-sm font-medium">Due Date</span>
                 </div>
-                <p className="text-lg font-bold text-orange-900">
+                <p className="text-lg font-semibold">
                   {new Date(quiz.dueDate).toLocaleDateString()}
                 </p>
               </div>
             </div>
 
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-              <h3 className="font-semibold text-yellow-900 mb-2">Important Instructions:</h3>
-              <ul className="space-y-2 text-sm text-yellow-800">
+            <div className="rounded-lg border bg-muted/40 p-4">
+              <h3 className="mb-2 font-semibold">Important Instructions:</h3>
+              <ul className="space-y-2 text-sm leading-relaxed text-muted-foreground">
                 <li>• Once you start, the timer will begin and cannot be paused</li>
                 <li>• Questions may use single choice, multiple choice, or typed answers</li>
                 <li>• You can change your answers before submitting</li>
@@ -193,7 +196,7 @@ export function TakeQuiz({ quiz, onBack, onSubmit }: TakeQuizProps) {
 
             <Button
               onClick={() => setHasStarted(true)}
-              className="w-full bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white text-lg py-6"
+              className="min-h-12 w-full text-base"
             >
               Start Quiz
             </Button>
@@ -206,7 +209,7 @@ export function TakeQuiz({ quiz, onBack, onSubmit }: TakeQuizProps) {
   return (
     <div className="p-6 max-w-4xl mx-auto">
       {/* Fixed Timer Header */}
-      <div className="sticky top-0 z-10 mb-6 bg-white rounded-lg shadow-lg border-2 border-gray-200 p-4">
+      <div className="sticky top-0 z-10 mb-6 rounded-xl border bg-background/95 p-4 backdrop-blur supports-[backdrop-filter]:bg-background/80">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-xl font-bold">{quiz.title}</h2>
@@ -225,10 +228,10 @@ export function TakeQuiz({ quiz, onBack, onSubmit }: TakeQuizProps) {
       </div>
 
       {/* Questions */}
-      <div className="space-y-6">
+      <div className="space-y-5">
         {quiz.questions.map((question: any, qIndex: any) => (
-          <Card key={question.id} className="border-2 border-gray-200 shadow-md">
-            <CardHeader className="bg-gradient-to-r from-gray-50 to-gray-100 pb-3">
+          <Card key={question.id} className="shadow-none">
+            <CardHeader className="border-b bg-muted/30 pb-4">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-2">
@@ -240,7 +243,7 @@ export function TakeQuiz({ quiz, onBack, onSubmit }: TakeQuizProps) {
                       </Badge>
                     )}
                   </div>
-                  <CardTitle className="text-lg">{question.question}</CardTitle>
+                  <CardTitle className="text-base leading-relaxed">{question.question}</CardTitle>
                 </div>
               </div>
             </CardHeader>
@@ -252,7 +255,7 @@ export function TakeQuiz({ quiz, onBack, onSubmit }: TakeQuizProps) {
                   onChange={(event) => handleTypedAnswer(question.id, event.target.value)}
                   placeholder="Type your answer"
                   aria-label={`Answer for question ${qIndex + 1}`}
-                  className="w-full rounded-lg border-2 border-gray-200 bg-background p-4 outline-none transition focus:border-indigo-500"
+                  className="min-h-12 w-full rounded-md border border-input bg-background px-3 py-3 text-sm outline-none transition-[border-color,box-shadow] placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
                 />
               ) : (
               <div className="space-y-3">
@@ -261,19 +264,21 @@ export function TakeQuiz({ quiz, onBack, onSubmit }: TakeQuizProps) {
                   const isSelected = selectedAnswers.includes(optIndex);
                   return (
                     <button
+                      type="button"
                       key={optIndex}
                       onClick={() => handleAnswerSelect(question.id, optIndex)}
-                      className={`w-full text-left p-4 rounded-lg border-2 transition-all ${
+                      aria-pressed={isSelected}
+                      className={`flex min-h-12 w-full items-center rounded-lg border px-4 py-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                         isSelected
-                          ? 'border-indigo-500 bg-indigo-50'
-                          : 'border-gray-200 hover:border-indigo-300 hover:bg-gray-50'
+                          ? 'border-primary/50 bg-primary/5'
+                          : 'border-border hover:bg-muted/50'
                       }`}
                     >
                       <div className="flex items-center gap-3">
-                        <div className={`flex items-center justify-center w-8 h-8 rounded-full font-semibold text-sm ${
+                        <div className={`flex size-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${
                           isSelected
-                            ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white'
-                            : 'bg-gray-200 text-gray-700'
+                            ? 'bg-primary text-primary-foreground'
+                            : 'bg-muted text-muted-foreground'
                         }`}>
                           {question.type === 'multiple-choice' ? (isSelected ? '✓' : '') : String.fromCharCode(65 + optIndex)}
                         </div>
@@ -290,15 +295,15 @@ export function TakeQuiz({ quiz, onBack, onSubmit }: TakeQuizProps) {
       </div>
 
       {/* Submit Section */}
-      <Card className="mt-6 border-2 border-green-200 bg-green-50">
+      <Card className="mt-6 shadow-none">
         <CardContent className="p-6">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <h3 className="font-semibold text-lg">Ready to submit?</h3>
               <p className="text-sm text-muted-foreground">
                 You've answered {answeredCount} out of {totalQuestions} questions
                 {answeredCount < totalQuestions && (
-                  <span className="text-orange-600 font-medium">
+                  <span className="font-medium text-destructive">
                     {' '}({totalQuestions - answeredCount} unanswered)
                   </span>
                 )}
@@ -307,7 +312,7 @@ export function TakeQuiz({ quiz, onBack, onSubmit }: TakeQuizProps) {
             <Button
               onClick={handleSubmit}
               disabled={isSubmitting}
-              className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white px-8 py-6 text-lg"
+              className="min-h-11 px-8"
             >
               {isSubmitting ? 'Submitting...' : 'Submit Quiz'}
             </Button>
