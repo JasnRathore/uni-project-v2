@@ -7,14 +7,14 @@ This module contains `StudentApp` (session, route, and auth orchestration), `Stu
 ## Props and state
 
 - `StudentLogin`: `onLogin(email, password)`, `onSwitchToSignup()`, `onSwitchToFaculty()`.
-- `StudentSignup`: `onSignup(credentials)`, `onSwitchToLogin()`, `onBack()`. Credentials sent by the form include name, username, email, PRN, degree/cohort IDs, and password; confirmation is used for client validation but omitted from its callback payload.
+- `StudentSignup`: `onSignup(credentials)`, `onSwitchToLogin()`, `onBack()`. The form passes account and academic identity values plus password to its callback; confirmation is used for client validation but omitted from its callback payload.
 - `StudentApp` tracks session loading/authentication, student, access token and pathname; the forms track input values, lookup options, and submission loading.
 
 ## Routes, data, and interactions
 
 `StudentApp` is the `/student/*` client entry. On mount it reads an auth session, applies disabled-account reactivation, rejects teacher-role sessions, validates `/api/student/profile`, and redirects an accepted session to `/student/dashboard`. Unauthenticated `/student/signup` renders the signup form; other unauthenticated student paths render login. Student signup posts `/api/student/signup` with `role: "student"` and routes to `/student/login` after success. Login uses the auth client, validates `/api/student/profile`, then enters the dashboard; it rejects teacher accounts and signs out on a profile authorization failure.
 
-`StudentSignup` loads `/api/academic/degrees`; selecting a degree loads `/api/academic/degrees/:degreeId/cohorts`. Required identity fields are name, username, email, PRN, degree and cohort; password must be at least six characters and match confirmation.
+`StudentSignup` loads `/api/academic/degrees`; selecting a degree loads `/api/academic/degrees/:degreeId/cohorts`. The form validates required account and academic identity values, including name, email, PRN, degree and cohort; password must be at least six characters and match confirmation. The canonical student record stores email, name, optional PRN, and optional cohort ID; degree is resolved through the selected cohort.
 
 ## Loading, error, empty states
 

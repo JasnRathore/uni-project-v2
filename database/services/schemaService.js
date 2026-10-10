@@ -15,6 +15,7 @@ const getSchemaPath = () => {
 
 const ensureDatabaseSchema = async db => {
   await db.executeMultiple(fs.readFileSync(getSchemaPath(), 'utf8'));
+  await db.execute('DROP TABLE IF EXISTS usernames');
   const columns = (await db.execute('PRAGMA table_info("teacher_profiles")')).rows;
   if (!columns.some(column => column.name === 'department_id')) {
     await db.execute(

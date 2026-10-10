@@ -136,12 +136,6 @@ const getAuthService = () => {
               className: metadata.class || null,
               registeredAt: new Date().toISOString(),
             });
-            if (metadata.username) {
-              await tx.execute({
-                sql: 'INSERT INTO usernames (username, user_id) VALUES (?, ?)',
-                args: [metadata.username, userId],
-              });
-            }
           } else if (role === 'teacher') {
             await tx.execute({
               sql: 'INSERT INTO teacher_profiles (user_id, department_id, source_json) VALUES (?, ?, ?)',
@@ -181,15 +175,6 @@ const getAuthService = () => {
           if (role === 'student') {
             const studentUpdates = updates.user_metadata || {};
             await require('./relationalDataService').ensureStudent(tx, row.email, studentUpdates);
-            if (Object.hasOwn(studentUpdates, 'username') && studentUpdates.username) {
-              await tx.execute({
-                sql: `INSERT INTO usernames (username, user_id) VALUES (?, ?)
-                  ON CONFLICT(user_id) DO UPDATE SET username=excluded.username`,
-                args: [studentUpdates.username, id],
-              });
-            } else if (Object.hasOwn(studentUpdates, 'username')) {
-              await tx.execute({ sql: 'DELETE FROM usernames WHERE user_id=?', args: [id] });
-            }
           } else if (role === 'teacher') {
             await tx.execute({
               sql: `INSERT INTO teacher_profiles (user_id, department_id, source_json) VALUES (?, ?, ?)

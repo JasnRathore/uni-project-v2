@@ -17,7 +17,6 @@ interface StudentSignupProps {
 
 interface StudentSignupCredentials {
   name: string;
-  username: string;
   email: string;
   prn: string;
   degreeId: string;
@@ -38,7 +37,6 @@ interface CohortOption {
 export function StudentSignup({ onSignup, onSwitchToLogin, onBack }: StudentSignupProps) {
   const [formData, setFormData] = useState({
     name: '',
-    username: '',
     email: '',
     prn: '',
     degreeId: '',
@@ -90,11 +88,6 @@ export function StudentSignup({ onSignup, onSwitchToLogin, onBack }: StudentSign
       return;
     }
 
-    if (!formData.username.trim()) {
-      toast.error('Please enter a username');
-      return;
-    }
-
     if (!formData.email.trim()) {
       toast.error('Please enter your email address');
       return;
@@ -129,7 +122,6 @@ export function StudentSignup({ onSignup, onSwitchToLogin, onBack }: StudentSign
     try {
       await onSignup({
         name: formData.name.trim(),
-        username: formData.username.trim(),
         email: formData.email.trim(),
         prn: formData.prn.trim(),
         degreeId: formData.degreeId,
@@ -184,22 +176,6 @@ export function StudentSignup({ onSignup, onSwitchToLogin, onBack }: StudentSign
                   placeholder="John Doe"
                   value={formData.name}
                   onChange={(e) => setFormData({...formData, name: e.target.value})}
-                  required
-                  className="h-11"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="username" className="flex items-center gap-2">
-                  <Hash className="w-4 h-4" />
-                  Username
-                </Label>
-                <Input
-                  id="username"
-                  type="text"
-                  placeholder="johndoe123"
-                  value={formData.username}
-                  onChange={(e) => setFormData({...formData, username: e.target.value})}
                   required
                   className="h-11"
                 />

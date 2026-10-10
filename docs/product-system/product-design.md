@@ -36,7 +36,7 @@ Primary evidence: `app/page.tsx`, `components/PortalLanding.tsx`, `components/Fa
 | --- | --- |
 | `/` | Portal selection cards linking to Faculty and Student sign-in. |
 | `/faculty/login`, `/faculty/signup` | Faculty sign-in and account creation. Signup collects name, email, department, qualification, and password/confirmation. |
-| `/student/login`, `/student/signup` | Student sign-in and signup. Signup collects name, username, email, PRN, degree, graduation cohort, and password/confirmation. Degree and cohort options are loaded from academic lookup endpoints; cohort options depend on the selected degree. |
+| `/student/login`, `/student/signup` | Student sign-in and signup. Signup collects account details and student academic identity, including PRN and graduation cohort. Degree and cohort options are loaded from academic lookup endpoints; cohort options depend on the selected degree. |
 | `/admin/login`, `/admin/signup` | Redirects to the matching faculty login/signup page. These are aliases, not separate admin authentication screens. |
 
 Both sign-in flows use email and password and reject an account that belongs to the other portal, with a message directing the user to the correct portal. A signed-in session is checked against a profile API before showing a dashboard. Dashboard routes redirect unauthenticated users to the corresponding login page. Sign-out returns to `/`.
@@ -132,7 +132,7 @@ Student lifecycle is separate from authentication role: the schema stores `activ
 ## Product and data constraints relevant to design
 
 - The product is explicitly branded for a dental-college setting; departments and subject examples use dental disciplines.
-- Student account identity includes a unique email and optional PRN, plus a graduation cohort; a degree is derived through that cohort in the canonical data model. Username maps to an account, rather than being a duplicate student field.
+- Account identity is based on the user ID, unique email, name, and role; login uses email and password. A student record links to an account when one exists and stores its own unique email, name, optional PRN, and optional graduation cohort. Degree is derived through that cohort in the canonical data model.
 - A degree contains program years and subjects. Program year, graduation cohort, calendar academic year, and the student’s gamification level are distinct concepts.
 - A class belongs to a teacher and requires a subject from the catalog. A student can be associated with multiple classes; class membership records can be ended or withdrawn. Class capacity is present as data/UI, but enforcement is not established by the inspected screen.
 - Tasks belong to a class. Task assignments track per-student completion and score. Grades require a student and class; a grade may optionally be linked to a task.

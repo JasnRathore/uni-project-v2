@@ -144,6 +144,10 @@ CREATE TABLE IF NOT EXISTS degrees (
     updated_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+INSERT OR IGNORE INTO degrees (id, name) VALUES
+    ('degree-bds', 'BDS'),
+    ('degree-mds', 'MDS');
+
 CREATE TABLE IF NOT EXISTS graduation_cohorts (
     id              TEXT PRIMARY KEY,
     degree_id       TEXT NOT NULL REFERENCES degrees(id) ON DELETE RESTRICT,
@@ -156,6 +160,11 @@ CREATE TABLE IF NOT EXISTS graduation_cohorts (
 );
 
 CREATE INDEX IF NOT EXISTS idx_cohorts_degree ON graduation_cohorts(degree_id);
+
+INSERT OR IGNORE INTO graduation_cohorts (id, degree_id, label) VALUES
+    ('cohort-bds-2024-2029', 'degree-bds', '2024-2029'),
+    ('cohort-bds-2025-2030', 'degree-bds', '2025-2030'),
+    ('cohort-bds-2026-2031', 'degree-bds', '2026-2031');
 
 CREATE TABLE IF NOT EXISTS program_years (
     id              TEXT PRIMARY KEY,
@@ -170,6 +179,16 @@ CREATE TABLE IF NOT EXISTS program_years (
 );
 
 CREATE INDEX IF NOT EXISTS idx_program_years_degree ON program_years(degree_id);
+
+INSERT OR IGNORE INTO program_years (id, degree_id, label) VALUES
+    ('program-year-bds-1', 'degree-bds', 'BDS 1st Year'),
+    ('program-year-bds-2', 'degree-bds', 'BDS 2nd Year'),
+    ('program-year-bds-3', 'degree-bds', 'BDS 3rd Year'),
+    ('program-year-bds-4', 'degree-bds', 'BDS 4th Year'),
+    ('program-year-bds-5', 'degree-bds', 'BDS 5th Year'),
+    ('program-year-mds-1', 'degree-mds', 'MDS 1st Year'),
+    ('program-year-mds-2', 'degree-mds', 'MDS 2nd Year'),
+    ('program-year-mds-3', 'degree-mds', 'MDS 3rd Year');
 
 CREATE TABLE IF NOT EXISTS subjects (
     id              TEXT PRIMARY KEY,
@@ -187,6 +206,49 @@ CREATE INDEX IF NOT EXISTS idx_subjects_program_year
     ON subjects(program_year_id);
 CREATE INDEX IF NOT EXISTS idx_subjects_degree
     ON subjects(degree_id);
+
+INSERT OR IGNORE INTO subjects (id, degree_id, program_year_id, name) VALUES
+    ('subject-bds-1-oral-anatomy-histology', 'degree-bds', 'program-year-bds-1', 'Oral Anatomy & Histology'),
+    ('subject-bds-1-dental-materials', 'degree-bds', 'program-year-bds-1', 'Dental Materials'),
+    ('subject-bds-1-general-anatomy', 'degree-bds', 'program-year-bds-1', 'General Anatomy'),
+    ('subject-bds-2-dental-pharmacology', 'degree-bds', 'program-year-bds-2', 'Dental Pharmacology'),
+    ('subject-bds-2-microbiology', 'degree-bds', 'program-year-bds-2', 'Microbiology'),
+    ('subject-bds-2-general-systemic-pathology', 'degree-bds', 'program-year-bds-2', 'General & Systemic Pathology'),
+    ('subject-bds-3-oral-pathology', 'degree-bds', 'program-year-bds-3', 'Oral Pathology'),
+    ('subject-bds-3-conservative-dentistry-endodontics', 'degree-bds', 'program-year-bds-3', 'Conservative Dentistry & Endodontics'),
+    ('subject-bds-3-prosthodontics', 'degree-bds', 'program-year-bds-3', 'Prosthodontics'),
+    ('subject-bds-3-oral-medicine-radiology', 'degree-bds', 'program-year-bds-3', 'Oral Medicine & Radiology'),
+    ('subject-bds-4-periodontics', 'degree-bds', 'program-year-bds-4', 'Periodontics'),
+    ('subject-bds-4-orthodontics', 'degree-bds', 'program-year-bds-4', 'Orthodontics & Dentofacial Orthopedics'),
+    ('subject-bds-4-pedodontics-preventive-dentistry', 'degree-bds', 'program-year-bds-4', 'Pedodontics & Preventive Dentistry'),
+    ('subject-bds-4-oral-maxillofacial-surgery', 'degree-bds', 'program-year-bds-4', 'Oral & Maxillofacial Surgery'),
+    ('subject-bds-5-public-health-dentistry', 'degree-bds', 'program-year-bds-5', 'Public Health Dentistry'),
+    ('subject-bds-5-prosthodontics', 'degree-bds', 'program-year-bds-5', 'Prosthodontics'),
+    ('subject-bds-5-clinical-practice', 'degree-bds', 'program-year-bds-5', 'Clinical Practice'),
+    ('subject-mds-1-oral-pathology-microbiology', 'degree-mds', 'program-year-mds-1', 'Oral Pathology & Microbiology'),
+    ('subject-mds-1-orthodontics', 'degree-mds', 'program-year-mds-1', 'Orthodontics'),
+    ('subject-mds-1-periodontics', 'degree-mds', 'program-year-mds-1', 'Periodontics'),
+    ('subject-mds-1-prosthodontics', 'degree-mds', 'program-year-mds-1', 'Prosthodontics'),
+    ('subject-mds-1-conservative-dentistry-endodontics', 'degree-mds', 'program-year-mds-1', 'Conservative Dentistry & Endodontics'),
+    ('subject-mds-1-oral-maxillofacial-surgery', 'degree-mds', 'program-year-mds-1', 'Oral & Maxillofacial Surgery'),
+    ('subject-mds-1-pedodontics', 'degree-mds', 'program-year-mds-1', 'Pedodontics'),
+    ('subject-mds-1-public-health-dentistry', 'degree-mds', 'program-year-mds-1', 'Public Health Dentistry'),
+    ('subject-mds-2-oral-pathology-microbiology', 'degree-mds', 'program-year-mds-2', 'Oral Pathology & Microbiology'),
+    ('subject-mds-2-orthodontics', 'degree-mds', 'program-year-mds-2', 'Orthodontics'),
+    ('subject-mds-2-periodontics', 'degree-mds', 'program-year-mds-2', 'Periodontics'),
+    ('subject-mds-2-prosthodontics', 'degree-mds', 'program-year-mds-2', 'Prosthodontics'),
+    ('subject-mds-2-conservative-dentistry-endodontics', 'degree-mds', 'program-year-mds-2', 'Conservative Dentistry & Endodontics'),
+    ('subject-mds-2-oral-maxillofacial-surgery', 'degree-mds', 'program-year-mds-2', 'Oral & Maxillofacial Surgery'),
+    ('subject-mds-2-pedodontics', 'degree-mds', 'program-year-mds-2', 'Pedodontics'),
+    ('subject-mds-2-public-health-dentistry', 'degree-mds', 'program-year-mds-2', 'Public Health Dentistry'),
+    ('subject-mds-3-oral-pathology-microbiology', 'degree-mds', 'program-year-mds-3', 'Oral Pathology & Microbiology'),
+    ('subject-mds-3-orthodontics', 'degree-mds', 'program-year-mds-3', 'Orthodontics'),
+    ('subject-mds-3-periodontics', 'degree-mds', 'program-year-mds-3', 'Periodontics'),
+    ('subject-mds-3-prosthodontics', 'degree-mds', 'program-year-mds-3', 'Prosthodontics'),
+    ('subject-mds-3-conservative-dentistry-endodontics', 'degree-mds', 'program-year-mds-3', 'Conservative Dentistry & Endodontics'),
+    ('subject-mds-3-oral-maxillofacial-surgery', 'degree-mds', 'program-year-mds-3', 'Oral & Maxillofacial Surgery'),
+    ('subject-mds-3-pedodontics', 'degree-mds', 'program-year-mds-3', 'Pedodontics'),
+    ('subject-mds-3-public-health-dentistry', 'degree-mds', 'program-year-mds-3', 'Public Health Dentistry');
 
 CREATE TABLE IF NOT EXISTS academic_identity_events (
     id              TEXT PRIMARY KEY,
@@ -346,13 +408,6 @@ CREATE TABLE IF NOT EXISTS daily_quest_views (
 
 CREATE INDEX IF NOT EXISTS idx_daily_quest_views_student
     ON daily_quest_views(student_id);
-
--- The legacy username:<name> keys are an index over account IDs, not profiles.
-CREATE TABLE IF NOT EXISTS usernames (
-    username        TEXT PRIMARY KEY COLLATE NOCASE,
-    user_id         TEXT NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
-    created_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
 
 -- Keeps exact source provenance (including duplicate array entries) while
 -- importing/reconciling legacy values. This is not a runtime key-value store.

@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "test": "node --test tests/schema.test.js"
+    "test": "node --test tests/schema.test.js tests/username-application.test.js"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",

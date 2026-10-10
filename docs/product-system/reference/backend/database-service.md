@@ -17,8 +17,8 @@ At module load it asks dotenv to load root `.env`. The client is created lazily 
 
 - `listUsers({page=1, perPage=1000})` queries ordered users with limit/offset and returns `{data:{users}, error:null}`. It adds unpacked metadata while retaining selected row fields.
 - `deleteUser(id)` transactionally deletes a linked student row only when DB role is exactly student, then deletes the user. Returns `{error:null}` or `{error}`; other FK effects follow schema.
-- `createUser({email,password,user_metadata={}})` requires both, generates UUID, bcrypt-hashes at cost 10, derives role (student default), removes `department` for teachers, stores wrapped metadata, and transactionally creates relational student/profile data. Students also get a username index if supplied; teachers get `teacher_profiles`. Returns `{data:{user},error:null}` or `{data:null,error}`.
-- `updateUserById` transactionally reads user, merges provided metadata objects, computes role/name, updates canonical user fields, then ensures student state and optional username insert/delete or upserts teacher profile. Returns `{error:null}` or `{error}`.
+- `createUser({email,password,user_metadata={}})` requires both, generates UUID, bcrypt-hashes at cost 10, derives role (student default), removes `department` for teachers, stores wrapped metadata, and transactionally creates relational student/profile data. Teachers get `teacher_profiles`. Returns `{data:{user},error:null}` or `{data:null,error}`.
+- `updateUserById` transactionally reads user, merges provided metadata objects, computes role/name, updates canonical user fields, then ensures student state or upserts teacher profile. Returns `{error:null}` or `{error}`.
 - `getUserById` reads one user and returns auth-shaped `{data:{user},error:null}` or `{data:null,error: Error('Not found')}`. DB exceptions are not caught here.
 
 ## Transactions, dependencies, and caveats

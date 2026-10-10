@@ -109,7 +109,7 @@ The student client fetches protected profile/dashboard/data endpoints. Controlle
 - **Class membership:** `classes` belongs to a teacher and subject. `teacher_students` is the teacher-level roster/compatibility relation; `class_memberships` models a student's membership in a teacher's class, including active/ended/withdrawn state and dates.
 - **Learning and grading:** `tasks` belong to classes; `task_assignments` associate tasks and students with completion/score/grade state; `grades` stores grading records and indexes support teacher/student lookup.
 - **Engagement:** `notifications`, `student_activity`, `student_activity_days`, `xp_events`, `progression_states`, `daily_quests`, and `daily_quest_views` support notices, activity/streak tracking, game rewards/progression, and quest state.
-- **Compatibility/provenance:** `usernames` enforces username mappings and `legacy_record_map` preserves legacy-record provenance during migration.
+- **Compatibility/provenance:** `legacy_record_map` preserves legacy-record provenance during migration.
 
 Foreign keys, unique constraints, checks, and indexes express important integrity rules in `new_schema.sql`. JSON columns such as `metadata_json`, `profile_json`, and `source_json` preserve flexible or source-compatible attributes alongside normalized columns. The relational compatibility layer translates legacy API storage calls to these tables rather than storing opaque blobs in a single general-purpose KV table (`database\services\relationalDataService.js`).
 

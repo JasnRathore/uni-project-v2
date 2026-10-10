@@ -103,6 +103,57 @@ test('departments are seeded and teacher profiles reference them by ID', async (
   }
 });
 
+test('academic catalog and graduation cohorts are seeded idempotently', async () => {
+  const db = createClient({ url: 'file::memory:' });
+  try {
+    await ensureDatabaseSchema(db);
+
+    const degrees = (await db.execute(
+      'SELECT id, name FROM degrees ORDER BY id',
+    )).rows;
+    assert.deepEqual(degrees, [
+      { id: 'degree-bds', name: 'BDS' },
+      { id: 'degree-mds', name: 'MDS' },
+    ]);
+
+    const cohorts = (await db.execute(
+      `SELECT degree_id, label FROM graduation_cohorts ORDER BY label`,
+    )).rows;
+    assert.deepEqual(cohorts, [
+      { degree_id: 'degree-bds', label: '2024-2029' },
+      { degree_id: 'degree-bds', label: '2025-2030' },
+      { degree_id: 'degree-bds', label: '2026-2031' },
+    ]);
+
+    const programYears = (await db.execute(
+      'SELECT COUNT(*) AS count FROM program_years',
+    )).rows[0].count;
+    assert.equal(Number(programYears), 8);
+
+    const subjectCount = (await db.execute(
+      'SELECT COUNT(*) AS count FROM subjects',
+    )).rows[0].count;
+    assert.equal(Number(subjectCount), 41);
+
+    const classSubjects = (await db.execute(
+      `SELECT COUNT(*) AS count FROM subjects
+        WHERE id IN ('subject-bds-1-oral-anatomy-histology',
+          'subject-bds-3-oral-pathology', 'subject-mds-3-public-health-dentistry')`,
+    )).rows[0].count;
+    assert.equal(Number(classSubjects), 3);
+
+    await ensureDatabaseSchema(db);
+    assert.equal(Number((await db.execute(
+      'SELECT COUNT(*) AS count FROM graduation_cohorts',
+    )).rows[0].count), 3);
+    assert.equal(Number((await db.execute(
+      'SELECT COUNT(*) AS count FROM subjects',
+    )).rows[0].count), 41);
+  } finally {
+    await db.close();
+  }
+});
+
 test('schema initialization upgrades existing professor profiles and resolves known names', async () => {
   const db = createClient({ url: 'file::memory:' });
   try {
@@ -179,9 +230,46 @@ test('student schema keeps normalized identity without legacy duplicates', () =>
   assert.match(studentTable, /\bprn\b/);
   assert.match(studentTable, /\bcohort_id\b/);
   assert.doesNotMatch(studentTable, /\bprogram_year_id\b/);
-  assert.match(schema, /CREATE TABLE IF NOT EXISTS usernames/);
+  assert.doesNotMatch(schema, /CREATE TABLE IF NOT EXISTS usernames/i);
   assert.match(schema, /CREATE TABLE IF NOT EXISTS academic_identity_events/);
   assert.doesNotMatch(studentControllerSource, /'username'/);
+});
+
+test('schema initialization removes legacy username storage without losing accounts', async () => {
+  const db = createClient({ url: 'file::memory:' });
+  try {
+    await db.execute(`CREATE TABLE users (
+      id TEXT PRIMARY KEY, email TEXT NOT NULL COLLATE NOCASE UNIQUE,
+      password_hash TEXT NOT NULL, name TEXT NOT NULL DEFAULT '',
+      role TEXT NOT NULL, metadata_json TEXT NOT NULL DEFAULT '{}',
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`);
+    await db.execute(`CREATE TABLE usernames (
+      username TEXT PRIMARY KEY COLLATE NOCASE,
+      user_id TEXT NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`);
+    await db.execute(
+      "INSERT INTO users (id, email, password_hash, role) VALUES ('legacy-user', 'legacy@example.edu', 'hash', 'student')",
+    );
+    await db.execute(
+      "INSERT INTO usernames (username, user_id) VALUES ('legacy-name', 'legacy-user')",
+    );
+
+    await ensureDatabaseSchema(db);
+    await ensureDatabaseSchema(db);
+
+    const usernameTable = (await db.execute(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'usernames'",
+    )).rows;
+    assert.deepEqual(usernameTable, []);
+    assert.equal(Number((await db.execute(
+      "SELECT COUNT(*) AS count FROM users WHERE id = 'legacy-user'",
+    )).rows[0].count), 1);
+  } finally {
+    await db.close();
+  }
 });
 
 test('fresh schema initialization is complete, idempotent, and enforces catalog relationships', async () => {

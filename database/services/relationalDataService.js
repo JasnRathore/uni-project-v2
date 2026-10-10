@@ -336,10 +336,6 @@ const readPortalData = async key => {
       const result = await readRows('SELECT has_seen FROM daily_quest_views WHERE legacy_key = ?', [key]);
       return result[0] ? Boolean(result[0].has_seen) : null;
     }
-    case 'username': {
-      const result = await readRows('SELECT user_id FROM usernames WHERE username = ? COLLATE NOCASE', [suffix]);
-      return result[0]?.user_id || null;
-    }
     default:
       throw new Error(`No relational storage mapping is defined for "${namespace}"`);
   }
@@ -660,14 +656,6 @@ const writeProfile = async (tx, email, value) => {
     finiteNumber(value.gameProgress) ?? student.game_progress, asText(value.registeredAt),
     JSON.stringify(profile), student.id,
   ]);
-  if (student.user_id && Object.hasOwn(value, 'username')) {
-    if (value.username) {
-      await run(tx, `INSERT INTO usernames (username, user_id) VALUES (?, ?)
-        ON CONFLICT(user_id) DO UPDATE SET username=excluded.username`, [asText(value.username), student.user_id]);
-    } else {
-      await run(tx, 'DELETE FROM usernames WHERE user_id=?', [student.user_id]);
-    }
-  }
 };
 
 const writePortalData = (key, value) => {
@@ -739,12 +727,6 @@ const writePortalData = (key, value) => {
           key, null, value ? 1 : 0,
         ]);
         return;
-      case 'username': {
-        const userId = typeof value === 'string' ? value : null;
-        if (!userId) throw new Error('Username index requires a user ID');
-        await run(tx, 'INSERT INTO usernames (username, user_id) VALUES (?, ?) ON CONFLICT(username) DO UPDATE SET user_id=excluded.user_id', [suffix, userId]);
-        return;
-      }
       default:
         throw new Error(`No relational storage mapping is defined for "${namespace}"`);
     }
@@ -788,8 +770,6 @@ const deletePortalData = (key) => {
         await run(tx, 'DELETE FROM daily_quests'); return;
       case 'daily_quest_seen':
         await run(tx, 'DELETE FROM daily_quest_views WHERE legacy_key=?', [key]); return;
-      case 'username':
-        await run(tx, 'DELETE FROM usernames WHERE username=? COLLATE NOCASE', [suffix]); return;
       default:
         throw new Error(`No relational delete mapping is defined for "${namespace}"`);
     }
@@ -822,8 +802,6 @@ const listPortalDataByPrefix = async prefix => {
       suffixes = (await readRows('SELECT DISTINCT graded_by AS suffix FROM grades WHERE graded_by IS NOT NULL')).map(row => row.suffix); break;
     case 'task_grades':
       suffixes = (await readRows('SELECT DISTINCT task_id AS suffix FROM grades WHERE task_id IS NOT NULL')).map(row => row.suffix); break;
-    case 'username':
-      suffixes = (await readRows('SELECT username AS suffix FROM usernames')).map(row => row.suffix); break;
     case 'daily_quest_seen':
       return (await readRows('SELECT legacy_key AS key, has_seen FROM daily_quest_views WHERE legacy_key LIKE ?', [`${prefix}%`]))
         .map(row => ({ key: row.key, value: Boolean(row.has_seen) }));

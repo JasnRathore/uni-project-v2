@@ -26,8 +26,9 @@ email with relational records:
 - `grades` is the canonical grade history; `notifications` and
   `student_activity` / `student_activity_days` replace their corresponding
   arrays and streak objects.
-- `daily_quests`, `daily_quest_views`, and `usernames` replace the quest,
-  seen-state, and username-index keys.
+- `daily_quests` and `daily_quest_views` replace the quest and seen-state keys.
+- Legacy username-index keys are retained only as provenance in
+  `legacy_record_map`; there is no active username lookup table.
 - `legacy_record_map` records each source key and array position for audit and
   duplicate reconciliation. It is provenance data, not a replacement KV store.
 
@@ -55,7 +56,7 @@ them only in a later, separately reviewed migration.
 | `student_activity:<email>` / `student_streak:<email>` | `student_activity` plus one `student_activity_days` row per date |
 | `daily_quest` | `daily_quests` |
 | `daily_quest_seen:<suffix>` | `daily_quest_views`; resolve the suffix to a student and retain the exact key in `legacy_key` |
-| `username:<username>` | `usernames`; the value is a user ID and may be a raw string or JSON-encoded string |
+| `username:<username>` | `legacy_record_map` provenance only; username indexes are not imported |
 
 Key suffixes and row fields can be inconsistent. Parse prefixes using the first
 colon only; emails themselves may contain punctuation and must not be split
@@ -71,10 +72,9 @@ further. Preserve original key strings in the provenance map.
    execute `new_schema.sql`, and implement a repeatable importer that can be
    restarted safely. Do not point the importer at production during testing.
 3. **Normalize source values.** `kv_store.value` is normally JSON text, but
-   older exports/rows (notably username index values) may be plain strings.
-   Decode JSON when valid; otherwise preserve the literal string and record the
-   parse mode. Do not silently replace malformed values with empty objects or
-   arrays.
+   older exports/rows may be plain strings. Decode JSON when valid; otherwise
+   preserve the literal string and record the parse mode. Do not silently
+   replace malformed values with empty objects or arrays.
 4. **Import identities first.** Import `users`, preserving user IDs and role
    metadata. Then import teacher profiles and construct one `students` row per
    canonical email. Match email case-insensitively after trimming whitespace;
@@ -99,8 +99,8 @@ further. Preserve original key strings in the provenance map.
    mirrored submission. Rows without a resolvable student should be reported
    and held for manual resolution, not discarded.
 8. **Import secondary data.** Import notifications, activity/streak dates,
-   quests, seen state, and username indexes. Resolve references where possible;
-   preserve unresolved source keys and report them for review.
+   quests, and seen state. Preserve legacy username-index source keys as
+   provenance only; do not create a username lookup.
 9. **Validate before cutover.** Compare source and target counts by namespace
    and entity, unique normalized emails, class/task/grade totals, assigned
    memberships, and streak dates. Also compare sampled records field by field
@@ -157,19 +157,18 @@ session files directory, not in the repository or configured Turso database.
 | `notifications` | 105 |
 | `student_activity` / `student_activity_days` | 1 / 1 |
 | `daily_quests` / `daily_quest_views` | 1 / 3 |
-| `usernames` | 0 |
 | `legacy_record_map` | 170 |
 
 The SQL import completed with no foreign-key violations, but it is **not ready
 for cutover**. Teacher profiles, classes, and roster memberships were held back
-because their owners are absent from the supplied account snapshot. The
-username index values likewise reference user IDs not present in that
-snapshot. Task ownership and the daily quest owner also remain unresolved; the
-three daily-quest seen flags could not be linked to a student. Fifteen student
-records had no resolvable email and remain available in the provenance map
-rather than being assigned invented identities. Supply a consistent full
-users/KV backup, resolve these records, and rerun to a fresh target before
-proceeding.
+because their owners are absent from the supplied account snapshot. Legacy
+username index values reference user IDs not present in that snapshot and are
+kept only as provenance, not as active lookup records. Task ownership and the
+daily quest owner also remain unresolved; the three daily-quest seen flags
+could not be linked to a student. Fifteen student records had no resolvable
+email and remain available in the provenance map rather than being assigned
+invented identities. Supply a consistent full users/KV backup, resolve these
+records, and rerun to a fresh target before proceeding.
 
 ## Current local database state
 
@@ -183,14 +182,18 @@ The application now targets the local SQLite database when
 `DATABASE_TARGET=local` and uses the relational tables for authentication and
 portal data. The server-side relational data adapter preserves existing API
 payloads while storing classes, memberships, tasks, assignments, grades,
-notifications, profiles, activity, quests, and usernames in their target
-tables. It does not create or query a `kv_store` table. Root `.env.local`
+notifications, profiles, activity, and quests in their target tables. It does
+not create or query a `kv_store` or username lookup table. Root `.env.local`
 selects local mode for this checkout and is git-ignored.
 
-The configured Turso database was not migrated or modified. To point the
-application at Turso, first apply the schema and migrate/verify that database,
-then set `DATABASE_TARGET=turso`; the runtime deliberately does not bootstrap
-or rewrite a remote database automatically.
+The configured Turso database (`main-jasnrathore`, `aws-ap-south-1`) received
+the username-removal schema migration on 2026-10-10. The obsolete `usernames`
+table and its one index record were removed transactionally; the two user
+accounts and existing catalog rows were preserved (9 departments, 2 degrees,
+3 cohorts, 8 program years, and 41 subjects). A post-migration foreign-key
+check returned no violations. This was a schema cleanup only: it did not import
+or reconcile the legacy snapshot data described above. The runtime deliberately
+does not bootstrap or rewrite a remote database automatically.
 
 ## Data-quality and reconciliation notes
 
@@ -219,7 +222,7 @@ or rewrite a remote database automatically.
 ## Minimum verification checklist
 
 - Imported user IDs and password hashes match the backup exactly.
-- No duplicate `users.email`, `students.email`, or username values remain after
+- No duplicate `users.email` or `students.email` values remain after
   case-insensitive normalization.
 - Every imported class/task owner maps to a user or is explicitly reported.
 - Every roster membership resolves to a student; class assignments point to

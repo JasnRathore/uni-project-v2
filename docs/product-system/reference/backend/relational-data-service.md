@@ -31,7 +31,6 @@ Read namespaces and their normalized sources:
 | `student_streak:<email>`, `student_activity:<email>` | One activity row plus ordered activity dates, or `null` if absent. |
 | `daily_quest` | Most recently inserted quest, or `null`. |
 | `daily_quest_seen:<...>` | Boolean `has_seen` for the complete key, or `null`. |
-| `username:<name>` | Case-insensitive username lookup returning user ID or `null`. |
 
 ## Write mappings and invariants
 
@@ -41,7 +40,7 @@ Every `writePortalData` mapping executes inside `withTransaction`:
 - `students` / `teacher_students` are full teacher-roster snapshots. Every item requires email; `ensureStudent` runs and inactive students are rejected. Requested classes must be active and owned by the teacher. Existing memberships for the teacher/student are deleted and requested memberships are inserted; a compatibility `teacher_students` row is upserted. Active roster rows omitted from the full snapshot are removed with memberships; inactive roster rows are skipped during omission cleanup.
 - `tasks` requires ID/title/class, verifies class ownership, upserts teacher-owned tasks, rejects ID collisions owned by another teacher, and removes omitted tasks for that teacher.
 - `student_tasks` requires an active student and each assignment ID/title/class. It normalizes an invalid/missing teacher to null, verifies the class exists and, if a teacher ID resolved, that it belongs to that teacher. It creates a task only if absent, upserts `task_assignments`, then deletes that student's assignments omitted from the supplied snapshot. An unresolved teacher means class-owner matching is not enforced.
-- `student_profile` requires an object, ensures/updates canonical student fields/profile, and updates or removes username mapping only when a linked user exists and a `username` field was supplied.
+- `student_profile` requires an object and ensures/updates canonical student fields and profile.
 - `student` requires an object with email and ensures the row, using the key suffix as fallback ID.
 - `teacher` requires an object and an existing non-student user, strips legacy department text from source JSON, and upserts department ID/profile.
 - `student_grades`, `dental_college_grades`, and `task_grades` canonicalize into `grades`. Student-grade writes delete that student's existing grades first; teacher-grade writes delete grades graded by that teacher first; task-grade object writes delete task grades absent from the supplied map. Each incoming grade requires an active student, valid task if specified, class, and teacher ownership when a teacher resolves; a grade's class must equal its task class. Existing student/task grade with a different ID is removed before upsert.
@@ -49,13 +48,12 @@ Every `writePortalData` mapping executes inside `withTransaction`:
 - `student_streak` / `student_activity` require an object, upsert streak values and replace that student's activity-day set.
 - `daily_quest` requires object and ID; optional class must belong to supplied teacher; then upserts quest fields/source JSON.
 - `daily_quest_seen` writes the full legacy key and booleanized value with a null student ID.
-- `username` requires a string user ID and upserts the username index.
 
 ## Delete and prefix-list behavior
 
-`deletePortalData` uses a transaction and deletes the corresponding canonical scope: a teacher's classes/roster/tasks, a student's assignments/profile/grades/notifications/activity, a teacher profile or grade set, one task's grades, all daily quests, a quest-view key, or one username. In particular, deleting `students:<teacherId>` directly removes `teacher_students` rows only; it does not directly remove `class_memberships`. Database FK cascade/restrict/set-null behavior applies; deleting classes/tasks/students may therefore affect related rows beyond the direct DELETE.
+`deletePortalData` uses a transaction and deletes the corresponding canonical scope: a teacher's classes/roster/tasks, a student's assignments/profile/grades/notifications/activity, a teacher profile or grade set, one task's grades, all daily quests, or a quest-view key. In particular, deleting `students:<teacherId>` directly removes `teacher_students` rows only; it does not directly remove `class_memberships`. Database FK cascade/restrict/set-null behavior applies; deleting classes/tasks/students may therefore affect related rows beyond the direct DELETE.
 
-`listPortalDataByPrefix` accepts a namespace with or without trailing colon, gets distinct suffixes from its table, then reads each key in sequence and returns `{key, value}`. Special cases enumerate matching daily-quest view keys or return only the latest daily quest. Supported lists include classes, rosters, tasks, student collections/profile/activity, grades by teacher/task, teachers, students, usernames, daily quests, and seen flags. Unsupported namespace listing throws.
+`listPortalDataByPrefix` accepts a namespace with or without trailing colon, gets distinct suffixes from its table, then reads each key in sequence and returns `{key, value}`. Special cases enumerate matching daily-quest view keys or return only the latest daily quest. Supported lists include classes, rosters, tasks, student collections/profile/activity, grades by teacher/task, teachers, students, daily quests, and seen flags. Unsupported namespace listing throws.
 
 ## Consistency and edge cases
 

@@ -736,17 +736,6 @@ def main():
                 mark_unresolved("daily_quest_seen_student")
         counts["daily_quest_views"] = db.execute("SELECT count(*) FROM daily_quest_views").fetchone()[0]
 
-        for key, username, value, _ in records_by_namespace.get("username", []):
-            user_id = value if isinstance(value, str) else None
-            if not username or not user_id or user_id not in user_by_id:
-                mark_unresolved("username")
-                continue
-            db.execute(
-                "INSERT INTO usernames (username, user_id) VALUES (?, ?) ON CONFLICT(username) DO NOTHING",
-                (username, user_id),
-            )
-        counts["usernames"] = db.execute("SELECT count(*) FROM usernames").fetchone()[0]
-
         for key, value, mode in source_records:
             namespace = key.partition(":")[0]
             if namespace == "username":
@@ -768,7 +757,7 @@ def main():
             "users", "teacher_profiles", "students", "classes", "teacher_students",
             "tasks", "task_assignments", "grades", "notifications",
             "student_activity", "student_activity_days", "daily_quests",
-            "daily_quest_views", "usernames", "legacy_record_map", "degrees",
+            "daily_quest_views", "legacy_record_map", "degrees",
             "program_years", "subjects",
         ):
             counts[table] = db.execute(f"SELECT count(*) FROM {table}").fetchone()[0]
