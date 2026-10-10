@@ -46,6 +46,13 @@ next-env.d.ts
 discussion.md
 overhaul.md
 /docs
+!/docs/
+/docs/*
+!/docs/product-system/
+/docs/product-system/*
+!/docs/product-system/**/
+!/docs/product-system/*.md
+!/docs/product-system/**/*.md
 
 */__pycache__
 local.db
