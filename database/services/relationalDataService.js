@@ -458,7 +458,7 @@ const writeTasks = async (tx, teacherId, records) => {
     await run(tx, `INSERT INTO tasks
       (id, teacher_id, class_id, title, description, due_at, priority,
        status, max_points, total_points, created_at, updated_at, source_json)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET class_id=excluded.class_id, title=excluded.title,
       description=excluded.description, due_at=excluded.due_at,
       priority=excluded.priority, status=excluded.status, max_points=excluded.max_points,
@@ -505,7 +505,7 @@ const writeStudentTasks = async (tx, email, records) => {
     await run(tx, `INSERT INTO tasks
       (id, teacher_id, class_id, title, description, due_at, priority, status,
        max_points, total_points, created_at, updated_at, source_json)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO NOTHING`, [
       taskId, teacherId, requestedClassId, String(item.title), asText(item.description),
       asText(item.dueDate || item.date), asText(item.priority),

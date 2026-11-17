@@ -4,7 +4,6 @@ import React, { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   BookOpen,
-  Database,
   Home,
   ListTodo,
   Settings as SettingsIcon,
@@ -148,7 +147,6 @@ export default function FacultyDashboardLayout({
                 identifier={identifier || email}
                 links={[
                   { label: 'Account settings', href: '/faculty/dashboard/settings', icon: SettingsIcon },
-                  { label: 'Diagnostics', href: '/faculty/dashboard/debug', icon: Database },
                 ]}
                 onNavigate={path => router.push(path)}
                 onLogout={logout}

@@ -348,6 +348,69 @@ test('student leaderboard offers cohort and active class scopes', () => {
   assert.match(studentLeaderboardSource, /Class rankings/);
 });
 
+test('teacher and student task snapshots persist tasks with all schema columns', async () => {
+  const db = createClient({ url: 'file::memory:' });
+  const dbServicePath = require.resolve('../database/services/dbService');
+  const originalDbService = require(dbServicePath);
+  const relationalDataServicePath = require.resolve('../database/services/relationalDataService');
+  const originalRelationalDataService = require.cache[relationalDataServicePath];
+
+  require.cache[dbServicePath].exports = {
+    ...originalDbService,
+    getDatabaseClient: () => db,
+  };
+  delete require.cache[relationalDataServicePath];
+
+  try {
+    await ensureDatabaseSchema(db);
+    await db.execute('PRAGMA foreign_keys = ON');
+    await db.execute({
+      sql: `INSERT INTO users (id, email, password_hash, role)
+        VALUES (?, ?, ?, ?)`,
+      args: ['task-test-teacher', 'task-test-teacher@example.edu', 'hash', 'teacher'],
+    });
+    await db.execute({
+      sql: `INSERT INTO classes (id, teacher_id, name, subject_id)
+        VALUES (?, ?, ?, ?)`,
+      args: [
+        'task-test-class',
+        'task-test-teacher',
+        'Task test class',
+        'subject-bds-1-dental-materials',
+      ],
+    });
+
+    const { writePortalData } = require(relationalDataServicePath);
+    const task = {
+      id: 'teacher-task-test',
+      title: 'Teacher task',
+      classId: 'task-test-class',
+      dueDate: '2026-11-20',
+      maxPoints: 20,
+      teacherId: 'task-test-teacher',
+    };
+    await writePortalData('tasks:task-test-teacher', [task]);
+    await writePortalData('student_tasks:task-test-student@example.edu', [{
+      ...task,
+      id: 'student-task-test',
+      title: 'Student task',
+    }]);
+
+    const tasks = await db.execute('SELECT id FROM tasks ORDER BY id');
+    const assignments = await db.execute('SELECT task_id FROM task_assignments');
+    assert.deepEqual(tasks.rows.map(row => row.id), ['student-task-test', 'teacher-task-test']);
+    assert.deepEqual(assignments.rows.map(row => row.task_id), ['student-task-test']);
+  } finally {
+    if (originalRelationalDataService) {
+      require.cache[relationalDataServicePath] = originalRelationalDataService;
+    } else {
+      delete require.cache[relationalDataServicePath];
+    }
+    require.cache[dbServicePath].exports = originalDbService;
+    await db.close();
+  }
+});
+
 test('teacher assignment writes authoritative class memberships', () => {
   assert.match(classMembershipSource, /\/api\/teacher\/classes\/\$\{encodeURIComponent\(selectedAvailableClassId\)\}\/memberships/);
 });
