@@ -4,17 +4,18 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { Mail, Lock, Eye, EyeOff, GraduationCap, Loader2, ArrowLeft } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, GraduationCap, Loader2, ArrowLeft, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
 import { ConnectionTest } from './ConnectionTest';
 
 interface LoginProps {
   onLogin: (email: string, password: string) => Promise<void>;
   onSwitchToSignup: () => void;
+  onSwitchToStudent: () => void;
   onBack: () => void;
 }
 
-export function Login({ onLogin, onSwitchToSignup, onBack }: LoginProps) {
+export function Login({ onLogin, onSwitchToSignup, onSwitchToStudent, onBack }: LoginProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -45,7 +46,7 @@ export function Login({ onLogin, onSwitchToSignup, onBack }: LoginProps) {
 
   if (showConnectionTest) {
     return (
-      <div className="flex min-h-dvh items-center justify-center bg-muted/40 p-4">
+      <div className="mobile-ui auth-screen flex min-h-dvh items-center justify-center bg-muted/40 p-4">
         <div className="w-full max-w-2xl">
           <Button 
             variant="outline" 
@@ -61,23 +62,28 @@ export function Login({ onLogin, onSwitchToSignup, onBack }: LoginProps) {
   }
 
   return (
-    <main className="flex min-h-dvh items-center justify-center bg-muted/40 p-4">
+    <main className="mobile-ui auth-screen flex min-h-dvh items-center justify-center bg-muted/40 p-4">
       <div className="w-full max-w-md">
         {onBack && (
           <button
+            type="button"
             onClick={onBack}
-            className="group mb-6 flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
+            className="auth-back-button group mb-6 flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
+            aria-label="Back to portal selection"
           >
             <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-            Back to Portal Selection
+            <span className="auth-back-label">Back to Portal Selection</span>
           </button>
         )}
-        {/* Logo/Header */}
-        <div className="text-center mb-8">
-          <p className="text-muted-foreground mt-2">Faculty Portal</p>
+        <div className="auth-heading mb-8 text-center">
+          <div className="auth-heading-icon mb-4 inline-flex size-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+            <GraduationCap className="size-7" />
+          </div>
+          <h1 className="text-3xl font-semibold tracking-tight text-foreground">Faculty Portal</h1>
+          <p className="mt-2 text-muted-foreground">Access your dental college progress</p>
         </div>
 
-        <Card className="border-border/80 shadow-sm">
+        <Card className="auth-panel border-border/80 shadow-sm">
           <CardHeader className="space-y-1 pb-4">
             <CardTitle className="text-2xl text-center">Welcome Back!</CardTitle>
             <CardDescription className="text-center">
@@ -87,9 +93,12 @@ export function Login({ onLogin, onSwitchToSignup, onBack }: LoginProps) {
           <CardContent>
             <form onSubmit={handleLogin} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email">Email Address</Label>
+                <Label htmlFor="email" className="auth-field-label">
+                  <span className="auth-mobile-label-icon hidden"><Mail aria-hidden="true" /></span>
+                  Email Address
+                </Label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
+                  <Mail className="auth-input-icon absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
                   <Input
                     id="email"
                     type="email"
@@ -103,9 +112,12 @@ export function Login({ onLogin, onSwitchToSignup, onBack }: LoginProps) {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="password" className="auth-field-label">
+                  <span className="auth-mobile-label-icon hidden"><Lock aria-hidden="true" /></span>
+                  Password
+                </Label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
+                  <Lock className="auth-input-icon absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
                   <Input
                     id="password"
                     type={showPassword ? 'text' : 'password'}
@@ -120,6 +132,7 @@ export function Login({ onLogin, onSwitchToSignup, onBack }: LoginProps) {
                     variant="ghost"
                     size="sm"
                     className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
                     onClick={() => setShowPassword(!showPassword)}
                     disabled={isLoading}
                   >
@@ -144,16 +157,34 @@ export function Login({ onLogin, onSwitchToSignup, onBack }: LoginProps) {
               </Button>
             </form>
 
-            <div className="mt-6 text-center">
-              <p className="text-sm text-muted-foreground">
-                Don&apos;t have an account?{' '}
+            <div className="mt-6 space-y-3">
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t" />
+                </div>
+                <div className="relative flex justify-center text-xs">
+                  <span className="bg-card px-2 text-muted-foreground">Don&apos;t have an account?</span>
+                </div>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onSwitchToSignup}
+                className="h-11 w-full"
+                disabled={isLoading}
+              >
+                <UserPlus aria-hidden="true" className="mr-2 size-4" />
+                Create Account
+              </Button>
+              <p className="mt-4 text-xs text-muted-foreground">
+                Are you a Student?{' '}
                 <button
                   type="button"
-                  onClick={onSwitchToSignup}
+                  onClick={onSwitchToStudent}
                   className="font-medium text-primary hover:underline"
                   disabled={isLoading}
                 >
-                  Sign up here
+                  Switch to Student Portal
                 </button>
               </p>
             </div>

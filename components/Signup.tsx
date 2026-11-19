@@ -5,7 +5,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Mail, Lock, Eye, EyeOff, User, BookOpen, GraduationCap, Loader2, ArrowLeft } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, User, BookOpen, CalendarDays, GraduationCap, Loader2, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 
 export interface SignupCredentials {
@@ -89,41 +89,45 @@ export function Signup({ onSignup, onSwitchToLogin, onBack }: SignupProps) {
   };
 
   return (
-    <main className="flex min-h-dvh items-center justify-center bg-muted/40 p-4">
+    <main className="mobile-ui auth-screen flex min-h-dvh items-center justify-center bg-muted/40 p-4">
       <div className="w-full max-w-md">
         {onBack && (
           <button
+            type="button"
             onClick={onBack}
-            className="group mb-6 flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
+            className="auth-back-button group mb-6 flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
+            aria-label="Back to portal selection"
           >
             <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-            Back to Portal Selection
+            <span className="auth-back-label">Back to Portal Selection</span>
           </button>
         )}
-        {/* Logo/Header */}
-        <div className="text-center mb-8">
-          <div className="mb-4 inline-flex size-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+        <div className="auth-heading text-center mb-8">
+          <div className="auth-heading-icon mb-4 inline-flex size-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
             <GraduationCap className="size-7" />
           </div>
           <h1 className="text-3xl font-semibold tracking-tight text-foreground">
-            Dental College Portal
+            Faculty Portal
           </h1>
-          <p className="text-muted-foreground mt-2">Create Your Faculty Account</p>
+          <p className="text-muted-foreground mt-2">Create your account to get started</p>
         </div>
 
-        <Card className="border-border/80 shadow-sm">
+        <Card className="auth-panel border-border/80 shadow-sm">
           <CardHeader className="space-y-1 pb-4">
-            <CardTitle className="text-2xl text-center">Join Our Faculty!</CardTitle>
+            <CardTitle className="text-2xl text-center">Create Account</CardTitle>
             <CardDescription className="text-center">
-              Create an account to start managing students
+              Join your dental college portal
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSignup} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="name">Full Name *</Label>
+                <Label htmlFor="name" className="auth-field-label">
+                  <span className="auth-mobile-label-icon hidden"><User aria-hidden="true" /></span>
+                  Full Name *
+                </Label>
                 <div className="relative">
-                  <User className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
+                  <User className="auth-input-icon absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
                   <Input
                     id="name"
                     type="text"
@@ -137,9 +141,12 @@ export function Signup({ onSignup, onSwitchToLogin, onBack }: SignupProps) {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="email">Email Address *</Label>
+                <Label htmlFor="email" className="auth-field-label">
+                  <span className="auth-mobile-label-icon hidden"><Mail aria-hidden="true" /></span>
+                  Email Address *
+                </Label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
+                  <Mail className="auth-input-icon absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
                   <Input
                     id="email"
                     type="email"
@@ -153,7 +160,10 @@ export function Signup({ onSignup, onSwitchToLogin, onBack }: SignupProps) {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="department">Department *</Label>
+                <Label htmlFor="department" className="auth-field-label">
+                  <span className="auth-mobile-label-icon hidden"><CalendarDays aria-hidden="true" /></span>
+                  Department *
+                </Label>
                 <Select 
                   value={formData.departmentId}
                   onValueChange={(value) => setFormData({ ...formData, departmentId: value ?? '' })}
@@ -171,9 +181,12 @@ export function Signup({ onSignup, onSwitchToLogin, onBack }: SignupProps) {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="qualification">Qualification</Label>
+                <Label htmlFor="qualification" className="auth-field-label">
+                  <span className="auth-mobile-label-icon hidden"><BookOpen aria-hidden="true" /></span>
+                  Qualification
+                </Label>
                 <div className="relative">
-                  <BookOpen className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
+                  <BookOpen className="auth-input-icon absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
                   <Input
                     id="qualification"
                     type="text"
@@ -187,9 +200,12 @@ export function Signup({ onSignup, onSwitchToLogin, onBack }: SignupProps) {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password">Password *</Label>
+                <Label htmlFor="password" className="auth-field-label">
+                  <span className="auth-mobile-label-icon hidden"><Lock aria-hidden="true" /></span>
+                  Password *
+                </Label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
+                  <Lock className="auth-input-icon absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
                   <Input
                     id="password"
                     type={showPassword ? 'text' : 'password'}
@@ -204,6 +220,7 @@ export function Signup({ onSignup, onSwitchToLogin, onBack }: SignupProps) {
                     variant="ghost"
                     size="sm"
                     className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
                     onClick={() => setShowPassword(!showPassword)}
                     disabled={isLoading}
                   >
@@ -213,9 +230,12 @@ export function Signup({ onSignup, onSwitchToLogin, onBack }: SignupProps) {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="confirmPassword">Confirm Password *</Label>
+                <Label htmlFor="confirmPassword" className="auth-field-label">
+                  <span className="auth-mobile-label-icon hidden"><Lock aria-hidden="true" /></span>
+                  Confirm Password *
+                </Label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
+                  <Lock className="auth-input-icon absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
                   <Input
                     id="confirmPassword"
                     type={showConfirmPassword ? 'text' : 'password'}
@@ -230,6 +250,7 @@ export function Signup({ onSignup, onSwitchToLogin, onBack }: SignupProps) {
                     variant="ghost"
                     size="sm"
                     className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                    aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                     disabled={isLoading}
                   >
@@ -254,18 +275,25 @@ export function Signup({ onSignup, onSwitchToLogin, onBack }: SignupProps) {
               </Button>
             </form>
 
-            <div className="mt-6 text-center">
-              <p className="text-sm text-muted-foreground">
-                Already have an account?{' '}
-                <button
-                  type="button"
-                  onClick={onSwitchToLogin}
-                  className="font-medium text-primary hover:underline"
-                  disabled={isLoading}
-                >
-                  Sign in here
-                </button>
-              </p>
+            <div className="mt-6 space-y-3">
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t" />
+                </div>
+                <div className="relative flex justify-center text-xs">
+                  <span className="bg-card px-2 text-muted-foreground">Already have an account?</span>
+                </div>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onSwitchToLogin}
+                className="h-11 w-full"
+                disabled={isLoading}
+              >
+                <ArrowLeft aria-hidden="true" className="mr-2 size-4" />
+                Back to Sign In
+              </Button>
             </div>
           </CardContent>
         </Card>

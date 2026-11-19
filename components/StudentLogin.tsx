@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { GraduationCap, Mail, Lock, LogIn, UserPlus, ArrowLeft } from 'lucide-react';
+import { GraduationCap, Mail, Lock, LogIn, UserPlus, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import { LoadingSpinner } from './ui/loading';
 
 interface StudentLoginProps {
@@ -16,6 +16,7 @@ interface StudentLoginProps {
 export function StudentLogin({ onLogin, onSwitchToSignup, onSwitchToFaculty }: StudentLoginProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -31,30 +32,31 @@ export function StudentLogin({ onLogin, onSwitchToSignup, onSwitchToFaculty }: S
   };
 
   return (
-    <main className="flex min-h-dvh items-center justify-center bg-muted/40 p-4">
+    <main className="mobile-ui auth-screen flex min-h-dvh items-center justify-center bg-muted/40 p-4">
       <div className="w-full max-w-md">
         <Button
           onClick={onSwitchToFaculty}
           variant="ghost"
-          className="mb-4"
+          className="auth-back-button mb-4"
+          aria-label="Back to portal selection"
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
-          Back to Portal Selection
+          <span className="auth-back-label">Back to Portal Selection</span>
         </Button>
         
-        <div className="text-center mb-8">
-          <div className="mb-4 inline-flex size-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+        <div className="auth-heading text-center mb-8">
+          <div className="auth-heading-icon mb-4 inline-flex size-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
             <GraduationCap className="size-7" />
           </div>
           <h1 className="mb-2 text-3xl font-semibold tracking-tight text-foreground">Student Portal</h1>
           <p className="text-muted-foreground">Access your dental college progress</p>
         </div>
 
-        <Card className="border-border/80 shadow-sm">
+        <Card className="auth-panel border-border/80 shadow-sm">
           <CardHeader className="space-y-2 pb-6">
             <CardTitle className="text-2xl text-center">Welcome Back!</CardTitle>
             <CardDescription className="text-center">
-              Sign in to track your progress and view assignments
+              Sign in to track your progress
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -79,15 +81,29 @@ export function StudentLogin({ onLogin, onSwitchToSignup, onSwitchToFaculty }: S
                   <Lock className="w-4 h-4" />
                   Password
                 </Label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="Enter your password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  className="h-11"
-                />
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="Enter your password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    className="h-11 pr-11"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-0 top-0 h-full"
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    onClick={() => setShowPassword(value => !value)}
+                  >
+                    {showPassword
+                      ? <EyeOff aria-hidden="true" className="size-4" />
+                      : <Eye aria-hidden="true" className="size-4" />}
+                  </Button>
+                </div>
               </div>
               
               <Button
@@ -116,7 +132,7 @@ export function StudentLogin({ onLogin, onSwitchToSignup, onSwitchToFaculty }: S
                 </div>
                 <div className="relative flex justify-center text-xs uppercase">
                   <span className="bg-card px-2 text-muted-foreground">
-                    New student?
+                    Don&apos;t have an account?
                   </span>
                 </div>
               </div>
@@ -131,14 +147,16 @@ export function StudentLogin({ onLogin, onSwitchToSignup, onSwitchToFaculty }: S
                 Create Account
               </Button>
 
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={onSwitchToFaculty}
-                className="w-full text-sm text-muted-foreground hover:text-foreground"
-              >
-                Are you a faculty member? Switch to Faculty Portal ?
-              </Button>
+              <p className="pt-2 text-center text-xs text-muted-foreground">
+                Are you a Faculty Member?{' '}
+                <button
+                  type="button"
+                  onClick={onSwitchToFaculty}
+                  className="font-medium text-primary hover:underline"
+                >
+                  Switch to Faculty Portal
+                </button>
+              </p>
             </div>
           </CardContent>
         </Card>

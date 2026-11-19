@@ -25,6 +25,8 @@ import {
 import { DASHBOARD_LOGOUT_EVENT } from '@/lib/dashboard-events';
 import { supabase } from '@/components/utils/supabase/client';
 import { DashboardAccountMenu } from '@/components/DashboardAccountMenu';
+import { MobileDashboardNavigation } from '@/components/MobileDashboardNavigation';
+import { Button } from '@/components/ui/button';
 
 const menuItems = [
   {
@@ -112,10 +114,17 @@ export default function FacultyDashboardLayout({
   const visibleMenuItems = canManageCatalog
     ? [...menuItems, { label: 'Academic', items: [{ id: 'catalog', label: 'Academic catalog', icon: BookOpen }] }]
     : menuItems;
+  const mobileTitle = activeView === 'class-view'
+    ? pageTitle
+    : activeView === 'dashboard'
+      ? 'Dashboard'
+      : activeView === 'tasks-quizzes'
+        ? 'Tasks and Quizzes'
+        : (titles[activeView] || 'Overview');
 
   return (
     <SidebarProvider>
-        <div className="flex min-h-svh w-full min-w-0 flex-1">
+        <div className="mobile-ui mobile-dashboard flex min-h-svh w-full min-w-0 flex-1">
           <Sidebar collapsible="icon">
             <SidebarContent>
               {visibleMenuItems.map(group => (
@@ -154,13 +163,61 @@ export default function FacultyDashboardLayout({
             </SidebarFooter>
           </Sidebar>
           <div className="flex min-w-0 flex-1 flex-col bg-background">
-            <header className="sticky top-0 z-10 flex min-h-14 items-center gap-3 border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+            <header className="sticky top-0 z-10 hidden min-h-14 items-center gap-3 border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/80 lg:flex">
               <SidebarTrigger />
               <h1 className="truncate text-sm font-semibold">
                 {activeView === 'class-view' ? pageTitle : (titles[activeView] || 'Overview')}
               </h1>
             </header>
-            <main id="main-content" className="min-h-0 flex-1 overflow-auto">
+            <MobileDashboardNavigation
+              role="professor"
+              title={mobileTitle}
+              displayName={displayName}
+              email={email}
+              identifier={identifier || email}
+              accountLabel="Account settings"
+              accountHref="/faculty/dashboard/settings"
+              onLogout={logout}
+              items={[
+                {
+                  label: 'Students',
+                  href: '/faculty/dashboard/students',
+                  icon: Users,
+                  activeRoutes: ['/faculty/dashboard/student-details', '/faculty/dashboard/profile', '/faculty/dashboard/portal-students'],
+                },
+                {
+                  label: 'Classes',
+                  href: '/faculty/dashboard/classes',
+                  icon: School,
+                  activeRoutes: ['/faculty/dashboard/class-view', '/faculty/dashboard/add-task', '/faculty/dashboard/add-quiz'],
+                },
+                {
+                  label: 'Grades',
+                  href: '/faculty/dashboard/grades',
+                  icon: BookOpen,
+                  activeRoutes: ['/faculty/dashboard/marks'],
+                },
+                {
+                  label: 'Tasks and quizzes',
+                  href: '/faculty/dashboard/tasks-quizzes',
+                  icon: ListTodo,
+                  activeRoutes: ['/faculty/dashboard/edit-task', '/faculty/dashboard/task-submissions'],
+                },
+              ]}
+              rightAction={
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="mobile-header-button"
+                  aria-label="Go to dashboard"
+                  onClick={() => router.push('/faculty/dashboard')}
+                >
+                  <Home aria-hidden="true" />
+                </Button>
+              }
+            />
+            <main id="main-content" data-mobile-view={activeView} className="min-h-0 flex-1 overflow-auto">
               {children}
             </main>
           </div>

@@ -44,6 +44,7 @@ export function MarksManagement({ students, classes, accessToken, projectId }: {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSubject, setSelectedSubject] = useState('all');
   const [selectedClass, setSelectedClass] = useState('all');
+  const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false);
   const [editingGrade, setEditingGrade] = useState<any>(null);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -266,33 +267,12 @@ export function MarksManagement({ students, classes, accessToken, projectId }: {
     toast.success(`Exported ${filteredGrades.length} grade records`);
   };
 
-  // Empty state when no students exist
-  if (students.length === 0) {
-    return (
-      <div className="p-6">
-        <Card className="shadow-none">
-          <CardContent className="py-12">
-            <div className="text-center space-y-4">
-              <div className="mb-4 inline-flex size-20 items-center justify-center rounded-full bg-muted">
-                <UserPlus className="size-10 text-muted-foreground" />
-              </div>
-              <h3 className="text-xl font-medium">No Students Added Yet</h3>
-              <p className="text-muted-foreground max-w-md mx-auto">
-                You need to add students first before you can manage their marks. 
-                Start by adding students from the sidebar menu.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-6 p-6">
+    <>
+    <div className={`faculty-grades-page space-y-6 p-6 ${students.length === 0 ? 'faculty-grades-page-mobile-only' : ''}`}>
       <div className="flex justify-end gap-2">
         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-          <DialogTrigger render={<Button />}>
+          <DialogTrigger render={<Button className="faculty-grade-add" />}>
             <Plus className="w-4 h-4 mr-2" />
             Add Grade
           </DialogTrigger>
@@ -424,6 +404,7 @@ export function MarksManagement({ students, classes, accessToken, projectId }: {
         </Dialog>
 
         <Button
+          className="faculty-grade-export"
           variant="outline"
           disabled={filteredGrades.length === 0}
           onClick={exportGrades}
@@ -434,7 +415,7 @@ export function MarksManagement({ students, classes, accessToken, projectId }: {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="faculty-grade-kpis grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard label="Students" value={students.length} icon={<GraduationCap aria-hidden="true" />} />
         <KpiCard label="Grades recorded" value={grades.length} icon={<BookOpen aria-hidden="true" />} />
         <KpiCard label="Classes" value={classes.length} icon={<Filter aria-hidden="true" />} />
@@ -448,9 +429,68 @@ export function MarksManagement({ students, classes, accessToken, projectId }: {
         />
       </div>
 
-      <Card className="shadow-none">
-        <CardHeader>
-          <div className="flex flex-col sm:flex-row gap-4">
+      <div className="faculty-grade-mobile-controls">
+        <div className="faculty-grade-mobile-search-row">
+          <div className="relative min-w-0 flex-1">
+            <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              aria-label="Search grades"
+              placeholder="Search students, assignments, or subjects..."
+              value={searchTerm}
+              onChange={event => setSearchTerm(event.target.value)}
+              className="pl-10"
+            />
+          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="faculty-grade-mobile-filter-toggle"
+            aria-label={isMobileFiltersOpen ? 'Hide grade filters' : 'Show grade filters'}
+            aria-expanded={isMobileFiltersOpen}
+            aria-controls="faculty-grade-mobile-filter-options"
+            onClick={() => setIsMobileFiltersOpen(open => !open)}
+          >
+            <Filter aria-hidden="true" />
+          </Button>
+        </div>
+        <div
+          id="faculty-grade-mobile-filter-options"
+          className={`faculty-grade-mobile-filter-options${isMobileFiltersOpen ? ' is-open' : ''}`}
+          aria-hidden={!isMobileFiltersOpen}
+        >
+          <Select value={selectedClass} onValueChange={value => setSelectedClass(value ?? 'all')}>
+            <SelectTrigger aria-label="Filter grades by class" className="w-full">
+              <SelectValue placeholder="All Classes" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Classes</SelectItem>
+              {classes.map(cls => (
+                <SelectItem key={cls.id} value={String(cls.id)}>
+                  {cls.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={selectedSubject} onValueChange={value => setSelectedSubject(value ?? 'all')}>
+            <SelectTrigger aria-label="Filter grades by subject" className="w-full">
+              <SelectValue placeholder="All Subjects" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Subjects</SelectItem>
+              {[...new Set(classes.map((classItem: any) => classItem.subject).filter(Boolean))].map(subject => (
+                <SelectItem key={subject} value={subject}>
+                  {subject}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      <Card className="faculty-grade-records shadow-none">
+        <CardHeader className="faculty-grade-records-header">
+          <div className="faculty-grade-filters flex flex-col sm:flex-row gap-4">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
               <Input
@@ -493,8 +533,8 @@ export function MarksManagement({ students, classes, accessToken, projectId }: {
         </CardHeader>
         <CardContent>
           {filteredGrades.length === 0 ? (
-            <div className="text-center py-12">
-              <div className="mb-4 inline-flex size-16 items-center justify-center rounded-full bg-muted">
+            <div className="faculty-grade-empty text-center py-12">
+              <div className="faculty-grade-empty-icon mb-4 inline-flex size-16 items-center justify-center rounded-full bg-muted">
                 <BookOpen className="size-8 text-muted-foreground" />
               </div>
               <h3 className="text-lg font-medium mb-2">No Grades Yet</h3>
@@ -627,5 +667,24 @@ export function MarksManagement({ students, classes, accessToken, projectId }: {
         </CardContent>
       </Card>
     </div>
+    {students.length === 0 && (
+      <div className="faculty-grades-no-students-desktop p-6">
+        <Card className="shadow-none">
+          <CardContent className="py-12">
+            <div className="text-center space-y-4">
+              <div className="mb-4 inline-flex size-20 items-center justify-center rounded-full bg-muted">
+                <UserPlus className="size-10 text-muted-foreground" />
+              </div>
+              <h3 className="text-xl font-medium">No Students Added Yet</h3>
+              <p className="text-muted-foreground max-w-md mx-auto">
+                You need to add students first before you can manage their marks.
+                Start by adding students from the sidebar menu.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )}
+    </>
   );
 }

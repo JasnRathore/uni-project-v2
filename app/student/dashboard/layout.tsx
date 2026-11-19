@@ -36,6 +36,7 @@ import {
 } from '@/components/ui/dialog';
 import { DASHBOARD_LOGOUT_EVENT } from '@/lib/dashboard-events';
 import { supabase } from '@/components/utils/supabase/client';
+import { MobileDashboardNavigation } from '@/components/MobileDashboardNavigation';
 
 interface StudentNotification {
   id: string;
@@ -168,7 +169,7 @@ export default function StudentDashboardLayout({
 
   return (
     <SidebarProvider>
-      <div className="flex min-h-svh w-full min-w-0 flex-1">
+      <div className="mobile-ui mobile-dashboard flex min-h-svh w-full min-w-0 flex-1">
         <Sidebar collapsible="icon">
           <SidebarContent>
             {menuGroups.map(group => (
@@ -242,7 +243,38 @@ export default function StudentDashboardLayout({
               {titles[activeView] || 'Dashboard'}
             </h1>
           </header>
-          <main id="main-content" className="min-h-0 flex-1 overflow-y-auto">{children}</main>
+          <MobileDashboardNavigation
+            role="student"
+            title={activeView === 'tasks' ? 'Tasks and Quizzes' : titles[activeView] || 'Dashboard'}
+            displayName={studentName}
+            email={studentEmail}
+            identifier={studentId || studentEmail}
+            accountLabel="My profile"
+            accountHref="/student/dashboard/profile"
+            onLogout={logout}
+            items={[
+              { label: 'Dashboard', href: '/student/dashboard', icon: Home },
+              { label: 'Tasks and quizzes', href: '/student/dashboard/tasks', icon: ListTodo },
+              { label: 'Leaderboard', href: '/student/dashboard/leaderboard', icon: Trophy },
+              { label: 'My grades', href: '/student/dashboard/grades', icon: BookOpen },
+            ]}
+            rightAction={
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="mobile-header-button"
+                aria-label={`Notifications${unreadCount > 0 ? `, ${unreadCount} unread` : ''}`}
+                onClick={() => setShowNotifications(true)}
+              >
+                <Bell aria-hidden="true" />
+                {unreadCount > 0 && (
+                  <span className="absolute right-2 top-2 size-2 rounded-full bg-primary" />
+                )}
+              </Button>
+            }
+          />
+          <main id="main-content" data-mobile-view={activeView} className="min-h-0 flex-1 overflow-y-auto">{children}</main>
         </div>
       </div>
       <Dialog open={showNotifications} onOpenChange={setShowNotifications}>

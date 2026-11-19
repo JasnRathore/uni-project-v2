@@ -58,14 +58,15 @@ export function ClassManagement({
   const grades = [...new Set(classes.map(classItem => classItem.grade))].sort();
 
   return (
-    <div className="p-6">
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <Button className="sm:order-1" onClick={() => setIsAddDialogOpen(true)}>
+    <div className="faculty-classes-page p-6">
+      <div className="faculty-class-controls mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <Button className="faculty-class-add sm:order-1" onClick={() => setIsAddDialogOpen(true)}>
             <Plus className="w-4 h-4 mr-2" />
-            Add New Class
+            <span className="faculty-class-add-desktop">Add New Class</span>
+            <span className="faculty-class-add-mobile hidden">Add Class</span>
           </Button>
-        <div className="flex w-full flex-col gap-2 sm:order-2 sm:ml-auto sm:max-w-xl sm:flex-row">
-          <div className="relative min-w-0 flex-1">
+        <div className="faculty-class-filters flex w-full flex-col gap-2 sm:order-2 sm:ml-auto sm:max-w-xl sm:flex-row">
+          <div className="faculty-class-search relative min-w-0 flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               placeholder="Search classes..."
@@ -164,8 +165,8 @@ export function ClassManagement({
       </div>
 
       {filteredClasses.length === 0 && (
-        <div className="text-center py-12">
-          <div className="mx-auto mb-4 flex size-16 items-center justify-center rounded-full bg-muted">
+        <div className="faculty-class-empty text-center py-12">
+          <div className="faculty-class-empty-icon mx-auto mb-4 flex size-16 items-center justify-center rounded-full bg-muted">
             <BookOpen className="size-8 text-muted-foreground" />
           </div>
           <h3 className="text-lg font-medium mb-2">No Classes Found</h3>

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, Eye, Flame, RefreshCw, Search, Trophy, Users } from 'lucide-react';
+import { CheckCircle2, ChevronDown, Copy, Eye, Filter, Flame, RefreshCw, Search, Trophy, Users } from 'lucide-react';
 import { RoleAvatar } from './RoleAvatar';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
@@ -9,6 +9,7 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
+import { toast } from 'sonner';
 
 type AssignmentFilter = 'all' | 'assigned' | 'unassigned';
 
@@ -75,6 +76,7 @@ export function StudentsList({
   }>>([]);
   const [classFilter, setClassFilter] = useState('all');
   const [assignmentFilter, setAssignmentFilter] = useState<AssignmentFilter>('all');
+  const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false);
   const [activityByEmail, setActivityByEmail] = useState<Record<string, StudentActivity>>({});
   const [isLoadingActivity, setIsLoadingActivity] = useState(false);
 
@@ -180,6 +182,16 @@ export function StudentsList({
     });
   }, [studentsWithData, searchTerm, cohortFilter, classFilter, assignmentFilter]);
 
+  const copyPrn = async (prn: string | number) => {
+    try {
+      await navigator.clipboard.writeText(String(prn));
+      toast.success('PRN copied');
+    } catch (error) {
+      console.error('Failed to copy student PRN:', error);
+      toast.error('Could not copy PRN');
+    }
+  };
+
   const renderStudentCard = (student: StudentRecord) => {
     const assigned = isAssigned(student);
     const className = student.className || student.class;
@@ -277,8 +289,28 @@ export function StudentsList({
   };
 
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-5 p-4 sm:p-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="students-directory mx-auto w-full max-w-7xl space-y-5 p-4 sm:p-6">
+      <div className="students-directory-heading flex items-center justify-between gap-3">
+        <div>
+          <h2 className="text-2xl font-semibold tracking-tight">Search Students</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Open a student record to review academic details, activity, and your class memberships.
+          </p>
+        </div>
+        {onRefresh && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="shrink-0"
+            aria-label="Refresh students"
+            onClick={onRefresh}
+          >
+            <RefreshCw aria-hidden="true" />
+          </Button>
+        )}
+      </div>
+      <div className="students-directory-desktop-intro flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-muted-foreground">
           Open a student record to review academic details, activity, and your class memberships.
         </p>
@@ -292,62 +324,81 @@ export function StudentsList({
 
       <section aria-label="Student filters" className="rounded-2xl border bg-card p-4">
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <div className="space-y-1.5 sm:col-span-2 xl:col-span-1">
-            <Label htmlFor="student-search">Search</Label>
-            <div className="relative">
-              <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                id="student-search"
-                placeholder="Name, email, PRN"
-                value={searchTerm}
-                onChange={event => setSearchTerm(event.target.value)}
-                className="pl-9"
-              />
+          <div className="students-directory-search-field space-y-1.5 sm:col-span-2 xl:col-span-1">
+            <Label htmlFor="student-search" className="sr-only lg:not-sr-only">Search</Label>
+            <div className="students-directory-search-row">
+              <div className="relative min-w-0 flex-1">
+                <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  id="student-search"
+                  placeholder="Name, email, PRN"
+                  value={searchTerm}
+                  onChange={event => setSearchTerm(event.target.value)}
+                  className="pl-9"
+                />
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="students-directory-filter-toggle hidden"
+                aria-label={isMobileFiltersOpen ? 'Hide student filters' : 'Show student filters'}
+                aria-expanded={isMobileFiltersOpen}
+                aria-controls="student-filter-options"
+                onClick={() => setIsMobileFiltersOpen(open => !open)}
+              >
+                <Filter aria-hidden="true" />
+              </Button>
             </div>
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="student-cohort">Graduation cohort</Label>
-            <Select value={cohortFilter} onValueChange={value => setCohortFilter(value ?? 'all')}>
-              <SelectTrigger id="student-cohort" className="w-full">
-                <SelectValue placeholder="All cohorts" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All cohorts</SelectItem>
-                {cohorts.map(cohort => (
-                  <SelectItem key={cohort.id} value={cohort.id}>
-                    {cohort.degree_name} · {cohort.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="student-class">Class</Label>
-            <Select value={classFilter} onValueChange={value => setClassFilter(value ?? 'all')}>
-              <SelectTrigger id="student-class" className="w-full">
-                <SelectValue placeholder="All classes" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All classes</SelectItem>
-                {classNames.map(className => <SelectItem key={className} value={className}>{className}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="student-assignment">Class assignment</Label>
-            <Select
-              value={assignmentFilter}
-              onValueChange={value => setAssignmentFilter((value ?? 'all') as AssignmentFilter)}
-            >
-              <SelectTrigger id="student-assignment" className="w-full">
-                <SelectValue placeholder="Any assignment" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All students</SelectItem>
-                <SelectItem value="assigned">Assigned</SelectItem>
-                <SelectItem value="unassigned">Unassigned</SelectItem>
-              </SelectContent>
-            </Select>
+          <div
+            id="student-filter-options"
+            className={`students-directory-filter-options contents${isMobileFiltersOpen ? ' is-open' : ''}`}
+          >
+            <div className="space-y-1.5">
+              <Label htmlFor="student-cohort">Graduation cohort</Label>
+              <Select value={cohortFilter} onValueChange={value => setCohortFilter(value ?? 'all')}>
+                <SelectTrigger id="student-cohort" className="w-full">
+                  <SelectValue placeholder="All cohorts" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All cohorts</SelectItem>
+                  {cohorts.map(cohort => (
+                    <SelectItem key={cohort.id} value={cohort.id}>
+                      {cohort.degree_name} · {cohort.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="student-class">Class</Label>
+              <Select value={classFilter} onValueChange={value => setClassFilter(value ?? 'all')}>
+                <SelectTrigger id="student-class" className="w-full">
+                  <SelectValue placeholder="All classes" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All classes</SelectItem>
+                  {classNames.map(className => <SelectItem key={className} value={className}>{className}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="student-assignment">Class assignment</Label>
+              <Select
+                value={assignmentFilter}
+                onValueChange={value => setAssignmentFilter((value ?? 'all') as AssignmentFilter)}
+              >
+                <SelectTrigger id="student-assignment" className="w-full">
+                  <SelectValue placeholder="Any assignment" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All students</SelectItem>
+                  <SelectItem value="assigned">Assigned</SelectItem>
+                  <SelectItem value="unassigned">Unassigned</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
       </section>
@@ -355,11 +406,11 @@ export function StudentsList({
       {isLoadingActivity && <p className="text-sm text-muted-foreground" role="status">Loading student activity…</p>}
 
       {filteredStudents.length ? (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="students-desktop-grid grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           {filteredStudents.map(renderStudentCard)}
         </div>
       ) : (
-        <Card className="shadow-none">
+        <Card className="students-desktop-empty shadow-none">
           <CardContent className="flex flex-col items-center px-6 py-12 text-center">
             <div className="mb-4 flex size-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
               <Users aria-hidden="true" className="size-6" />
@@ -375,6 +426,56 @@ export function StudentsList({
           </CardContent>
         </Card>
       )}
+
+      <Card className="students-mobile-results hidden shadow-none">
+        <CardHeader className="border-b px-4 py-3">
+          <CardTitle className="text-base">Search Result</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            {filteredStudents.length} {filteredStudents.length === 1 ? 'student' : 'students'} matched the search query.
+          </p>
+        </CardHeader>
+        <CardContent className="p-0">
+          {filteredStudents.length ? (
+            <ul className="divide-y">
+              {filteredStudents.map(student => (
+                <li key={student.id || student.email} className="flex min-w-0 items-center gap-2 px-4 py-3">
+                  <button
+                    type="button"
+                    onClick={() => onSelectStudent(student)}
+                    className="flex min-w-0 flex-1 items-center gap-3 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <RoleAvatar
+                      role="student"
+                      identifier={student.id || student.email}
+                      name={student.name || 'Student'}
+                      className="size-8 shrink-0"
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-medium">{student.name || 'Unnamed student'}</span>
+                      <span className="block truncate text-xs text-muted-foreground">
+                        {student.email}{student.prn ? ` · PRN ${student.prn}` : ''}
+                      </span>
+                    </span>
+                    <ChevronDown aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
+                  </button>
+                  {student.prn && (
+                    <button
+                      type="button"
+                      onClick={() => void copyPrn(student.prn!)}
+                      className="flex size-8 shrink-0 items-center justify-center rounded-md text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      aria-label={`Copy PRN for ${student.name || 'student'}`}
+                    >
+                      <Copy aria-hidden="true" className="size-3.5" />
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="px-4 py-6 text-sm text-muted-foreground">No students matched the search query.</p>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

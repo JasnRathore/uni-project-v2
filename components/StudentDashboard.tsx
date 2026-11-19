@@ -1,7 +1,6 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { SidebarTrigger } from "./ui/sidebar";
 import {
   Card,
   CardContent,
@@ -18,7 +17,6 @@ import {
   TableHeader,
   TableRow,
 } from "./ui/table";
-import { RoleAvatar } from "./RoleAvatar";
 import {
   Dialog,
   DialogContent,
@@ -31,13 +29,14 @@ import { TakeQuiz } from "./TakeQuiz";
 import { StudentProfile } from "./StudentProfile";
 import { StudentLeaderboard } from "./StudentLeaderboard";
 import {
+  ArrowRight,
   Trophy,
   Star,
   Zap,
   CheckCircle2,
   Clock,
   Flame,
-  GraduationCap,
+  Clipboard,
   Info,
   AlertCircle,
   BookOpen,
@@ -313,31 +312,8 @@ export function StudentDashboard({
 
   return (
       <>
-        {/* Mobile Header */}
-        <div className="border-b bg-background px-4 py-2.5 lg:hidden">
-          <div className="flex items-center justify-between">
-            <SidebarTrigger
-              size="icon-sm"
-              aria-label="Open navigation menu"
-            />
-            <div className="flex items-center gap-2">
-              <GraduationCap aria-hidden="true" className="size-5 text-primary" />
-              <span className="text-sm font-semibold">Student portal</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <RoleAvatar
-                role="student"
-                identifier={student?.id || student?.email}
-                name={profileData.name}
-                className="size-8"
-                fallbackClassName="text-xs font-medium"
-              />
-            </div>
-          </div>
-        </div>
-
         <div className="w-full min-w-0">
-              <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+              <div className="student-dashboard-content mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
                 {/* Profile Content if active */}
                 {activeView === "profile" && (
                   <StudentProfile
@@ -363,7 +339,7 @@ export function StudentDashboard({
 
                 {/* View Content based on activeView */}
                 {activeView === "dashboard" && (
-                  <div className="flex flex-col gap-8">
+                  <div className="student-overview flex flex-col gap-8">
                     <section
                       aria-labelledby="student-overview-heading"
                       className="flex flex-wrap items-end justify-between gap-4"
@@ -380,7 +356,7 @@ export function StudentDashboard({
                         </p>
                       </div>
                     </section>
-                    <section aria-label="Learning progress" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                    <section aria-label="Learning progress" className="student-overview-stats grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                       <Card className="border-primary/20 bg-primary/[0.035] shadow-none">
                         <CardContent className="p-5">
                           <div className="flex items-start justify-between gap-3">
@@ -468,8 +444,15 @@ export function StudentDashboard({
                               : 'You are up to date on assigned work.'}
                           </p>
                         </div>
-                        <Button variant="outline" onClick={() => setActiveView("tasks")}>
-                          View all tasks
+                        <Button
+                          className="student-upcoming-link"
+                          variant="outline"
+                          onClick={() => setActiveView("tasks")}
+                        >
+                          <span className="student-upcoming-desktop">View all tasks</span>
+                          <span className="student-upcoming-mobile hidden">
+                            All tasks <ArrowRight aria-hidden="true" className="size-4" />
+                          </span>
                         </Button>
                       </div>
 
@@ -517,7 +500,7 @@ export function StudentDashboard({
                           ))}
                         </div>
                       ) : (
-                        <Card className="shadow-none">
+                        <Card className="student-overview-empty shadow-none">
                           <CardContent className="flex flex-col items-start gap-3 p-6 sm:flex-row sm:items-center">
                             <CheckCircle2 aria-hidden="true" className="size-5 text-muted-foreground" />
                             <div className="flex-1">
@@ -540,24 +523,29 @@ export function StudentDashboard({
                   <div className="flex flex-col gap-6">
                     <div className="flex flex-wrap items-end justify-between gap-4">
                       <div>
-                        <h2 className="text-2xl font-semibold tracking-tight">Your grades</h2>
+                        <h2 className="text-2xl font-semibold tracking-tight">
+                          <span className="student-grades-title-desktop">Your grades</span>
+                          <span className="student-grades-title-mobile hidden">Your Grades</span>
+                        </h2>
                         <p className="mt-1 text-sm text-muted-foreground">
                           Results for assignments and quizzes that have been reviewed.
                         </p>
                       </div>
                       <Button
+                        className="student-grades-refresh"
                         type="button"
                         variant="outline"
                         size="sm"
                         onClick={loadStudentData}
                         disabled={isGradesLoading}
+                        aria-label="Refresh grades"
                       >
                         {isGradesLoading ? (
                           <Loader2 aria-hidden="true" data-icon="inline-start" className="animate-spin text-primary" />
                         ) : (
                           <RefreshCw aria-hidden="true" data-icon="inline-start" />
                         )}
-                        Refresh grades
+                        <span className="mobile-refresh-label">Refresh grades</span>
                       </Button>
                     </div>
 
@@ -579,7 +567,7 @@ export function StudentDashboard({
                         </CardContent>
                       </Card>
                     ) : grades.length === 0 ? (
-                      <Card className="shadow-none">
+                      <Card className="student-grades-empty shadow-none">
                         <CardContent className="flex flex-col items-center px-6 py-12 text-center">
                           <span className="flex size-10 items-center justify-center rounded-lg bg-muted text-muted-foreground">
                             <BookOpen aria-hidden="true" className="size-5" />
@@ -693,7 +681,10 @@ export function StudentDashboard({
                       {/* Ongoing Section */}
                       <section className="flex flex-col gap-4">
                         <div>
-                          <h3 className="font-semibold">Ongoing assignments</h3>
+                          <h3 className="font-semibold">
+                            <span className="student-tasks-title-desktop">Ongoing assignments</span>
+                            <span className="student-tasks-title-mobile hidden">Ongoing Assignments</span>
+                          </h3>
                           <p className="mt-1 text-sm text-muted-foreground">
                             {ongoingTasks.length} item{ongoingTasks.length === 1 ? '' : 's'}
                           </p>
@@ -749,9 +740,28 @@ export function StudentDashboard({
                             ))}
                           </div>
                         ) : (
-                          <Card className="shadow-none">
-                            <CardContent className="p-6 text-sm text-muted-foreground">
-                              No outstanding assignments or quizzes.
+                          <Card className="student-empty-work shadow-none">
+                            <CardContent className="flex min-h-[300px] flex-col items-center justify-center p-6 text-center">
+                              <Clipboard aria-hidden="true" className="size-6 text-muted-foreground" />
+                              <h4 className="mt-4 font-semibold">
+                                {tasks.length === 0 ? "No assignments yet" : "You’re all caught up"}
+                              </h4>
+                              <p className="mt-2 text-sm text-muted-foreground">
+                                {tasks.length === 0
+                                  ? "New assignments and quizzes will appear here."
+                                  : "There are no outstanding assignments or quizzes."}
+                              </p>
+                              {completedTasks.length > 0 && (
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className="mt-4"
+                                  onClick={() => setActiveView("grades")}
+                                >
+                                  Review grades
+                                </Button>
+                              )}
                             </CardContent>
                           </Card>
                         )}

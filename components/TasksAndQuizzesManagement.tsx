@@ -33,6 +33,7 @@ import {
   Brain,
   Plus,
   Search,
+  Filter,
   ChevronDown,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -73,6 +74,7 @@ export function TasksAndQuizzesManagement({
   const [searchTerm, setSearchTerm] = useState("");
   const [classFilter, setClassFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false);
 
   const creationClass = classes.find(classItem => String(classItem.id) === creationClassId);
   const selectedCreationClass = creationClass
@@ -376,19 +378,21 @@ export function TasksAndQuizzesManagement({
   };
 
   return (
-    <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 p-4 sm:p-6">
+    <div className="faculty-tasks-page mx-auto flex w-full max-w-7xl flex-col gap-5 p-4 sm:p-6">
       <div className="mb-6 flex flex-wrap items-center justify-end gap-2">
         <Button variant="outline" onClick={() => openCreationDialog("task")}>
           <Plus data-icon="inline-start" />
-          Create task
+          <span className="faculty-task-create-desktop">Create task</span>
+          <span className="faculty-task-create-mobile hidden">Add Task</span>
         </Button>
         <Button onClick={() => openCreationDialog("quiz")}>
           <Plus data-icon="inline-start" />
-          Create quiz
+          <span className="faculty-task-create-desktop">Create quiz</span>
+          <span className="faculty-task-create-mobile hidden">Add Quiz</span>
         </Button>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="faculty-task-kpis grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard label="Tasks" value={regularTasks.length} icon={<FileText aria-hidden="true" />} />
         <KpiCard label="Quizzes" value={quizzes.length} icon={<Brain aria-hidden="true" />} />
         <KpiCard
@@ -410,41 +414,60 @@ export function TasksAndQuizzesManagement({
             <TabsTrigger value="tasks">Tasks</TabsTrigger>
             <TabsTrigger value="quizzes">Quizzes</TabsTrigger>
           </TabsList>
-          <div className="grid gap-2 sm:flex sm:flex-wrap sm:justify-end">
-            <div className="relative sm:w-56">
-              <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                aria-label="Search tasks and quizzes"
-                placeholder="Search tasks and quizzes"
-                value={searchTerm}
-                onChange={event => setSearchTerm(event.target.value)}
-                className="pl-9"
-              />
+          <div className="faculty-task-filter-controls grid gap-2 sm:flex sm:flex-wrap sm:justify-end">
+            <div className="faculty-task-search-row">
+              <div className="relative sm:w-56">
+                <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  aria-label="Search tasks and quizzes"
+                  placeholder="Search tasks and quizzes"
+                  value={searchTerm}
+                  onChange={event => setSearchTerm(event.target.value)}
+                  className="pl-9"
+                />
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="faculty-task-filter-toggle hidden"
+                aria-label={isMobileFiltersOpen ? "Hide task filters" : "Show task filters"}
+                aria-expanded={isMobileFiltersOpen}
+                aria-controls="faculty-task-filter-options"
+                onClick={() => setIsMobileFiltersOpen(open => !open)}
+              >
+                <Filter aria-hidden="true" />
+              </Button>
             </div>
-            <Select value={classFilter} onValueChange={value => setClassFilter(value ?? "all")}>
-              <SelectTrigger aria-label="Filter by class" className="w-full sm:w-48">
-                <SelectValue placeholder="All classes" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All classes</SelectItem>
-                {classes.map(classItem => (
-                  <SelectItem key={classItem.id} value={String(classItem.id)}>
-                    {classItem.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={statusFilter} onValueChange={value => setStatusFilter(value ?? "all")}>
-              <SelectTrigger aria-label="Filter by status" className="w-full sm:w-36">
-                <SelectValue placeholder="Any status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Any status</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="inactive">Inactive</SelectItem>
-                <SelectItem value="overdue">Overdue</SelectItem>
-              </SelectContent>
-            </Select>
+            <div
+              id="faculty-task-filter-options"
+              className={`faculty-task-filter-options contents${isMobileFiltersOpen ? " is-open" : ""}`}
+            >
+              <Select value={classFilter} onValueChange={value => setClassFilter(value ?? "all")}>
+                <SelectTrigger aria-label="Filter by class" className="w-full sm:w-48">
+                  <SelectValue placeholder="All classes" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All classes</SelectItem>
+                  {classes.map(classItem => (
+                    <SelectItem key={classItem.id} value={String(classItem.id)}>
+                      {classItem.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={statusFilter} onValueChange={value => setStatusFilter(value ?? "all")}>
+                <SelectTrigger aria-label="Filter by status" className="w-full sm:w-36">
+                  <SelectValue placeholder="Any status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Any status</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                  <SelectItem value="overdue">Overdue</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
 

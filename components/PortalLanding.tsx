@@ -2,27 +2,32 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { ArrowRight, GraduationCap, Users } from "lucide-react";
+import { ArrowRight, GraduationCap, House } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 
 export function PortalLanding() {
   return (
-    <main className="flex min-h-dvh items-center justify-center bg-muted/40 px-4 py-12 sm:py-16">
+    <main className="mobile-ui portal-screen flex min-h-dvh items-center justify-center bg-muted/40 px-4 py-12 sm:py-16">
       <div className="w-full max-w-5xl">
+        <header className="portal-heading mb-8 text-center">
+          <House aria-hidden="true" className="mx-auto mb-6 size-8 text-primary" />
+          <h1 className="text-3xl font-semibold tracking-tight text-foreground">Portal Selection</h1>
+          <p className="mt-2 text-muted-foreground">Choose the right portal to continue</p>
+        </header>
         <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
           <PortalLink
-            href="/faculty/login"
-            icon={<Users aria-hidden="true" className="size-5" />}
-            title="Faculty portal"
-            description="Manage classes, student records, grades, and assignments."
-            action="Open the faculty portal"
+            href="/student/login"
+            icon={<GraduationCap aria-hidden="true" className="size-7" />}
+            title="Student Portal"
+            description={<><span className="portal-description-desktop">View grades, assigned work, notifications, and learning progress.</span><span className="portal-description-mobile hidden">Manage classes, student records, grades, and assignments.</span></>}
+            action="Open the Student Portal"
           />
           <PortalLink
-            href="/student/login"
-            icon={<GraduationCap aria-hidden="true" className="size-5" />}
-            title="Student"
-            description="View grades, assigned work, notifications, and learning progress."
-            action="Open the student portal"
+            href="/faculty/login"
+            icon={<GraduationCap aria-hidden="true" className="size-7" />}
+            title="Faculty Portal"
+            description={<><span className="portal-description-desktop">Faculty portal for managing classes, student records, grades, and assignments.</span><span className="portal-description-mobile hidden">View grades, assigned work, notifications, and learning progress.</span></>}
+            action="Open the Faculty Portal"
           />
         </div>
       </div>
@@ -34,7 +39,7 @@ type PortalLinkProps = {
   href: string;
   icon: ReactNode;
   title: string;
-  description: string;
+  description: ReactNode;
   action: string;
 };
 
@@ -42,14 +47,14 @@ function PortalLink({ href, icon, title, description, action }: PortalLinkProps)
   return (
     <Link
       href={href}
-      className="group rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      className="portal-card-link group rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
     >
-      <Card className="h-full border-border/80 shadow-sm transition-[transform,box-shadow,border-color] duration-200 group-hover:-translate-y-0.5 group-hover:border-primary/40 group-hover:shadow-md">
-        <CardHeader className="pb-4">
-          <div className="mb-2 flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
+      <Card className="portal-card h-full border-border/80 shadow-sm transition-[transform,box-shadow,border-color] duration-200 group-hover:-translate-y-0.5 group-hover:border-primary/40 group-hover:shadow-md">
+        <CardHeader className="items-center pb-5 text-center">
+          <div className="portal-card-icon mb-2 flex size-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
             {icon}
           </div>
-          <CardTitle className="text-xl">{title}</CardTitle>
+          <CardTitle className="text-xl font-semibold">{title}</CardTitle>
           <CardDescription>{description}</CardDescription>
         </CardHeader>
         <CardContent>

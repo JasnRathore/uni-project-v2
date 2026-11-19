@@ -13,6 +13,8 @@ import {
   MapPin,
   Save,
   Camera,
+  ImagePlus,
+  Pencil,
 } from "lucide-react";
 import { toast } from "sonner";
 import { LoadingSpinner } from "./ui/loading";
@@ -69,7 +71,21 @@ export function StudentProfile({ student, accessToken, projectId, onUpdate, isTe
   };
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6 pb-12">
+    <div className="student-profile mx-auto max-w-4xl space-y-6 pb-12">
+      <div className="student-profile-mobile-header hidden">
+        <ImagePlus aria-hidden="true" className="size-8" />
+        <h2 className="text-xl font-semibold">{profileData.name || "Student"}</h2>
+        <p className="text-sm text-muted-foreground">Student account</p>
+        <Button
+          type="button"
+          size="sm"
+          className="mt-3"
+          onClick={() => document.getElementById("name")?.focus()}
+        >
+          <Pencil aria-hidden="true" />
+          Edit Profile
+        </Button>
+      </div>
       <Card className="shadow-none">
         <CardHeader>
           <CardTitle className="text-base">Profile information</CardTitle>
@@ -77,8 +93,8 @@ export function StudentProfile({ student, accessToken, projectId, onUpdate, isTe
         </CardHeader>
         <CardContent className="space-y-8">
           {/* Avatar Section */}
-          <div className="flex flex-wrap items-center gap-5 border-b pb-6">
-            <div className="relative">
+          <div className="student-profile-identity flex flex-wrap items-center gap-5 border-b pb-6">
+            <div className="student-profile-avatar relative">
               <RoleAvatar
                 role="student"
                 identifier={student?.id || student?.email}
@@ -98,17 +114,17 @@ export function StudentProfile({ student, accessToken, projectId, onUpdate, isTe
             <div className="min-w-0">
               <h3 className="truncate text-lg font-semibold">{profileData.name}</h3>
               <p className="mt-1 text-sm text-muted-foreground">Student account</p>
-              <Button type="button" variant="outline" size="sm" className="mt-3 min-h-9">Change Photo</Button>
+              <Button type="button" variant="outline" size="sm" className="student-profile-change-photo mt-3 min-h-9">Change Photo</Button>
             </div>
           </div>
 
-          <form onSubmit={handleSave} className="space-y-6">
-            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+          <form onSubmit={handleSave} className="student-profile-form space-y-6">
+            <div className="student-profile-fields grid grid-cols-1 gap-5 md:grid-cols-2">
               {/* Full Name */}
-              <div className="space-y-2">
-                <Label htmlFor="name" className="text-sm font-semibold">Full Name</Label>
+              <div className="student-profile-field-name space-y-2">
+                <Label htmlFor="name" className="text-sm font-semibold"><span className="student-profile-label-icon hidden"><User aria-hidden="true" /></span>Full Name</Label>
                 <div className="relative">
-                  <User aria-hidden="true" className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                  <User aria-hidden="true" className="student-profile-input-icon absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     id="name"
                     value={profileData.name}
@@ -120,10 +136,10 @@ export function StudentProfile({ student, accessToken, projectId, onUpdate, isTe
               </div>
 
               {/* Email Address */}
-              <div className="space-y-2">
-                <Label htmlFor="email" className="text-sm font-semibold">Email Address</Label>
+              <div className="student-profile-field-email space-y-2">
+                <Label htmlFor="email" className="text-sm font-semibold"><span className="student-profile-label-icon hidden"><Mail aria-hidden="true" /></span>Email Address</Label>
                 <div className="relative">
-                  <Mail aria-hidden="true" className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                  <Mail aria-hidden="true" className="student-profile-input-icon absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     id="email"
                     value={profileData.email}
@@ -134,10 +150,10 @@ export function StudentProfile({ student, accessToken, projectId, onUpdate, isTe
               </div>
 
               {/* Phone Number */}
-              <div className="space-y-2">
-                <Label htmlFor="phone" className="text-sm font-semibold">Phone Number</Label>
+              <div className="student-profile-field-phone space-y-2">
+                <Label htmlFor="phone" className="text-sm font-semibold"><span className="student-profile-label-icon hidden"><Phone aria-hidden="true" /></span>Phone Number</Label>
                 <div className="relative">
-                  <Phone aria-hidden="true" className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                  <Phone aria-hidden="true" className="student-profile-input-icon absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     id="phone"
                     value={profileData.phone}
@@ -151,10 +167,10 @@ export function StudentProfile({ student, accessToken, projectId, onUpdate, isTe
             </div>
 
             {/* Address */}
-            <div className="space-y-2">
-              <Label htmlFor="address" className="text-sm font-semibold">Address</Label>
+            <div className="student-profile-field-address space-y-2">
+              <Label htmlFor="address" className="text-sm font-semibold"><span className="student-profile-label-icon hidden"><MapPin aria-hidden="true" /></span>Address</Label>
               <div className="relative">
-                <MapPin aria-hidden="true" className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <MapPin aria-hidden="true" className="student-profile-input-icon absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   id="address"
                   value={profileData.address || ""}
@@ -166,7 +182,7 @@ export function StudentProfile({ student, accessToken, projectId, onUpdate, isTe
             </div>
 
             {/* Bio */}
-            <div className="space-y-2">
+            <div className="student-profile-field-bio space-y-2">
               <Label htmlFor="bio" className="text-sm font-semibold">Bio</Label>
               <Textarea
                 id="bio"
@@ -178,7 +194,7 @@ export function StudentProfile({ student, accessToken, projectId, onUpdate, isTe
               />
             </div>
 
-            <div className="flex justify-end border-t pt-5">
+            <div className="student-profile-save flex justify-end border-t pt-5">
               <Button
                 type="submit"
                 disabled={isUpdating}

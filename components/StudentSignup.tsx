@@ -5,7 +5,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { GraduationCap, Mail, Lock, User, ArrowLeft, UserPlus, Hash, Calendar } from 'lucide-react';
+import { GraduationCap, Mail, Lock, User, ArrowLeft, UserPlus, Hash, Calendar, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 import { LoadingSpinner } from './ui/loading';
 
@@ -47,6 +47,8 @@ export function StudentSignup({ onSignup, onSwitchToLogin, onBack }: StudentSign
   const [degrees, setDegrees] = useState<DegreeOption[]>([]);
   const [cohorts, setCohorts] = useState<CohortOption[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   useEffect(() => {
     fetch('/api/academic/degrees', { cache: 'no-store' })
@@ -137,26 +139,28 @@ export function StudentSignup({ onSignup, onSwitchToLogin, onBack }: StudentSign
   };
 
   return (
-    <main className="flex min-h-dvh items-center justify-center bg-muted/40 p-4">
+    <main className="mobile-ui auth-screen flex min-h-dvh items-center justify-center bg-muted/40 p-4">
       <div className="w-full max-w-md">
         {onBack && (
           <button
+            type="button"
             onClick={onBack}
-            className="group mb-6 flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
+            className="auth-back-button group mb-6 flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
+            aria-label="Back to portal selection"
           >
             <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-            Back to Portal Selection
+            <span className="auth-back-label">Back to Portal Selection</span>
           </button>
         )}
-        <div className="text-center mb-8">
-          <div className="mb-4 inline-flex size-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+        <div className="auth-heading text-center mb-8">
+          <div className="auth-heading-icon mb-4 inline-flex size-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
             <GraduationCap className="size-7" />
           </div>
           <h1 className="mb-2 text-3xl font-semibold tracking-tight text-foreground">Student Portal</h1>
           <p className="text-muted-foreground">Create your account to get started</p>
         </div>
 
-        <Card className="border-border/80 shadow-sm">
+        <Card className="auth-panel border-border/80 shadow-sm">
           <CardHeader className="space-y-2 pb-6">
             <CardTitle className="text-2xl text-center">Create Account</CardTitle>
             <CardDescription className="text-center">
@@ -213,7 +217,7 @@ export function StudentSignup({ onSignup, onSwitchToLogin, onBack }: StudentSign
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="student-signup-fields grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="degreeId" className="flex items-center gap-2">
                     <Calendar className="w-4 h-4" />
@@ -261,15 +265,29 @@ export function StudentSignup({ onSignup, onSwitchToLogin, onBack }: StudentSign
                   <Lock className="w-4 h-4" />
                   Password
                 </Label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="Create a strong password"
-                  value={formData.password}
-                  onChange={(e) => setFormData({...formData, password: e.target.value})}
-                  required
-                  className="h-11"
-                />
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="Create a strong password"
+                    value={formData.password}
+                    onChange={(e) => setFormData({...formData, password: e.target.value})}
+                    required
+                    className="h-11 pr-11"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-0 top-0 h-full"
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    onClick={() => setShowPassword(value => !value)}
+                  >
+                    {showPassword
+                      ? <EyeOff aria-hidden="true" className="size-4" />
+                      : <Eye aria-hidden="true" className="size-4" />}
+                  </Button>
+                </div>
               </div>
 
               <div className="space-y-2">
@@ -277,15 +295,29 @@ export function StudentSignup({ onSignup, onSwitchToLogin, onBack }: StudentSign
                   <Lock className="w-4 h-4" />
                   Confirm Password
                 </Label>
-                <Input
-                  id="confirmPassword"
-                  type="password"
-                  placeholder="Re-enter your password"
-                  value={formData.confirmPassword}
-                  onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})}
-                  required
-                  className="h-11"
-                />
+                <div className="relative">
+                  <Input
+                    id="confirmPassword"
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    placeholder="Re-enter your password"
+                    value={formData.confirmPassword}
+                    onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})}
+                    required
+                    className="h-11 pr-11"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-0 top-0 h-full"
+                    aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+                    onClick={() => setShowConfirmPassword(value => !value)}
+                  >
+                    {showConfirmPassword
+                      ? <EyeOff aria-hidden="true" className="size-4" />
+                      : <Eye aria-hidden="true" className="size-4" />}
+                  </Button>
+                </div>
               </div>
               
               <Button

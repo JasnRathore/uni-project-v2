@@ -19,6 +19,9 @@ import { AcademicCatalogManagement } from './AcademicCatalogManagement';
 import { AddDailyTask } from './AddDailyTask';
 import { LoadingScreen } from './ui/loading';
 import { 
+  ArrowRight,
+  ChevronDown,
+  ClipboardCopy,
   Users, 
   BookOpen, 
   School,
@@ -697,91 +700,176 @@ export function FacultyDashboard({ currentUser: initialUser, onLogout, accessTok
         return <DebugPanel accessToken={accessToken} />;
       default:
         return (
-          <div className="mx-auto flex w-full max-w-7xl flex-col gap-8 p-4 sm:p-6 lg:p-8">
-            <section aria-labelledby="overview-heading">
-              <h2 id="overview-heading" className="text-2xl font-semibold tracking-tight">
-                {currentUser?.name ? `Welcome back, Dr. ${currentUser.name}` : 'Overview'}
-              </h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                A summary of your classes and student records.
-              </p>
-            </section>
+          <>
+            <div className="faculty-overview-desktop hidden lg:block">
+              <div className="mx-auto flex w-full max-w-7xl flex-col gap-8 p-4 sm:p-6 lg:p-8">
+                <section aria-labelledby="overview-heading">
+                  <h2 id="overview-heading" className="text-2xl font-semibold tracking-tight">
+                    {currentUser?.name ? `Welcome back, Dr. ${currentUser.name}` : 'Overview'}
+                  </h2>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    A summary of your classes and student records.
+                  </p>
+                </section>
 
-            <section aria-label="Workspace totals" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              {[
-                { label: 'Students', value: allStudents.length, icon: Users },
-                { label: 'Classes', value: classes.length, icon: School },
-                { label: 'Tasks and quizzes', value: tasks.length, icon: BookOpen },
-              ].map(({ label, value, icon: Icon }) => (
-                <Card key={label} className="shadow-none">
-                  <CardContent className="flex items-center justify-between gap-4 p-5">
-                    <div>
+                <section aria-label="Workspace totals" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                  {[
+                    { label: 'Students', value: allStudents.length, icon: Users },
+                    { label: 'Classes', value: classes.length, icon: School },
+                    { label: 'Tasks and quizzes', value: tasks.length, icon: BookOpen },
+                  ].map(({ label, value, icon: Icon }) => (
+                    <Card key={label} className="shadow-none">
+                      <CardContent className="flex items-center justify-between gap-4 p-5">
+                        <div>
+                          <p className="text-sm text-muted-foreground">{label}</p>
+                          <p className="mt-2 text-3xl font-semibold tabular-nums">{value}</p>
+                        </div>
+                        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
+                          <Icon aria-hidden="true" className="size-5" />
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </section>
+
+                <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,0.72fr)]">
+                  <Card className="shadow-none">
+                    <CardHeader>
+                      <CardTitle className="text-base">Students on record</CardTitle>
+                      <CardDescription>
+                        {allStudents.length
+                          ? 'Students with portal accounts in your workspace.'
+                          : 'Students with portal accounts will appear here after signing up.'}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      {allStudents.length ? (
+                        <ul className="divide-y">
+                          {allStudents.slice(0, 5).map(student => (
+                            <li key={student.email || student.id}>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedStudent(student);
+                                  setActiveView('student-details', student.email || student.id);
+                                }}
+                                className="flex min-h-14 w-full items-center gap-3 rounded-lg px-3 py-3 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                              >
+                                <RoleAvatar
+                                  role="student"
+                                  identifier={student.id || student.email}
+                                  name={student.name || 'Student'}
+                                  className="size-9"
+                                />
+                                <span className="min-w-0 flex-1">
+                                  <span className="block truncate text-sm font-medium">{student.name || 'Unnamed student'}</span>
+                                  <span className="block truncate text-xs text-muted-foreground">{student.email}</span>
+                                </span>
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="rounded-lg bg-muted/50 px-4 py-6 text-sm text-muted-foreground">
+                          No student accounts yet. Students can sign up through the portal.
+                        </p>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  <Card className="shadow-none">
+                    <CardHeader>
+                      <CardTitle className="text-base">Student onboarding</CardTitle>
+                      <CardDescription>
+                        Students create their own portal accounts. You can assign them to classes from the Students page.
+                      </CardDescription>
+                    </CardHeader>
+                  </Card>
+                </div>
+              </div>
+            </div>
+            <div className="faculty-overview-mobile hidden">
+              <section>
+                <h2 className="text-2xl font-semibold tracking-tight">
+                  {currentUser?.name ? `Welcome Back, ${currentUser.name}!` : 'Welcome Back, User!'}
+                </h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  A summary of your classes and students on records.
+                </p>
+              </section>
+
+              <section aria-label="Workspace totals" className="faculty-overview-mobile-stats">
+                {[
+                  { label: 'Students', value: allStudents.length, icon: Users },
+                  { label: 'Classes', value: classes.length, icon: School },
+                  { label: 'Tasks and Quizzes', value: tasks.length, icon: BookOpen },
+                ].map(({ label, value, icon: Icon }) => (
+                  <Card key={label} className="shadow-none">
+                    <CardContent className="p-4">
                       <p className="text-sm text-muted-foreground">{label}</p>
-                      <p className="mt-2 text-3xl font-semibold tabular-nums">{value}</p>
-                    </div>
-                    <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
-                      <Icon aria-hidden="true" className="size-5" />
-                    </div>
+                      <Icon aria-hidden="true" className="faculty-overview-mobile-stat-icon size-4" />
+                      <p className="mt-2 text-xl font-semibold tabular-nums">{value}</p>
+                    </CardContent>
+                  </Card>
+                ))}
+              </section>
+
+              <section className="faculty-overview-mobile-records">
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="text-xl font-semibold">Students on Record</h3>
+                  <button
+                    type="button"
+                    onClick={() => setActiveView('students')}
+                    className="flex shrink-0 items-center gap-1 text-sm font-medium text-primary"
+                  >
+                    All students <ArrowRight aria-hidden="true" className="size-4" />
+                  </button>
+                </div>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Students with portal accounts in your workspace.
+                </p>
+                <Card className="mt-5 shadow-none">
+                  <CardContent className="p-4">
+                    {allStudents.length ? (
+                      <ul className="divide-y">
+                        {allStudents.slice(0, 5).map(student => (
+                          <li key={student.email || student.id}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedStudent(student);
+                                setActiveView('student-details', student.email || student.id);
+                              }}
+                              className="flex min-h-14 w-full items-center gap-3 py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            >
+                              <RoleAvatar
+                                role="student"
+                                identifier={student.id || student.email}
+                                name={student.name || 'Student'}
+                                className="size-8"
+                              />
+                              <span className="min-w-0 flex-1">
+                                <span className="block truncate text-sm font-medium">{student.name || 'Student'}</span>
+                                <span className="block truncate text-[10px] text-muted-foreground">
+                                  {student.email}{student.prn ? ` · PRN ${student.prn}` : ''}
+                                  {student.prn && <ClipboardCopy aria-hidden="true" className="ml-1 inline size-3 text-primary" />}
+                                </span>
+                              </span>
+                              <ChevronDown aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="py-2 text-sm text-muted-foreground">
+                        No student accounts yet. Students can sign up through the portal.
+                      </p>
+                    )}
                   </CardContent>
                 </Card>
-              ))}
-            </section>
-
-            <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,0.72fr)]">
-              <Card className="shadow-none">
-                <CardHeader>
-                  <CardTitle className="text-base">Students on record</CardTitle>
-                  <CardDescription>
-                    {allStudents.length
-                      ? 'Students with portal accounts in your workspace.'
-                      : 'Students with portal accounts will appear here after signing up.'}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {allStudents.length ? (
-                    <ul className="divide-y">
-                      {allStudents.slice(0, 5).map(student => (
-                        <li key={student.email || student.id}>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSelectedStudent(student);
-                              setActiveView('student-details', student.email || student.id);
-                            }}
-                            className="flex min-h-14 w-full items-center gap-3 rounded-lg px-3 py-3 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                          >
-                            <RoleAvatar
-                              role="student"
-                              identifier={student.id || student.email}
-                              name={student.name || 'Student'}
-                              className="size-9"
-                            />
-                            <span className="min-w-0 flex-1">
-                              <span className="block truncate text-sm font-medium">{student.name || 'Unnamed student'}</span>
-                              <span className="block truncate text-xs text-muted-foreground">{student.email}</span>
-                            </span>
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="rounded-lg bg-muted/50 px-4 py-6 text-sm text-muted-foreground">
-                      No student accounts yet. Students can sign up through the portal.
-                    </p>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card className="shadow-none">
-                <CardHeader>
-                  <CardTitle className="text-base">Student onboarding</CardTitle>
-                  <CardDescription>
-                    Students create their own portal accounts. You can assign them to classes from the Students page.
-                  </CardDescription>
-                </CardHeader>
-              </Card>
+              </section>
             </div>
-          </div>
+          </>
         );
     }
   };

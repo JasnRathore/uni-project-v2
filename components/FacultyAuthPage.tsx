@@ -87,6 +87,7 @@ export function FacultyAuthPage({ mode }: FacultyAuthPageProps) {
         <Login
           onLogin={handleLogin}
           onSwitchToSignup={() => router.push("/faculty/signup")}
+          onSwitchToStudent={() => router.push("/student/login")}
           onBack={() => router.push("/")}
         />
       )}

@@ -101,9 +101,9 @@ export function StudentLeaderboard({ accessToken }: { accessToken: string }) {
   }, [accessToken, reloadCount, selectedScope]);
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="student-leaderboard flex flex-col gap-6">
       <div>
-        <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="student-leaderboard-heading flex flex-wrap items-start justify-between gap-4">
           <div>
             <h2 className="text-2xl font-semibold tracking-tight">Leaderboard</h2>
             <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
@@ -111,7 +111,7 @@ export function StudentLeaderboard({ accessToken }: { accessToken: string }) {
             </p>
           </div>
           {data?.scope && (
-            <Badge variant="secondary" className="shrink-0">
+            <Badge variant="secondary" className="student-leaderboard-meta shrink-0">
               {data.scopeName || (data.scope === "cohort" ? "My cohort" : "Class leaderboard")}
               {" · "}Updated {new Date(data.calculatedAt).toLocaleTimeString()}
             </Badge>
@@ -190,6 +190,7 @@ export function StudentLeaderboard({ accessToken }: { accessToken: string }) {
             <AlertCircle aria-hidden="true" className="size-5 text-destructive" />
             <p className="text-sm">{error}</p>
             <Button
+              className="student-leaderboard-refresh"
               variant="outline"
               size="sm"
               onClick={() => {
