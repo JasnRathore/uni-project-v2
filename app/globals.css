@@ -1265,6 +1265,23 @@
 }
 
 @media (max-width: 639px) {
+  .portal-card [data-slot="card-header"] {
+    padding-top: 12px;
+    padding-bottom: 12px;
+  }
+
+  .portal-card [data-slot="card-content"] {
+    padding-bottom: 12px;
+  }
+
+  .auth-back-button {
+    display: none;
+  }
+
+  .auth-screen > div {
+    margin-top: 0;
+  }
+
   [data-slot="dialog-content"],
   [data-slot="alert-dialog-content"] {
     width: calc(100vw - 24px);

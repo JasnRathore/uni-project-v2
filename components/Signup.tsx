@@ -109,7 +109,6 @@ export function Signup({ onSignup, onSwitchToLogin, onBack }: SignupProps) {
           <h1 className="text-3xl font-semibold tracking-tight text-foreground">
             Faculty Portal
           </h1>
-          <p className="text-muted-foreground mt-2">Create your account to get started</p>
         </div>
 
         <Card className="auth-panel border-border/80 shadow-sm">

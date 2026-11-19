@@ -348,6 +348,16 @@ test('student leaderboard offers cohort and active class scopes', () => {
   assert.match(studentLeaderboardSource, /Class rankings/);
 });
 
+test('active class leaderboard query resolves subjects through the subjects table', () => {
+  const leaderboardServiceSource = fs.readFileSync(
+    path.join(__dirname, '..', 'lib', 'api', 'services', 'leaderboardService.js'),
+    'utf8',
+  );
+  assert.match(leaderboardServiceSource, /sub\.name AS subject/);
+  assert.match(leaderboardServiceSource, /JOIN subjects sub ON sub\.id = c\.subject_id/);
+  assert.doesNotMatch(leaderboardServiceSource, /c\.subject\b/);
+});
+
 test('teacher and student task snapshots persist tasks with all schema columns', async () => {
   const db = createClient({ url: 'file::memory:' });
   const dbServicePath = require.resolve('../database/services/dbService');

@@ -157,7 +157,6 @@ export function StudentSignup({ onSignup, onSwitchToLogin, onBack }: StudentSign
             <GraduationCap className="size-7" />
           </div>
           <h1 className="mb-2 text-3xl font-semibold tracking-tight text-foreground">Student Portal</h1>
-          <p className="text-muted-foreground">Create your account to get started</p>
         </div>
 
         <Card className="auth-panel border-border/80 shadow-sm">

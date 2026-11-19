@@ -49,7 +49,6 @@ export function StudentLogin({ onLogin, onSwitchToSignup, onSwitchToFaculty }: S
             <GraduationCap className="size-7" />
           </div>
           <h1 className="mb-2 text-3xl font-semibold tracking-tight text-foreground">Student Portal</h1>
-          <p className="text-muted-foreground">Access your dental college progress</p>
         </div>
 
         <Card className="auth-panel border-border/80 shadow-sm">

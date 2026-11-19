@@ -12,7 +12,6 @@ export function PortalLanding() {
         <header className="portal-heading mb-8 text-center">
           <House aria-hidden="true" className="mx-auto mb-6 size-8 text-primary" />
           <h1 className="text-3xl font-semibold tracking-tight text-foreground">Portal Selection</h1>
-          <p className="mt-2 text-muted-foreground">Choose the right portal to continue</p>
         </header>
         <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
           <PortalLink

@@ -80,7 +80,6 @@ export function Login({ onLogin, onSwitchToSignup, onSwitchToStudent, onBack }: 
             <GraduationCap className="size-7" />
           </div>
           <h1 className="text-3xl font-semibold tracking-tight text-foreground">Faculty Portal</h1>
-          <p className="mt-2 text-muted-foreground">Access your dental college progress</p>
         </div>
 
         <Card className="auth-panel border-border/80 shadow-sm">
