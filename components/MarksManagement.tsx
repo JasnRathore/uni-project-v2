@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Textarea } from './ui/textarea';
 import { toast } from 'sonner';
 import { KpiCard } from './ui/kpi-card';
+import { downloadCsv } from '@/lib/csv';
 import { 
   Plus, 
   Edit, 
@@ -120,12 +121,13 @@ export function MarksManagement({ students, classes, accessToken, projectId }: {
     const student = students.find((s: any) => String(s.id) === String(grade.studentId));
     if (!student) return false;
 
-    const matchesSearch = student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         grade.assignment.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         grade.subject.toLowerCase().includes(searchTerm.toLowerCase());
+    const search = searchTerm.toLowerCase();
+    const matchesSearch = String(student.name || '').toLowerCase().includes(search) ||
+                         String(grade.assignment || '').toLowerCase().includes(search) ||
+                         String(grade.subject || '').toLowerCase().includes(search);
     const gradeClass = classes.find((classItem: any) => String(classItem.id) === String(grade.classId));
-    const matchesSubject = selectedSubject === 'all' || gradeClass?.subject === selectedSubject;
-    const matchesClass = selectedClass === 'all' || grade.classId === selectedClass;
+    const matchesSubject = selectedSubject === 'all' || (gradeClass?.subject || gradeClass?.subject_name) === selectedSubject;
+    const matchesClass = selectedClass === 'all' || String(grade.classId) === selectedClass;
     return matchesSearch && matchesSubject && matchesClass;
   });
 
@@ -208,11 +210,11 @@ export function MarksManagement({ students, classes, accessToken, projectId }: {
   };
 
   const getStudentById = (studentId: any) => {
-    return students.find((s: any) => s.id === studentId);
+    return students.find((s: any) => String(s.id) === String(studentId));
   };
 
   const getClassById = (classId: any) => {
-    return classes.find((c: any) => c.id === classId);
+    return classes.find((c: any) => String(c.id) === String(classId));
   };
 
   const calculateStudentAverage = (studentId: any) => {
@@ -227,44 +229,46 @@ export function MarksManagement({ students, classes, accessToken, projectId }: {
   };
 
   const exportGrades = () => {
+    if (isLoadingGrades) {
+      toast.error('Grades are still loading. Try exporting again in a moment.');
+      return;
+    }
     if (filteredGrades.length === 0) {
       toast.error('No grades match the current filters');
       return;
     }
 
-    const escapeCsv = (value: unknown) => {
-      const text = String(value ?? '');
-      const safeText = /^[\s]*[=+\-@]/.test(text) ? `'${text}` : text;
-      return `"${safeText.replace(/"/g, '""')}"`;
-    };
     const rows = [
-      ['Student', 'Email', 'Class', 'Subject', 'Assignment', 'Score', 'Maximum score', 'Percentage', 'Grade', 'Date', 'Feedback'],
+      ['Student', 'PRN', 'Email', 'Class', 'Subject', 'Assignment', 'Score', 'Maximum score', 'Percentage', 'Grade', 'Date', 'Feedback'],
       ...filteredGrades.map((grade: any) => {
         const student = getStudentById(grade.studentId);
         const classData = getClassById(grade.classId);
+        const percentage = grade.maxScore
+          ? ((Number(grade.score) / Number(grade.maxScore)) * 100)
+          : null;
         return [
           student?.name,
+          student?.prn,
           student?.email,
           classData?.name,
-          grade.subject,
+          grade.subject || classData?.subject || classData?.subject_name,
           grade.assignment,
           grade.score,
           grade.maxScore,
-          grade.maxScore ? `${((grade.score / grade.maxScore) * 100).toFixed(1)}%` : '',
+          percentage !== null && Number.isFinite(percentage) ? `${percentage.toFixed(1)}%` : '',
           grade.grade,
           grade.date,
           grade.feedback,
         ];
       }),
     ];
-    const csv = rows.map(row => row.map(escapeCsv).join(',')).join('\r\n');
-    const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }));
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `grades-${new Date().toISOString().slice(0, 10)}.csv`;
-    link.click();
-    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-    toast.success(`Exported ${filteredGrades.length} grade records`);
+    try {
+      downloadCsv(`grades-${new Date().toISOString().slice(0, 10)}.csv`, rows);
+      toast.success(`Exported ${filteredGrades.length} grade records`);
+    } catch (error) {
+      console.error('Error exporting grades:', error);
+      toast.error('Could not download the CSV file. Please try again.');
+    }
   };
 
   return (
@@ -404,9 +408,9 @@ export function MarksManagement({ students, classes, accessToken, projectId }: {
         </Dialog>
 
         <Button
+          type="button"
           className="faculty-grade-export"
           variant="outline"
-          disabled={filteredGrades.length === 0}
           onClick={exportGrades}
         >
             <FileSpreadsheet className="w-4 h-4 mr-2" />
