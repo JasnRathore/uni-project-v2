@@ -24,7 +24,6 @@ import {
   DialogTitle,
   DialogDescription,
 } from "./ui/dialog";
-import { Alert, AlertDescription } from "./ui/alert";
 import { TakeQuiz } from "./TakeQuiz";
 import { StudentProfile } from "./StudentProfile";
 import { StudentLeaderboard } from "./StudentLeaderboard";
@@ -37,7 +36,6 @@ import {
   Clock,
   Flame,
   Clipboard,
-  Info,
   AlertCircle,
   BookOpen,
   Loader2,
@@ -48,13 +46,11 @@ import { toast } from "sonner";
 interface StudentDashboardProps {
   student: any;
   accessToken: string;
-  projectId: string;
 }
 
 export function StudentDashboard({
   student,
   accessToken,
-  projectId,
 }: StudentDashboardProps) {
   const pathname = usePathname();
   const router = useRouter();
@@ -69,7 +65,6 @@ export function StudentDashboard({
   };
   const [dailyQuest, setDailyQuest] = useState<any>(null);
   const [showDailyQuestDialog, setShowDailyQuestDialog] = useState(false);
-  const [adminMessage, setAdminMessage] = useState<any>(null);
   const profileData = {
     name: student?.name || "",
     email: student?.email || "",
@@ -116,7 +111,6 @@ export function StudentDashboard({
         console.log("Student data loaded:", data);
         setGrades(data.grades || []);
         setTasks(data.tasks || []);
-        setAdminMessage(data.adminMessage || null);
         if (data.stats) {
           setStats(data.stats);
         } else {
@@ -319,22 +313,8 @@ export function StudentDashboard({
                   <StudentProfile
                     student={{ ...student, ...profileData }}
                     accessToken={accessToken}
-                    projectId={projectId}
                     onUpdate={loadStudentData}
                   />
-                )}
-
-                {/* Admin Broadcast Message - only show on dashboard */}
-                {activeView === "dashboard" && adminMessage && (
-                  <Alert className="mb-6" aria-labelledby="student-admin-message-heading">
-                    <Info aria-hidden="true" />
-                    <AlertDescription>
-                      <span id="student-admin-message-heading" className="mb-1 block font-medium text-foreground">
-                        Message from administration
-                      </span>
-                      {adminMessage}
-                    </AlertDescription>
-                  </Alert>
                 )}
 
                 {/* View Content based on activeView */}

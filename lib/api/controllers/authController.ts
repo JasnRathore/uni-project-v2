@@ -9,6 +9,15 @@ const jwt = require('jsonwebtoken');
 
 const JWT_SECRET: string | undefined = process.env.JWT_SECRET;
 
+// Transactional email is best-effort: a missing configuration or send failure is
+// logged but must never change the authentication response. The mailer is required
+// lazily so the module (and the test harness) can load without mail credentials.
+const sendMailBestEffort = (kind: string, send: () => Promise<unknown>) => {
+  void Promise.resolve()
+    .then(send)
+    .catch((error) => console.error(`[auth] Unable to send ${kind} email:`, error));
+};
+
 // Login endpoint (new – replaces Supabase signInWithPassword)
 const login = async (req: any, res: any) => {
   try {
@@ -36,6 +45,11 @@ const login = async (req: any, res: any) => {
       JWT_SECRET,
       { expiresIn: '7d' }
     );
+
+    sendMailBestEffort('sign-in notice', () => {
+      const { sendSignInNotice } = require('../../email/mailer.ts');
+      return sendSignInNotice({ to: user.email, name: metadata.name });
+    });
 
     return res.json({
       success: true,
@@ -75,6 +89,14 @@ const signup = async (req: any, res: any) => {
       user_metadata: { name, role: role || 'teacher', ...rest },
     });
     if (error) return res.status(400).json({ error: error.message });
+    sendMailBestEffort('welcome', () => {
+      const { sendWelcomeEmail } = require('../../email/mailer.ts');
+      return sendWelcomeEmail({
+        to: data.user?.email || email,
+        name: data.user?.user_metadata?.name || name,
+        role: data.user?.user_metadata?.role || role || 'teacher',
+      });
+    });
     return res.json({ success: true, user: data.user });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
@@ -109,11 +131,117 @@ const studentSignup = async (req: any, res: any) => {
       lifecycleState: 'active',
       totalPoints: 0,
       currentLevel: 1,
-      gameProgress: 0,
       registeredAt: new Date().toISOString(),
     });
 
+    sendMailBestEffort('welcome', () => {
+      const { sendWelcomeEmail } = require('../../email/mailer.ts');
+      return sendWelcomeEmail({
+        to: data.user?.email || email,
+        name: data.user?.user_metadata?.name || name,
+        role: 'student',
+      });
+    });
+
     return res.json({ success: true, user: data.user });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+};
+
+const forgotPassword = async (req: any, res: any) => {
+  // Always respond with the same generic success so callers cannot probe which
+  // emails belong to a user account.
+  try {
+    const email = req.body?.email;
+    if (!email || typeof email !== 'string') return res.json({ success: true });
+    if (!JWT_SECRET) {
+      console.error('[auth] Password reset is unavailable: JWT_SECRET is not configured');
+      return res.json({ success: true });
+    }
+
+    const { createPasswordResetToken } = require('../services/passwordResetService.ts');
+    const db = getDatabaseClient();
+    const result = await db.execute({
+      sql: 'SELECT id, email, password_hash, metadata_json FROM users WHERE email = ? COLLATE NOCASE',
+      args: [email.trim()],
+    });
+    if (!result.rows.length) return res.json({ success: true });
+
+    const user = result.rows[0];
+    const token = createPasswordResetToken({ userId: user.id, passwordHash: user.password_hash });
+    if (!token) return res.json({ success: true });
+
+    const { unpackMetadata } = require('../../../database/services/dbService.ts');
+    const metadata = unpackMetadata(user.metadata_json).user_metadata;
+
+    sendMailBestEffort('password reset', () => {
+      const { sendPasswordResetEmail } = require('../../email/mailer.ts');
+      return sendPasswordResetEmail({ to: user.email, name: metadata?.name, token });
+    });
+
+    return res.json({ success: true });
+  } catch (err: any) {
+    console.error('[auth] forgot-password failed:', err);
+    return res.json({ success: true });
+  }
+};
+
+const resetPassword = async (req: any, res: any) => {
+  try {
+    const token = req.body?.token;
+    const password = req.body?.password ?? req.body?.newPassword;
+    if (!token || !password) return res.status(400).json({ error: 'A reset token and new password are required' });
+    if (String(password).length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters long' });
+    }
+
+    const { verifyPasswordResetToken, fingerprintPasswordHash } = require('../services/passwordResetService.ts');
+    const verification = verifyPasswordResetToken(token);
+    if (!verification.ok) return res.status(400).json({ error: verification.error });
+
+    const db = getDatabaseClient();
+    const result = await db.execute({
+      sql: 'SELECT id, password_hash FROM users WHERE id = ?',
+      args: [verification.userId],
+    });
+    if (!result.rows.length) return res.status(400).json({ error: 'Invalid or expired reset link' });
+
+    const user = result.rows[0];
+    if (fingerprintPasswordHash(user.password_hash) !== verification.fingerprint) {
+      return res.status(400).json({ error: 'This reset link is no longer valid' });
+    }
+
+    const passwordHash = await bcrypt.hash(String(password), 10);
+    await db.execute({
+      sql: 'UPDATE users SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      args: [passwordHash, user.id],
+    });
+
+    return res.json({ success: true });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+};
+
+const changePassword = async (req: any, res: any) => {
+  try {
+    const user = req.user;
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+
+    const password = req.body?.password ?? req.body?.newPassword;
+    if (!password) return res.status(400).json({ error: 'A new password is required' });
+    if (String(password).length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters long' });
+    }
+
+    const passwordHash = await bcrypt.hash(String(password), 10);
+    await getDatabaseClient().execute({
+      sql: 'UPDATE users SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      args: [passwordHash, user.id],
+    });
+
+    return res.json({ success: true });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
@@ -140,5 +268,8 @@ module.exports = {
   login,
   signup,
   studentSignup,
+  forgotPassword,
+  resetPassword,
+  changePassword,
   reactivateAccount
 };

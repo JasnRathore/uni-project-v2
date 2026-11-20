@@ -28,7 +28,7 @@ interface StudentRecord {
   isAssigned?: boolean;
   currentLevel?: number;
   totalPoints?: number;
-  gameProgress?: number;
+  progress?: number;
   averageGrade?: number;
   registeredAt?: string;
   streakData?: { currentStreak?: number; longestStreak?: number; dates?: string[] };
@@ -195,7 +195,7 @@ export function StudentsList({
   const renderStudentCard = (student: StudentRecord) => {
     const assigned = isAssigned(student);
     const className = student.className || student.class;
-    const progress = Number(student.gameProgress) || 0;
+    const progress = Number(student.progress) || 0;
     return (
       <Card key={student.id || student.email} className="h-full shadow-none">
         <CardHeader className="pb-3">
@@ -263,7 +263,7 @@ export function StudentsList({
             <div
               className="h-1.5 overflow-hidden rounded-full bg-muted"
               role="progressbar"
-              aria-label={`${student.name || 'Student'} game progress`}
+              aria-label={`${student.name || 'Student'} progress`}
               aria-valuemin={0}
               aria-valuemax={100}
               aria-valuenow={Math.min(100, Math.max(0, progress))}

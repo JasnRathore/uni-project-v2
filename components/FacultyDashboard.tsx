@@ -14,7 +14,6 @@ import { EditTask } from './EditTask';
 import { Settings } from './Settings';
 import { StudentDetails } from './StudentDetails';
 import { RoleAvatar } from './RoleAvatar';
-import { DebugPanel } from './DebugPanel';
 import { AcademicCatalogManagement } from './AcademicCatalogManagement';
 import { AddDailyTask } from './AddDailyTask';
 import { LoadingScreen } from './ui/loading';
@@ -27,7 +26,6 @@ import {
   School,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { projectId } from './utils/supabase/info';
 
 interface FacultyDashboardProps {
   currentUser: any;
@@ -451,7 +449,6 @@ export function FacultyDashboard({ currentUser: initialUser, onLogout, accessTok
           <StudentProfile 
             student={selectedStudent}
             accessToken={accessToken}
-            projectId={projectId}
             isTeacherEditing
             onUpdate={(updatedStudent: any) => {
               setStudents(prev => prev.map(student =>
@@ -523,7 +520,6 @@ export function FacultyDashboard({ currentUser: initialUser, onLogout, accessTok
               setActiveView('student-details', student.email || student.id);
             }}
             accessToken={accessToken}
-            projectId={projectId}
           />
         );
       case 'add-task':
@@ -598,11 +594,9 @@ export function FacultyDashboard({ currentUser: initialUser, onLogout, accessTok
         );
       case 'grades':
       case 'marks':
-        return <MarksManagement students={allStudents} classes={classes} accessToken={accessToken} projectId={projectId} />;
+        return <MarksManagement students={allStudents} classes={classes} accessToken={accessToken} />;
       case 'settings':
         return <Settings currentUser={currentUser} accessToken={accessToken} onLogout={onLogout} onUpdateProfile={handleUpdateProfile} />;
-      case 'debug':
-        return <DebugPanel accessToken={accessToken} />;
       default:
         return (
           <>
@@ -610,7 +604,7 @@ export function FacultyDashboard({ currentUser: initialUser, onLogout, accessTok
               <div className="mx-auto flex w-full max-w-7xl flex-col gap-8 p-4 sm:p-6 lg:p-8">
                 <section aria-labelledby="overview-heading">
                   <h2 id="overview-heading" className="text-2xl font-semibold tracking-tight">
-                    {currentUser?.name ? `Welcome back, Dr. ${currentUser.name}` : 'Overview'}
+                    {currentUser?.name ? `Welcome back, ${currentUser.name}` : 'Overview'}
                   </h2>
                   <p className="mt-1 text-sm text-muted-foreground">
                     A summary of your classes and student records.

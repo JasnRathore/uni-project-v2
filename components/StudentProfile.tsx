@@ -21,12 +21,11 @@ import { LoadingSpinner } from "./ui/loading";
 interface StudentProfileProps {
   student: any;
   accessToken: string;
-  projectId: string;
   onUpdate: (data: any) => void;
   isTeacherEditing?: boolean;
 }
 
-export function StudentProfile({ student, accessToken, projectId, onUpdate, isTeacherEditing = false }: StudentProfileProps) {
+export function StudentProfile({ student, accessToken, onUpdate, isTeacherEditing = false }: StudentProfileProps) {
   const [isUpdating, setIsUpdating] = useState(false);
   const [profileData, setProfileData] = useState({
     name: student?.name || "",

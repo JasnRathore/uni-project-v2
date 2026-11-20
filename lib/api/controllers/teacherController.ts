@@ -567,6 +567,18 @@ const getAllStudents = async (req: any, res: any) => {
       const average = Number(row.average_grade);
       return [row.student_id, Number.isFinite(average) ? Math.round(average) : 0];
     }));
+    const assignmentProgressRows = (await getDatabaseClient().execute({
+      sql: `SELECT student_id,
+          COUNT(*) AS total_assignments,
+          SUM(CASE WHEN completed = 1 THEN 1 ELSE 0 END) AS completed_assignments
+        FROM task_assignments
+        GROUP BY student_id`,
+    })).rows;
+    const assignmentProgressByStudentId = new Map(assignmentProgressRows.map((row: any) => {
+      const total = Number(row.total_assignments) || 0;
+      const completed = Number(row.completed_assignments) || 0;
+      return [row.student_id, total > 0 ? Math.round((completed / total) * 100) : 0];
+    }));
     const academicIdentityByEmail = new Map(
       academicIdentityRows.map((row: any) => [String(row.email).toLowerCase(), row]),
     );
@@ -604,7 +616,7 @@ const getAllStudents = async (req: any, res: any) => {
         phone: profile.phone || meta.phone || '',
         currentLevel: profile.currentLevel || 1,
         totalPoints: profile.totalPoints || 0,
-        gameProgress: profile.gameProgress || 0,
+        progress: assignmentProgressByStudentId.get(academicIdentity.student_id) ?? 0,
         lastActive: u.last_sign_in_at || u.created_at,
         subjects: profile.subjects || [],
         averageGrade: averageGradeByStudentId.get(academicIdentity.student_id) ?? 0,

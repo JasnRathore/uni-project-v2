@@ -5,8 +5,8 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Mail, Lock, Eye, EyeOff, GraduationCap, Loader2, ArrowLeft, UserPlus } from 'lucide-react';
+import Link from 'next/link';
 import { toast } from 'sonner';
-import { ConnectionTest } from './ConnectionTest';
 
 interface LoginProps {
   onLogin: (email: string, password: string) => Promise<void>;
@@ -20,7 +20,6 @@ export function Login({ onLogin, onSwitchToSignup, onSwitchToStudent, onBack }: 
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [showConnectionTest, setShowConnectionTest] = useState(false);
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -34,32 +33,12 @@ export function Login({ onLogin, onSwitchToSignup, onSwitchToStudent, onBack }: 
     
     try {
       await onLogin(email, password);
-    } catch (error: unknown) {
-      // Show connection test option if there's a network error
-      if (error instanceof Error && error.message.includes('fetch')) {
-        setShowConnectionTest(true);
-      }
+    } catch {
+      // onLogin surfaces its own errors through toast notifications.
     } finally {
       setIsLoading(false);
     }
   };
-
-  if (showConnectionTest) {
-    return (
-      <div className="mobile-ui auth-screen flex min-h-dvh items-center justify-center bg-muted/40 p-4">
-        <div className="w-full max-w-2xl">
-          <Button 
-            variant="outline" 
-            onClick={() => setShowConnectionTest(false)}
-            className="mb-4"
-          >
-            ? Back to Login
-          </Button>
-          <ConnectionTest />
-        </div>
-      </div>
-    );
-  }
 
   return (
     <main className="mobile-ui auth-screen flex min-h-dvh items-center justify-center bg-muted/40 p-4">
@@ -138,6 +117,15 @@ export function Login({ onLogin, onSwitchToSignup, onSwitchToStudent, onBack }: 
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </Button>
                 </div>
+              </div>
+
+              <div className="flex justify-end">
+                <Link
+                  href="/forgot-password"
+                  className="text-sm font-medium text-primary hover:underline"
+                >
+                  Forgot password?
+                </Link>
               </div>
 
               <Button

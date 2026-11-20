@@ -8,7 +8,7 @@ const teacherController = require('../../../lib/api/controllers/teacherControlle
 const adminController = require('../../../lib/api/controllers/adminController.ts');
 const gameController = require('../../../lib/api/controllers/gameController.ts');
 const { getUser } = require('../../../lib/api/middleware/authMiddleware.ts');
-const { ensureDatabaseReady, getDatabaseClient, readPortalData } = require('../../../database/services/dbService.ts');
+const { ensureDatabaseReady, getDatabaseClient } = require('../../../database/services/dbService.ts');
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -38,12 +38,6 @@ async function dispatch(request: NextRequest, segments: string[]) {
   const route = findRoute(createRouteRegistry(authController, studentController, teacherController, adminController, gameController), method, path);
   const params = route?.params || {};
 
-  if (!route && method === 'GET' && path === '/debug/students') {
-    const user = await getUser(request.headers.get('authorization'));
-    if (!user) return response({ error: 'Unauthorized' }, 401);
-    const students = (await readPortalData(`students:${user.id}`)) || [];
-    return response({ students, count: Array.isArray(students) ? students.length : 0 });
-  }
   if (!route) return response({ error: 'Not found' }, 404);
 
   const { handler, protectedRoute, studentOnly } = route.route;

@@ -9,7 +9,7 @@ class MockAuth {
     return { data: { session: null }, error: null };
   }
   
-  async signInWithPassword({ email, password }: any) {
+  async signInWithPassword({ email, password }: { email: string; password: string }) {
     try {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
@@ -32,6 +32,25 @@ class MockAuth {
       localStorage.removeItem('user');
     }
     return { error: null };
+  }
+
+  async updateUser({ password }: { password: string }) {
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+      const res = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ password }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Failed to update password');
+      return { data, error: null };
+    } catch (err) {
+      return { data: null, error: err instanceof Error ? err : new Error(String(err)) };
+    }
   }
 }
 

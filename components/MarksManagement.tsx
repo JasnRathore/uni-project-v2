@@ -39,7 +39,7 @@ const letterGrades = [
   { value: 'F', label: 'F', percentage: 0, description: 'Fail' }
 ];
 
-export function MarksManagement({ students, classes, accessToken, projectId }: { students: any[]; classes: any[]; accessToken: string; projectId: string }) {
+export function MarksManagement({ students, classes, accessToken }: { students: any[]; classes: any[]; accessToken: string }) {
   const [grades, setGrades] = useState<any[]>([]);
   const [isLoadingGrades, setIsLoadingGrades] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -77,7 +77,7 @@ export function MarksManagement({ students, classes, accessToken, projectId }: {
     };
     if (accessToken) loadGrades();
     else setIsLoadingGrades(false);
-  }, [accessToken, projectId]);
+  }, [accessToken]);
 
   const syncGradesToBackend = async () => {
     if (!accessToken) return;

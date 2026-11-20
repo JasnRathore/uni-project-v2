@@ -60,10 +60,9 @@ interface ClassViewProps {
   onStudentAssigned?: () => void;
   onViewStudent?: (student: any) => void;
   accessToken: string;
-  projectId: string;
 }
 
-export function ClassView({ classData, students, onAddTask, onAddQuiz, onStudentAssigned, onViewStudent, accessToken, projectId }: ClassViewProps) {
+export function ClassView({ classData, students, onAddTask, onAddQuiz, onStudentAssigned, onViewStudent, accessToken }: ClassViewProps) {
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
   const [isAssignDialogOpen, setIsAssignDialogOpen] = useState(false);
   const [studentToAssign, setStudentToAssign] = useState('');
@@ -276,7 +275,7 @@ export function ClassView({ classData, students, onAddTask, onAddQuiz, onStudent
   };
 
   const averageProgress = displayStudents.length > 0
-    ? Math.round(displayStudents.reduce((acc, s) => acc + (Number(s.gameProgress) || 0), 0) / displayStudents.length)
+    ? Math.round(displayStudents.reduce((acc, s) => acc + (Number(s.progress) || 0), 0) / displayStudents.length)
     : 0;
   
   const averageGrade = displayStudents.length > 0
@@ -575,11 +574,11 @@ export function ClassView({ classData, students, onAddTask, onAddQuiz, onStudent
                   </div>
                 </div>
                 <div className="mt-1">
-                  <span className="mb-1 block text-xs text-muted-foreground">Game Progress</span>
+                  <span className="mb-1 block text-xs text-muted-foreground">Progress</span>
                   <div className="h-2 w-full rounded-full bg-muted">
                     <div
                       className="h-full rounded-full bg-primary transition-[width] duration-300"
-                      style={{ width: `${student.gameProgress}%` }}
+                      style={{ width: `${student.progress}%` }}
                     />
                   </div>
                 </div>

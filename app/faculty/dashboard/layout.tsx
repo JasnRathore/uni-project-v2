@@ -61,7 +61,6 @@ const titles: Record<string, string> = {
   'tasks-quizzes': 'Tasks & Quizzes',
   'edit-task': 'Edit Task',
   settings: 'Settings',
-  debug: 'Debug Panel',
   catalog: 'Academic Catalog',
 };
 

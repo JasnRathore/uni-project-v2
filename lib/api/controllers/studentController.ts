@@ -29,7 +29,6 @@ const getProfile = async (req: any, res: any) => {
         prn: profile.prn || legacyRollNumber || meta.prn || meta.rollNumber || '',
         currentLevel: profile.currentLevel || 1,
         totalPoints: profile.totalPoints || 0,
-        gameProgress: profile.gameProgress || 0,
         classId: profile.classId || null,
         className: profile.className || meta.class || null,
         classIds: Array.isArray(profile.classIds) ? profile.classIds : [],
@@ -58,7 +57,6 @@ const getData = async (req: any, res: any) => {
       streakData,
       stats: calculateStats(gradesList, tasksWithCompletion, streakData),
       assignedClass,
-      adminMessage: profile.adminMessage || null,
     });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });

@@ -5,6 +5,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { GraduationCap, Mail, Lock, LogIn, UserPlus, ArrowLeft, Eye, EyeOff } from 'lucide-react';
+import Link from 'next/link';
 import { LoadingSpinner } from './ui/loading';
 
 interface StudentLoginProps {
@@ -105,6 +106,15 @@ export function StudentLogin({ onLogin, onSwitchToSignup, onSwitchToFaculty }: S
                 </div>
               </div>
               
+              <div className="flex justify-end">
+                <Link
+                  href="/forgot-password"
+                  className="text-sm font-medium text-primary hover:underline"
+                >
+                  Forgot password?
+                </Link>
+              </div>
+
               <Button
                 type="submit"
                 disabled={isLoading}

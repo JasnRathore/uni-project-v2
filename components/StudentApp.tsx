@@ -231,7 +231,6 @@ export function StudentApp({ onBackToLanding }: StudentAppProps) {
       <StudentDashboard 
         student={currentStudent} 
         accessToken={accessToken}
-        projectId=""
       />
       <Toaster />
     </>
