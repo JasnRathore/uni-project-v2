@@ -151,12 +151,10 @@ export function Settings({ currentUser, accessToken, onUpdateProfile, onLogout }
       return;
     }
     try {
-      const { error: verifyError } = await supabase.auth.signInWithPassword({
-        email: currentUser.email,
-        password: passwordData.currentPassword,
+      const { error } = await supabase.auth.updateUser({
+        password: passwordData.newPassword,
+        currentPassword: passwordData.currentPassword,
       });
-      if (verifyError) throw new Error('Current password is incorrect');
-      const { error } = await supabase.auth.updateUser({ password: passwordData.newPassword });
       if (error) throw error;
       toast.success('Password changed successfully!');
       setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
