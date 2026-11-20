@@ -77,6 +77,68 @@ async function upsertByTask(records: any[], entry: any) {
   return records;
 }
 
+// Awards XP for a grade while keeping revisions honest. The first award uses a
+// stable idempotency key so repeat submissions are ignored. When the computed
+// points for the same source change, the previous event is reversed and a fresh
+// event is written, so the ledger total reflects the revised grade instead of
+// silently returning the original event.
+async function awardGradeXp({
+  studentId,
+  points,
+  sourceType,
+  sourceId,
+  createdBy,
+}: {
+  studentId: string;
+  points: number;
+  sourceType: 'grade' | 'quiz';
+  sourceId: string;
+  createdBy?: string | null;
+}) {
+  const db = getDatabaseClient();
+  const active = (await db.execute({
+    sql: `SELECT e.* FROM xp_events e
+      WHERE e.student_id = ? AND e.source_id = ? AND e.source_type IN ('grade', 'quiz')
+        AND NOT EXISTS (SELECT 1 FROM xp_events r WHERE r.reversal_of = e.id)
+      ORDER BY e.created_at DESC, e.rowid DESC LIMIT 1`,
+    args: [studentId, sourceId],
+  })).rows[0];
+
+  const baseKey = `grade:${studentId}:${sourceId}`;
+  if (!active) {
+    return awardXp({
+      studentId,
+      points,
+      sourceApplication: 'portal',
+      sourceType,
+      sourceId,
+      idempotencyKey: baseKey,
+      createdBy,
+    });
+  }
+  if (Number(active.points) === points) return active;
+
+  await awardXp({
+    studentId,
+    points: -Number(active.points),
+    sourceApplication: 'portal',
+    sourceType: 'reversal',
+    sourceId,
+    idempotencyKey: `reversal:${active.id}`,
+    createdBy,
+    reversalOf: active.id,
+  });
+  return awardXp({
+    studentId,
+    points,
+    sourceApplication: 'portal',
+    sourceType,
+    sourceId,
+    idempotencyKey: `${baseKey}:${active.id}`,
+    createdBy,
+  });
+}
+
 async function recordGrade({ task = null, assignment, student, studentId, classId, teacherId, grade, score, maxScore, answers }: RecordGradeInput) {
   const resolvedStudentId = studentId || student?.id;
   const resolvedClassId = classId || task?.classId;
@@ -154,13 +216,11 @@ async function recordGrade({ task = null, assignment, student, studentId, classI
   await Promise.all(writes);
   const percentage = Math.round((entry.score / maximum) * 100);
   const points = percentage + (percentage >= 95 ? 15 : percentage >= 90 ? 10 : percentage >= 80 ? 5 : 0);
-  await awardXp({
+  await awardGradeXp({
     studentId: studentRow.id,
     points,
-    sourceApplication: 'portal',
     sourceType: task?.type === 'quiz' ? 'quiz' : 'grade',
     sourceId: task?.id || entry.id,
-    idempotencyKey: `grade:${studentRow.id}:${task?.id || entry.id}`,
     createdBy: teacherId || null,
   });
   return entry;
