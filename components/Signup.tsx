@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useSyncExternalStore } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -8,6 +8,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Mail, Lock, Eye, EyeOff, User, BookOpen, CalendarDays, GraduationCap, Loader2, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import { SignupOtpStep } from './SignupOtpStep';
+
+// Returns `false` during SSR and the hydration render, then `true` once React
+// has taken over. Server output and the first client render therefore match.
+const subscribeToNothing = () => () => {};
+const useHydrated = () => useSyncExternalStore(subscribeToNothing, () => true, () => false);
 
 export interface SignupCredentials {
   name: string;
@@ -47,6 +52,11 @@ export function Signup({ onSignup, onRequestOtp, onSwitchToLogin, onBack }: Sign
   const [departmentsLoading, setDepartmentsLoading] = useState(true);
   const [stage, setStage] = useState<'form' | 'otp'>('form');
   const [pendingEmail, setPendingEmail] = useState('');
+  // The department select starts disabled on the server, but its trigger is
+  // rendered by Base UI, which does not round-trip the `disabled` attribute
+  // through hydration reliably. Keep both the server HTML and the first client
+  // render enabled, then apply the loading state after hydration.
+  const hydrated = useHydrated();
 
   useEffect(() => {
     const loadDepartments = async () => {
@@ -186,7 +196,7 @@ export function Signup({ onSignup, onRequestOtp, onSwitchToLogin, onBack }: Sign
                 <Select 
                   value={formData.departmentId}
                   onValueChange={(value) => setFormData({ ...formData, departmentId: value ?? '' })}
-                  disabled={isLoading || departmentsLoading}
+                  disabled={hydrated && (isLoading || departmentsLoading)}
                 >
                   <SelectTrigger id="department">
                     <SelectValue placeholder="Select your department" />
