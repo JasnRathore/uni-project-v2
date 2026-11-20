@@ -12,7 +12,6 @@ import {
   Phone,
   MapPin,
   Save,
-  Camera,
   ImagePlus,
   Pencil,
 } from "lucide-react";
@@ -94,7 +93,7 @@ export function StudentProfile({ student, accessToken, projectId, onUpdate, isTe
         <CardContent className="space-y-8">
           {/* Avatar Section */}
           <div className="student-profile-identity flex flex-wrap items-center gap-5 border-b pb-6">
-            <div className="student-profile-avatar relative">
+            <div className="student-profile-avatar">
               <RoleAvatar
                 role="student"
                 identifier={student?.id || student?.email}
@@ -102,19 +101,10 @@ export function StudentProfile({ student, accessToken, projectId, onUpdate, isTe
                 className="size-20 border-4 border-background"
                 fallbackClassName="text-2xl font-bold"
               />
-              <Button
-                type="button"
-                aria-label="Change profile photo"
-                size="sm"
-                className="absolute -bottom-1 -right-1 size-9 rounded-full border-2 border-background p-0"
-              >
-                <Camera aria-hidden="true" className="size-4" />
-              </Button>
             </div>
             <div className="min-w-0">
               <h3 className="truncate text-lg font-semibold">{profileData.name}</h3>
               <p className="mt-1 text-sm text-muted-foreground">Student account</p>
-              <Button type="button" variant="outline" size="sm" className="student-profile-change-photo mt-3 min-h-9">Change Photo</Button>
             </div>
           </div>
 

@@ -45,6 +45,7 @@ next-env.d.ts
 /plans
 discussion.md
 overhaul.md
+unimplemented.md
 /docs
 !/docs/
 /docs/*
