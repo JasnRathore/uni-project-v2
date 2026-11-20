@@ -8,20 +8,23 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { GraduationCap, Mail, Lock, User, ArrowLeft, UserPlus, Hash, Calendar, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 import { LoadingSpinner } from './ui/loading';
+import { SignupOtpStep } from './SignupOtpStep';
 
 interface StudentSignupProps {
   onSignup: (credentials: StudentSignupCredentials) => void | Promise<void>;
+  onRequestOtp: (credentials: StudentSignupCredentials) => void | Promise<void>;
   onSwitchToLogin: () => void;
   onBack: () => void;
 }
 
-interface StudentSignupCredentials {
+export interface StudentSignupCredentials {
   name: string;
   email: string;
   prn: string;
   degreeId: string;
   cohortId: string;
   password: string;
+  otp?: string;
 }
 
 interface DegreeOption {
@@ -34,7 +37,7 @@ interface CohortOption {
   label: string;
 }
 
-export function StudentSignup({ onSignup, onSwitchToLogin, onBack }: StudentSignupProps) {
+export function StudentSignup({ onSignup, onRequestOtp, onSwitchToLogin, onBack }: StudentSignupProps) {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -49,6 +52,8 @@ export function StudentSignup({ onSignup, onSwitchToLogin, onBack }: StudentSign
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [stage, setStage] = useState<'form' | 'otp'>('form');
+  const [pendingCredentials, setPendingCredentials] = useState<StudentSignupCredentials | null>(null);
 
   useEffect(() => {
     fetch('/api/academic/degrees', { cache: 'no-store' })
@@ -122,21 +127,35 @@ export function StudentSignup({ onSignup, onSwitchToLogin, onBack }: StudentSign
 
     setIsLoading(true);
     try {
-      await onSignup({
+      const credentials: StudentSignupCredentials = {
         name: formData.name.trim(),
         email: formData.email.trim(),
         prn: formData.prn.trim(),
         degreeId: formData.degreeId,
         cohortId: formData.cohortId,
         password: formData.password
-      });
+      };
+      await onRequestOtp(credentials);
+      setPendingCredentials(credentials);
+      setStage('otp');
+      toast.success('Verification code sent to your email');
     } catch (error) {
       console.error('Signup error:', error);
-      toast.error('Failed to create account');
     } finally {
       setIsLoading(false);
     }
   };
+
+  if (stage === 'otp' && pendingCredentials) {
+    return (
+      <SignupOtpStep
+        email={pendingCredentials.email}
+        onVerify={(otp) => onSignup({ ...pendingCredentials, otp })}
+        onResend={() => onRequestOtp(pendingCredentials)}
+        onChangeEmail={() => setStage('form')}
+      />
+    );
+  }
 
   return (
     <main className="mobile-ui auth-screen flex min-h-dvh items-center justify-center bg-muted/40 p-4">
@@ -327,12 +346,12 @@ export function StudentSignup({ onSignup, onSwitchToLogin, onBack }: StudentSign
                 {isLoading ? (
                   <div className="flex items-center gap-2">
                     <LoadingSpinner className="size-4 text-primary-foreground" />
-                    Creating account...
+                    Sending code...
                   </div>
                 ) : (
                   <>
                     <UserPlus className="w-4 h-4 mr-2" />
-                    Create Account
+                    Send verification code
                   </>
                 )}
               </Button>

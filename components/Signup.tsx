@@ -7,6 +7,7 @@ import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Mail, Lock, Eye, EyeOff, User, BookOpen, CalendarDays, GraduationCap, Loader2, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
+import { SignupOtpStep } from './SignupOtpStep';
 
 export interface SignupCredentials {
   name: string;
@@ -15,6 +16,7 @@ export interface SignupCredentials {
   confirmPassword: string;
   departmentId: string;
   qualification: string;
+  otp?: string;
 }
 
 interface Department {
@@ -24,11 +26,12 @@ interface Department {
 
 interface SignupProps {
   onSignup: (credentials: SignupCredentials) => void | Promise<void>;
+  onRequestOtp: (credentials: SignupCredentials) => void | Promise<void>;
   onSwitchToLogin: () => void;
   onBack: () => void;
 }
 
-export function Signup({ onSignup, onSwitchToLogin, onBack }: SignupProps) {
+export function Signup({ onSignup, onRequestOtp, onSwitchToLogin, onBack }: SignupProps) {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -42,6 +45,8 @@ export function Signup({ onSignup, onSwitchToLogin, onBack }: SignupProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [departmentsLoading, setDepartmentsLoading] = useState(true);
+  const [stage, setStage] = useState<'form' | 'otp'>('form');
+  const [pendingEmail, setPendingEmail] = useState('');
 
   useEffect(() => {
     const loadDepartments = async () => {
@@ -60,7 +65,7 @@ export function Signup({ onSignup, onSwitchToLogin, onBack }: SignupProps) {
     void loadDepartments();
   }, []);
 
-  const handleSignup = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleRequestOtp = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
     if (!formData.name || !formData.email || !formData.password || !formData.departmentId) {
@@ -81,12 +86,27 @@ export function Signup({ onSignup, onSwitchToLogin, onBack }: SignupProps) {
     setIsLoading(true);
 
     try {
-      await onSignup(formData);
+      await onRequestOtp(formData);
+      setPendingEmail(formData.email);
+      setStage('otp');
+      toast.success('Verification code sent to your email');
     } catch (error) {
       console.error('Signup error:', error);
+    } finally {
       setIsLoading(false);
     }
   };
+
+  if (stage === 'otp') {
+    return (
+      <SignupOtpStep
+        email={pendingEmail}
+        onVerify={(otp) => onSignup({ ...formData, otp })}
+        onResend={() => onRequestOtp(formData)}
+        onChangeEmail={() => setStage('form')}
+      />
+    );
+  }
 
   return (
     <main className="mobile-ui auth-screen flex min-h-dvh items-center justify-center bg-muted/40 p-4">
@@ -119,7 +139,7 @@ export function Signup({ onSignup, onSwitchToLogin, onBack }: SignupProps) {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSignup} className="space-y-4">
+            <form onSubmit={handleRequestOtp} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="name" className="auth-field-label">
                   <span className="auth-mobile-label-icon hidden"><User aria-hidden="true" /></span>
@@ -266,10 +286,10 @@ export function Signup({ onSignup, onSwitchToLogin, onBack }: SignupProps) {
                 {isLoading ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin text-primary-foreground" />
-                    Creating account...
+                    Sending code...
                   </>
                 ) : (
-                  'Create Account'
+                  'Send verification code'
                 )}
               </Button>
             </form>

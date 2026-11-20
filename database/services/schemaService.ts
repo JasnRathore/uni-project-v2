@@ -20,6 +20,13 @@ const getSchemaPath = (): string => {
 const ensureDatabaseSchema = async (db: any): Promise<void> => {
   await db.executeMultiple(fs.readFileSync(getSchemaPath(), 'utf8'));
   await db.execute('DROP TABLE IF EXISTS usernames');
+  const userColumns = (await db.execute('PRAGMA table_info("users")')).rows;
+  if (!userColumns.some((column: any) => column.name === 'email_verified_at')) {
+    await db.execute('ALTER TABLE users ADD COLUMN email_verified_at TEXT');
+    // Accounts created before OTP verification existed are treated as verified.
+    await db.execute('UPDATE users SET email_verified_at = created_at WHERE email_verified_at IS NULL');
+  }
+  await db.execute('DELETE FROM signup_otps WHERE expires_at < ?', [new Date().toISOString()]);
   const columns = (await db.execute('PRAGMA table_info("teacher_profiles")')).rows;
   if (!columns.some((column: any) => column.name === 'department_id')) {
     await db.execute(

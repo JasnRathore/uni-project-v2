@@ -59,6 +59,20 @@ export function FacultyAuthPage({ mode }: FacultyAuthPageProps) {
     router.replace("/faculty/dashboard");
   };
 
+  const handleRequestOtp = async (formData: SignupCredentials) => {
+    const response = await fetch("/api/auth/signup/request-otp", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...formData, role: "teacher" }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      const message = data.detail || data.error || "Could not send verification code";
+      toast.error(message);
+      throw new Error(message);
+    }
+  };
+
   const handleSignup = async (formData: SignupCredentials) => {
     const response = await fetch("/api/signup", {
       method: "POST",
@@ -80,6 +94,7 @@ export function FacultyAuthPage({ mode }: FacultyAuthPageProps) {
       {mode === "signup" ? (
         <Signup
           onSignup={handleSignup}
+          onRequestOtp={handleRequestOtp}
           onSwitchToLogin={() => router.push("/faculty/login")}
           onBack={() => router.push("/")}
         />

@@ -109,9 +109,21 @@ const sendPasswordResetEmail = async ({ to, name, token }: { to?: string; name?:
   });
 };
 
+const sendSignupOtpEmail = async ({ to, name, otp, expiresInMinutes = 10 }: { to?: string; name?: string; otp: string; expiresInMinutes?: number }): Promise<SendResult> => {
+  const greeting = escapeHtml(greetingName(name));
+  const safeOtp = escapeHtml(otp);
+  return send({
+    to,
+    subject: 'Your Dental College Portal verification code',
+    text: `Hi ${greetingName(name)},\n\nYour signup verification code is ${otp}. It expires in ${expiresInMinutes} minutes.\n\nIf you did not request this, you can ignore this email.\n\nDental College Portal`,
+    html: `<p>Hi ${greeting},</p><p>Your signup verification code is:</p><p style="font-size:28px;font-weight:700;letter-spacing:6px;margin:16px 0">${safeOtp}</p><p>This code expires in ${expiresInMinutes} minutes.</p><p>If you did not request this, you can ignore this email.</p><p>Dental College Portal</p>`,
+  });
+};
+
 module.exports = {
   resolveAppUrl,
   sendWelcomeEmail,
   sendSignInNotice,
   sendPasswordResetEmail,
+  sendSignupOtpEmail,
 };

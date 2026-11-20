@@ -6,6 +6,11 @@ const {
 } = require('../../../database/services/dbService.ts');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const {
+  consumeSignupOtp,
+  requestSignupOtp: requestSignupOtpCode,
+  cancelSignupOtp,
+} = require('../services/signupOtpService.ts');
 
 const JWT_SECRET: string | undefined = process.env.JWT_SECRET;
 
@@ -66,14 +71,92 @@ const login = async (req: any, res: any) => {
   }
 };
 
+const markEmailVerified = async (userId: unknown) => {
+  if (!userId) return;
+  try {
+    await getDatabaseClient().execute({
+      sql: 'UPDATE users SET email_verified_at = CURRENT_TIMESTAMP WHERE id = ? AND email_verified_at IS NULL',
+      args: [userId],
+    });
+  } catch (error) {
+    console.error('[auth] Unable to mark email as verified:', error);
+  }
+};
+
+const requestSignupOtp = async (req: any, res: any) => {
+  try {
+    const body = { ...(req.body || {}) };
+    const role = body.role === 'student' ? 'student' : 'teacher';
+    const email = typeof body.email === 'string' ? body.email.trim() : '';
+    const password = typeof body.password === 'string' ? body.password : '';
+    const name = typeof body.name === 'string' ? body.name.trim() : '';
+
+    if (!email || !password || !name) {
+      return res.status(400).json({ error: 'Email, password and name are required' });
+    }
+    if (password.length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters long' });
+    }
+
+    const db = getDatabaseClient();
+    const existing = await db.execute({
+      sql: 'SELECT id FROM users WHERE email = ? COLLATE NOCASE',
+      args: [email],
+    });
+    if (existing.rows.length) {
+      return res.status(409).json({ error: 'An account with this email already exists' });
+    }
+
+    if (role === 'teacher') {
+      if (!body.departmentId) return res.status(400).json({ error: 'A department is required' });
+      const department = await db.execute({
+        sql: 'SELECT id FROM departments WHERE id = ?',
+        args: [body.departmentId],
+      });
+      if (!department.rows.length) return res.status(400).json({ error: 'Select a valid department' });
+    } else {
+      if (!body.cohortId) return res.status(400).json({ error: 'A graduation cohort is required' });
+      const cohort = await db.execute({
+        sql: 'SELECT id FROM graduation_cohorts WHERE id = ?',
+        args: [body.cohortId],
+      });
+      if (!cohort.rows.length) return res.status(400).json({ error: 'Select a valid graduation cohort' });
+    }
+
+    const result = await requestSignupOtpCode({ email, role });
+    if (!result.ok) return res.status(result.status).json({ error: result.error });
+
+    let sent = false;
+    try {
+      const { sendSignupOtpEmail } = require('../../email/mailer.ts');
+      sent = await sendSignupOtpEmail({ to: email, name, otp: result.otp });
+    } catch (error) {
+      console.error('[auth] Unable to send signup verification email:', error);
+    }
+    if (!sent) {
+      await cancelSignupOtp(email);
+      return res.status(503).json({ error: 'Email delivery is not configured. Please contact an administrator.' });
+    }
+
+    return res.json({ success: true, email, expiresInSeconds: 600, resendAfterSeconds: 60 });
+  } catch (err: any) {
+    console.error('[auth] request-signup-otp failed:', err);
+    return res.status(500).json({ error: err.message });
+  }
+};
+
 const signup = async (req: any, res: any) => {
   try {
     const supabase = getAuthService();
     const signupBody = { ...req.body };
     delete signupBody.username;
-    const { email, password, name, role, ...rest } = signupBody;
+    const { email, password, name, role, otp, ...rest } = signupBody;
+    const effectiveRole = role === 'student' ? 'student' : 'teacher';
     if (!email || !password || !name) return res.status(400).json({ error: 'Email, password and name are required' });
-    if ((role || 'teacher') !== 'student') {
+    if (!otp) {
+      return res.status(400).json({ error: 'Enter the verification code sent to your email', code: 'OTP_REQUIRED' });
+    }
+    if (effectiveRole !== 'student') {
       if (!rest.departmentId) return res.status(400).json({ error: 'A department is required' });
       const department = await getDatabaseClient().execute({
         sql: 'SELECT id FROM departments WHERE id = ?',
@@ -82,19 +165,22 @@ const signup = async (req: any, res: any) => {
       if (!department.rows.length) return res.status(400).json({ error: 'Select a valid department' });
       delete rest.department;
     }
+    const verification = await consumeSignupOtp({ email, otp, role: effectiveRole });
+    if (!verification.ok) return res.status(verification.status).json({ error: verification.error });
     const { data, error } = await supabase.auth.admin.createUser({
       email,
       password,
       email_confirm: true,
-      user_metadata: { name, role: role || 'teacher', ...rest },
+      user_metadata: { name, role: effectiveRole, ...rest },
     });
     if (error) return res.status(400).json({ error: error.message });
+    await markEmailVerified(data.user?.id);
     sendMailBestEffort('welcome', () => {
       const { sendWelcomeEmail } = require('../../email/mailer.ts');
       return sendWelcomeEmail({
         to: data.user?.email || email,
         name: data.user?.user_metadata?.name || name,
-        role: data.user?.user_metadata?.role || role || 'teacher',
+        role: data.user?.user_metadata?.role || effectiveRole,
       });
     });
     return res.json({ success: true, user: data.user });
@@ -111,10 +197,14 @@ const studentSignup = async (req: any, res: any) => {
     delete signupBody.degreeId;
     delete signupBody.batch;
     delete signupBody.username;
-    const { email, password, name, prn, rollNumber: legacyRollNumber, cohortId, ...rest } = signupBody;
+    const { email, password, name, prn, rollNumber: legacyRollNumber, cohortId, otp, ...rest } = signupBody;
     const studentPrn = prn || legacyRollNumber || null;
     if (!email || !password || !name) return res.status(400).json({ error: 'Email, password and name are required' });
-
+    if (!otp) {
+      return res.status(400).json({ error: 'Enter the verification code sent to your email', code: 'OTP_REQUIRED' });
+    }
+    const verification = await consumeSignupOtp({ email, otp, role: 'student' });
+    if (!verification.ok) return res.status(verification.status).json({ error: verification.error });
     const { data, error } = await supabase.auth.admin.createUser({
       email,
       password,
@@ -122,7 +212,7 @@ const studentSignup = async (req: any, res: any) => {
       user_metadata: { name, role: 'student', prn: studentPrn, cohortId, ...rest },
     });
     if (error) return res.status(400).json({ error: error.message });
-
+    await markEmailVerified(data.user?.id);
     await writePortalData(`student_profile:${email}`, {
       email,
       name,
@@ -133,7 +223,6 @@ const studentSignup = async (req: any, res: any) => {
       currentLevel: 1,
       registeredAt: new Date().toISOString(),
     });
-
     sendMailBestEffort('welcome', () => {
       const { sendWelcomeEmail } = require('../../email/mailer.ts');
       return sendWelcomeEmail({
@@ -142,7 +231,6 @@ const studentSignup = async (req: any, res: any) => {
         role: 'student',
       });
     });
-
     return res.json({ success: true, user: data.user });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
@@ -266,6 +354,7 @@ const reactivateAccount = async (req: any, res: any) => {
 
 module.exports = {
   login,
+  requestSignupOtp,
   signup,
   studentSignup,
   forgotPassword,

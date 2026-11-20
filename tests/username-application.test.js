@@ -10,8 +10,10 @@ const readSource = relativePath => fs.readFileSync(path.join(__dirname, '..', re
 test('student signup ignores username and stores only supported identity fields', async () => {
   const dbServicePath = require.resolve('../database/services/dbService.ts');
   const controllerPath = require.resolve('../lib/api/controllers/authController.ts');
+  const otpServicePath = require.resolve('../lib/api/services/signupOtpService.ts');
   const originalDbService = require(dbServicePath);
   const originalController = require.cache[controllerPath];
+  const originalOtpService = require.cache[otpServicePath];
   let authRequest;
   let storedProfile;
   let loginPasswordHash;
@@ -45,6 +47,16 @@ test('student signup ignores username and stores only supported identity fields'
       storedProfile = { key, value };
     },
   };
+  require.cache[otpServicePath] = {
+    id: otpServicePath,
+    filename: otpServicePath,
+    loaded: true,
+    exports: {
+      consumeSignupOtp: async () => ({ ok: true }),
+      requestSignupOtp: async () => ({ ok: false, status: 503, error: 'disabled in tests' }),
+      cancelSignupOtp: async () => {},
+    },
+  };
   delete require.cache[controllerPath];
 
   try {
@@ -57,6 +69,7 @@ test('student signup ignores username and stores only supported identity fields'
       prn: 'PRN-123',
       cohortId: 'cohort-1',
       role: 'student',
+      otp: '123456',
     };
     const makeResponse = () => ({
       statusCode: 200,
@@ -102,6 +115,8 @@ test('student signup ignores username and stores only supported identity fields'
   } finally {
     delete require.cache[controllerPath];
     if (originalController) require.cache[controllerPath] = originalController;
+    if (originalOtpService) require.cache[otpServicePath] = originalOtpService;
+    else delete require.cache[otpServicePath];
     require.cache[dbServicePath].exports = originalDbService;
   }
 });

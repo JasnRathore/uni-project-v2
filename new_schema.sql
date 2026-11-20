@@ -9,9 +9,29 @@ CREATE TABLE IF NOT EXISTS users (
     name            TEXT NOT NULL DEFAULT '',
     role            TEXT NOT NULL,
     metadata_json   TEXT NOT NULL DEFAULT '{}',
+    email_verified_at TEXT,
     created_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+-- One-time codes emailed during signup. Only a bcrypt hash is stored; the
+-- plaintext code never reaches the database. Rows are single-use and expire.
+CREATE TABLE IF NOT EXISTS signup_otps (
+    id              TEXT PRIMARY KEY,
+    email           TEXT NOT NULL COLLATE NOCASE,
+    role            TEXT NOT NULL DEFAULT 'teacher'
+        CHECK (role IN ('teacher', 'student')),
+    otp_hash        TEXT NOT NULL,
+    attempts        INTEGER NOT NULL DEFAULT 0,
+    expires_at      TEXT NOT NULL,
+    consumed_at     TEXT,
+    created_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_signup_otps_email
+    ON signup_otps(email, created_at);
+CREATE INDEX IF NOT EXISTS idx_signup_otps_expiry
+    ON signup_otps(expires_at);
 
 CREATE TABLE IF NOT EXISTS departments (
     id              TEXT PRIMARY KEY,

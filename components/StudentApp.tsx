@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { StudentLogin } from './StudentLogin';
-import { StudentSignup } from './StudentSignup';
+import { StudentSignup, type StudentSignupCredentials } from './StudentSignup';
 import { StudentDashboard } from './StudentDashboard';
 import { Toaster } from './ui/sonner';
 import { toast } from 'sonner';
@@ -161,6 +161,20 @@ export function StudentApp({ onBackToLanding }: StudentAppProps) {
     }
   };
 
+  const handleRequestOtp = async (formData: StudentSignupCredentials) => {
+    const response = await fetch('/api/auth/signup/request-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...formData, role: 'student' }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const message = data.error || 'Could not send verification code';
+      toast.error(message);
+      throw new Error(message);
+    }
+  };
+
   const handleSignup = async (formData: any) => {
     try {
       const response = await fetch(`/api/student/signup`, {
@@ -207,6 +221,7 @@ export function StudentApp({ onBackToLanding }: StudentAppProps) {
         <>
           <StudentSignup 
             onSignup={handleSignup}
+            onRequestOtp={handleRequestOtp}
             onSwitchToLogin={() => router.push('/student/login')}
             onBack={onBackToLanding}
           />
