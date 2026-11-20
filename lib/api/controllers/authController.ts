@@ -135,7 +135,7 @@ const requestSignupOtp = async (req: any, res: any) => {
     }
     if (!sent) {
       await cancelSignupOtp(email);
-      return res.status(503).json({ error: 'Email delivery is not configured. Please contact an administrator.' });
+      return res.status(503).json({ error: 'We could not send the verification email. Please try again later or contact an administrator.' });
     }
 
     return res.json({ success: true, email, expiresInSeconds: 600, resendAfterSeconds: 60 });

@@ -1,4 +1,8 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+// Keep the suite hermetic: signup fires a best-effort welcome email, and dotenv
+// must not pull a real RESEND_KEY into the test process (dotenv never overrides
+// an existing variable, so an empty value here disables sending).
+process.env.RESEND_KEY = '';
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');

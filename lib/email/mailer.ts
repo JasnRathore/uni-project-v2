@@ -1,8 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-require-imports */
 
-// Transactional email helper. The transport is created lazily on first use so the
-// application (and the test harness) can load this module without mail credentials.
-// Every helper logs and returns `false` on failure; none of them ever throw.
+// Transactional email helper backed by Resend. The client is created lazily on
+// first use so the application (and the test harness) can load this module
+// without mail credentials. Every helper logs and returns `false` on failure;
+// none of them ever throw.
 
 type SendResult = boolean;
 
@@ -19,32 +20,26 @@ const resolveAppUrl = (): string => {
   return trimmed ? trimmed.replace(/\/$/, '') : 'http://localhost:3000';
 };
 
-const isConfigured = (): boolean => Boolean(process.env.MAIL && process.env.MAIL_PASSWORD);
+const isConfigured = (): boolean => Boolean(process.env.RESEND_KEY && process.env.RESEND_KEY.trim());
 
-let transport: any = null;
+let resendClient: any = null;
 
-const getTransport = (): any => {
-  if (!transport) {
-    const nodemailer = require('nodemailer');
-    transport = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: process.env.MAIL,
-        pass: process.env.MAIL_PASSWORD,
-      },
-    });
+const getResend = (): any => {
+  if (!resendClient) {
+    const { Resend } = require('resend');
+    resendClient = new Resend(process.env.RESEND_KEY);
   }
-  return transport;
+  return resendClient;
 };
 
 const resolveFromAddress = (): string => {
   const override = process.env.MAIL_FROM && process.env.MAIL_FROM.trim();
-  return override || `Dental College Portal <${process.env.MAIL}>`;
+  return override || 'Dental College Portal <onboarding@resend.dev>';
 };
 
 const send = async (options: MailOptions): Promise<SendResult> => {
   if (!isConfigured()) {
-    console.error('[email] MAIL and MAIL_PASSWORD are not configured; skipping email send');
+    console.error('[email] RESEND_KEY is not configured; skipping email send');
     return false;
   }
   if (!options.to) {
@@ -52,13 +47,17 @@ const send = async (options: MailOptions): Promise<SendResult> => {
     return false;
   }
   try {
-    await getTransport().sendMail({
+    const { error } = await getResend().emails.send({
       from: resolveFromAddress(),
       to: options.to,
       subject: options.subject,
       text: options.text,
       html: options.html,
     });
+    if (error) {
+      console.error('[email] Resend rejected the email:', error);
+      return false;
+    }
     return true;
   } catch (error) {
     console.error('[email] Failed to send email:', error);
