@@ -13,7 +13,7 @@ interface TakeQuizProps {
 }
 
 export function TakeQuiz({ quiz, onBack, onSubmit }: TakeQuizProps) {
-  const [answers, setAnswers] = useState({});
+  const [answers, setAnswers] = useState<Record<string, any>>({});
   const [timeRemaining, setTimeRemaining] = useState(quiz.duration * 60); // Convert to seconds
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasStarted, setHasStarted] = useState(false);

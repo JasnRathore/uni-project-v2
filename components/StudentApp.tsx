@@ -223,7 +223,7 @@ export function StudentApp({ onBackToLanding }: StudentAppProps) {
             onSignup={handleSignup}
             onRequestOtp={handleRequestOtp}
             onSwitchToLogin={() => router.push('/student/login')}
-            onBack={onBackToLanding}
+            onBack={() => onBackToLanding?.()}
           />
           <Toaster />
         </>
@@ -245,7 +245,7 @@ export function StudentApp({ onBackToLanding }: StudentAppProps) {
     <>
       <StudentDashboard 
         student={currentStudent} 
-        accessToken={accessToken}
+        accessToken={accessToken ?? ''}
       />
       <Toaster />
     </>

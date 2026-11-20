@@ -152,9 +152,9 @@ export function StudentDashboard({
     }
   };
 
-  const calculateStats = (gradesData, tasksData, streakData) => {
+  const calculateStats = (gradesData: any[], tasksData: any[], streakData: any) => {
     // Calculate total EXP from grades
-    const totalEXP = gradesData.reduce((sum, grade) => {
+    const totalEXP = gradesData.reduce((sum: number, grade: any) => {
       if (grade.score != null && grade.maxScore != null && grade.maxScore > 0) {
         const percentage = (grade.score / grade.maxScore) * 100;
         const baseExp = Math.floor(percentage);
@@ -165,7 +165,7 @@ export function StudentDashboard({
         return sum + baseExp + bonus;
       }
       if (grade.grade) {
-        const gradeMap = {
+        const gradeMap: Record<string, number> = {
           "A+": 100,
           A: 95,
           "A-": 90,
@@ -189,7 +189,7 @@ export function StudentDashboard({
 
     const completedAssignments = tasksData.filter((t: any) => {
       const isGraded = gradesData.some(
-        (g) => g.taskId === t.id || g.task_id === t.id,
+        (g: any) => g.taskId === t.id || g.task_id === t.id,
       );
       return t.completed === true || t.grade != null || isGraded;
     }).length;

@@ -146,7 +146,7 @@ export function QuestDialog({
             <Label htmlFor="quest-class">Class</Label>
             <Select
               value={selectedClass}
-              onValueChange={(value: string) => setSelectedClass(value)}
+              onValueChange={(value: string | null) => setSelectedClass(value ?? "")}
             >
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Select a class" />
