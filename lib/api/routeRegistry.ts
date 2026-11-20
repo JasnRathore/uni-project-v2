@@ -18,6 +18,9 @@ export function createRouteRegistry(
 ): RouteDefinition[] {
   const definitions: Array<[string, string, Handler, boolean, boolean, string?]> = [
     ['POST', '/auth/login', authController.login, false, false],
+    ['POST', '/auth/refresh', authController.refresh, false, false],
+    ['POST', '/auth/logout', authController.logout, false, false],
+    ['GET', '/auth/me', authController.me, true, false],
     ['POST', '/auth/signup/request-otp', authController.requestSignupOtp, false, false],
     ['POST', '/auth/forgot-password', authController.forgotPassword, false, false],
     ['POST', '/auth/reset-password', authController.resetPassword, false, false],

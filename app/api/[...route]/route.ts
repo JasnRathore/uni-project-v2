@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server';
+import { stringifySetCookie, type SetCookie } from 'cookie';
 import { createRouteRegistry, findRoute } from '@/lib/api/routeRegistry';
 
 /* eslint-disable @typescript-eslint/no-require-imports */
@@ -8,6 +9,7 @@ const teacherController = require('../../../lib/api/controllers/teacherControlle
 const adminController = require('../../../lib/api/controllers/adminController.ts');
 const gameController = require('../../../lib/api/controllers/gameController.ts');
 const { getUser } = require('../../../lib/api/middleware/authMiddleware.ts');
+const { readAuthCookies } = require('../../../lib/api/services/authCookieService.ts');
 const { ensureDatabaseReady, getDatabaseClient } = require('../../../database/services/dbService.ts');
 
 export const runtime = 'nodejs';
@@ -15,12 +17,16 @@ export const dynamic = 'force-dynamic';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
+  'Access-Control-Allow-Credentials': 'true',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
 
-function response(body: unknown, status = 200) {
-  return Response.json(body, { status, headers: corsHeaders });
+function response(body: unknown, status = 200, setCookies: string[] = []) {
+  const headers = new Headers(corsHeaders);
+  headers.set('Content-Type', 'application/json');
+  for (const cookie of setCookies) headers.append('Set-Cookie', cookie);
+  return new Response(JSON.stringify(body), { status, headers });
 }
 
 async function dispatch(request: NextRequest, segments: string[]) {
@@ -41,9 +47,11 @@ async function dispatch(request: NextRequest, segments: string[]) {
   if (!route) return response({ error: 'Not found' }, 404);
 
   const { handler, protectedRoute, studentOnly } = route.route;
+  const authCookies = readAuthCookies(request.headers.get('cookie'));
+  const bearer = request.headers.get('authorization');
   let user;
   if (protectedRoute) {
-    user = await getUser(request.headers.get('authorization'));
+    user = await getUser(bearer || (authCookies.accessToken ? `Bearer ${authCookies.accessToken}` : null));
     if (!user) return response({ error: 'Unauthorized' }, 401);
     if (user.app_metadata?.accountDisabled && path !== '/account/reactivate') {
       return response({ error: 'This account has been deactivated' }, 403);
@@ -80,11 +88,37 @@ async function dispatch(request: NextRequest, segments: string[]) {
     body,
     params,
     user,
+    cookies: authCookies,
     headers: Object.fromEntries(request.headers.entries()),
   };
-  const res = {
-    status(code: number) { return { json(value: unknown) { result = response(value, code); return result; } }; },
-    json(value: unknown) { result = response(value); return result; },
+  const setCookies: string[] = [];
+  const extraHeaders: Record<string, string> = {};
+  const finalize = (value: unknown, code = 200) => {
+    const apiResponse = response(value, code, setCookies);
+    for (const [name, headerValue] of Object.entries(extraHeaders)) apiResponse.headers.set(name, headerValue);
+    return apiResponse;
+  };
+  const res: Record<string, unknown> = {
+    cookie(name: string, value: string, options: Omit<SetCookie, 'name' | 'value'> = {}) {
+      setCookies.push(stringifySetCookie({ name, value, ...options }));
+      return res;
+    },
+    clearCookie(name: string, options: Omit<SetCookie, 'name' | 'value'> = {}) {
+      setCookies.push(stringifySetCookie({ name, value: '', ...options, maxAge: 0 }));
+      return res;
+    },
+    setHeader(name: string, value: string | string[]) {
+      if (name.toLowerCase() === 'set-cookie') {
+        setCookies.push(...(Array.isArray(value) ? value : [value]));
+      } else {
+        extraHeaders[name] = String(value);
+      }
+      return res;
+    },
+    status(code: number) {
+      return { json(value: unknown) { result = finalize(value, code); return result; } };
+    },
+    json(value: unknown) { result = finalize(value); return result; },
   };
   try {
     await handler(req, res);

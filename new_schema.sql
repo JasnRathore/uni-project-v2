@@ -443,3 +443,41 @@ CREATE TABLE IF NOT EXISTS legacy_record_map (
 
 CREATE INDEX IF NOT EXISTS idx_legacy_record_map_entity
     ON legacy_record_map(entity_type, entity_id);
+
+-- Server-side refresh-token sessions. Only a SHA-256 hash of the refresh
+-- token is stored. Rotating a refresh token revokes the previous row and
+-- records `replaced_by`; replaying a revoked token revokes the whole family.
+CREATE TABLE IF NOT EXISTS auth_sessions (
+    id                  TEXT PRIMARY KEY,
+    user_id             TEXT NOT NULL,
+    refresh_token_hash  TEXT NOT NULL,
+    family_id           TEXT NOT NULL,
+    user_agent          TEXT,
+    ip_address          TEXT,
+    created_at          TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_used_at        TEXT,
+    expires_at          TEXT NOT NULL,
+    revoked_at          TEXT,
+    replaced_by         TEXT
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_auth_sessions_token
+    ON auth_sessions(refresh_token_hash);
+CREATE INDEX IF NOT EXISTS idx_auth_sessions_user
+    ON auth_sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_auth_sessions_family
+    ON auth_sessions(family_id);
+
+-- Login throttling. Every attempt is recorded; recent failures gate a login.
+CREATE TABLE IF NOT EXISTS login_attempts (
+    id              TEXT PRIMARY KEY,
+    email           TEXT NOT NULL COLLATE NOCASE,
+    ip_address      TEXT,
+    success         INTEGER NOT NULL DEFAULT 0,
+    created_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_login_attempts_email
+    ON login_attempts(email, created_at);
+CREATE INDEX IF NOT EXISTS idx_login_attempts_ip
+    ON login_attempts(ip_address, created_at);
