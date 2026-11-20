@@ -34,7 +34,9 @@ const getResend = (): any => {
 
 const resolveFromAddress = (): string => {
   const override = process.env.MAIL_FROM && process.env.MAIL_FROM.trim();
-  return override || 'Dental College Portal <onboarding@resend.dev>';
+  if (override) return override;
+  const domain = process.env.RESEND_DOMAIN && process.env.RESEND_DOMAIN.trim();
+  return domain ? `Dental College Portal <no-reply@${domain}>` : 'Dental College Portal <onboarding@resend.dev>';
 };
 
 const send = async (options: MailOptions): Promise<SendResult> => {
