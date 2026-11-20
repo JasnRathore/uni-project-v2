@@ -1,16 +1,16 @@
-/* eslint-disable @typescript-eslint/no-require-imports */
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-require-imports */
 const {
   getAuthService,
   getDatabaseClient,
   writePortalData,
-} = require('../../../database/services/dbService');
+} = require('../../../database/services/dbService.ts');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
-const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_SECRET: string | undefined = process.env.JWT_SECRET;
 
 // Login endpoint (new – replaces Supabase signInWithPassword)
-const login = async (req, res) => {
+const login = async (req: any, res: any) => {
   try {
     if (!JWT_SECRET) return res.status(503).json({ error: 'Authentication is not configured' });
     const { email, password } = req.body;
@@ -27,7 +27,7 @@ const login = async (req, res) => {
     const valid = await bcrypt.compare(password, user.password_hash);
     if (!valid) return res.status(401).json({ error: 'Invalid login credentials' });
 
-    const { unpackMetadata } = require('../../../database/services/dbService');
+    const { unpackMetadata } = require('../../../database/services/dbService.ts');
     const metadata = unpackMetadata(user.metadata_json).user_metadata;
     const userMetadata = { ...metadata };
     delete userMetadata.username;
@@ -47,12 +47,12 @@ const login = async (req, res) => {
         app_metadata: {},
       }
     });
-  } catch (err) {
+  } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
 };
 
-const signup = async (req, res) => {
+const signup = async (req: any, res: any) => {
   try {
     const supabase = getAuthService();
     const signupBody = { ...req.body };
@@ -76,12 +76,12 @@ const signup = async (req, res) => {
     });
     if (error) return res.status(400).json({ error: error.message });
     return res.json({ success: true, user: data.user });
-  } catch (err) {
+  } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
 };
 
-const studentSignup = async (req, res) => {
+const studentSignup = async (req: any, res: any) => {
   try {
     const supabase = getAuthService();
     const signupBody = { ...req.body };
@@ -114,12 +114,12 @@ const studentSignup = async (req, res) => {
     });
 
     return res.json({ success: true, user: data.user });
-  } catch (err) {
+  } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
 };
 
-const reactivateAccount = async (req, res) => {
+const reactivateAccount = async (req: any, res: any) => {
   try {
     // User already decoded by requireAuth middleware
     const user = req.user;
@@ -131,7 +131,7 @@ const reactivateAccount = async (req, res) => {
     });
     if (updateError) return res.status(400).json({ error: updateError.message });
     return res.json({ success: true });
-  } catch (err) {
+  } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
 };

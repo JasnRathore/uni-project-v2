@@ -1,15 +1,15 @@
-/* eslint-disable @typescript-eslint/no-require-imports */
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-require-imports */
 const {
   readPortalData,
   writePortalData,
   getAuthService,
   getDatabaseClient,
-} = require('../../../database/services/dbService');
-const { getStudentStreak } = require('../services/studentService');
-const { recordGrade } = require('../services/gradeRecordingService');
-const { mergeTaskCompletion, calculateStats } = require('../services/studentDashboardService');
+} = require('../../../database/services/dbService.ts');
+const { getStudentStreak } = require('../services/studentService.ts');
+const { recordGrade } = require('../services/gradeRecordingService.ts');
+const { mergeTaskCompletion, calculateStats } = require('../services/studentDashboardService.ts');
 
-const getProfile = async (req, res) => {
+const getProfile = async (req: any, res: any) => {
   try {
     const user = req.user;
     const role = user.user_metadata?.role;
@@ -24,7 +24,7 @@ const getProfile = async (req, res) => {
         id: user.id,
         name: profile.name || name,
         email: user.email,
-        avatar: (profile.name || name).split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2),
+        avatar: (profile.name || name).split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2),
         role: 'student',
         prn: profile.prn || legacyRollNumber || meta.prn || meta.rollNumber || '',
         currentLevel: profile.currentLevel || 1,
@@ -36,12 +36,12 @@ const getProfile = async (req, res) => {
         classMemberships: Array.isArray(profile.classMemberships) ? profile.classMemberships : [],
       }
     });
-  } catch (err) {
+  } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
 };
 
-const getData = async (req, res) => {
+const getData = async (req: any, res: any) => {
   try {
     const user = req.user;
     const allTasks = (await readPortalData(`student_tasks:${user.email}`)) || [];
@@ -60,12 +60,12 @@ const getData = async (req, res) => {
       assignedClass,
       adminMessage: profile.adminMessage || null,
     });
-  } catch (err) {
+  } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
 };
 
-const getDashboard = async (req, res) => {
+const getDashboard = async (req: any, res: any) => {
   try {
     const user = req.user;
     const tasks = (await readPortalData(`student_tasks:${user.email}`)) || [];
@@ -75,14 +75,14 @@ const getDashboard = async (req, res) => {
     const tasksWithCompletion = mergeTaskCompletion(taskList, gradeList);
     const streak = await getStudentStreak(user.email, tasksWithCompletion);
     const profile = (await readPortalData(`student_profile:${user.email}`)) || { totalPoints: 0, currentLevel: 1 };
-    const pendingTasks = tasksWithCompletion.filter(task => !task.completed);
+    const pendingTasks = tasksWithCompletion.filter((task: any) => !task.completed);
     return res.json({ tasks: tasksWithCompletion, streak, stats: calculateStats(gradeList, tasksWithCompletion, streak), quest: pendingTasks[0] || null, profile });
-  } catch (err) {
+  } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
 };
 
-const getLeaderboard = async (req, res) => {
+const getLeaderboard = async (req: any, res: any) => {
   try {
     const db = getDatabaseClient();
     const currentResult = await db.execute({
@@ -100,10 +100,10 @@ const getLeaderboard = async (req, res) => {
       return res.status(404).json({ error: 'Student profile not found' });
     }
 
-    let profile;
+    let profile: any;
     try {
       profile = JSON.parse(current.profile_json || '{}');
-    } catch (error) {
+    } catch (error: any) {
       throw new Error(`Student profile data is invalid: ${error.message}`);
     }
 
@@ -129,7 +129,7 @@ const getLeaderboard = async (req, res) => {
     }
 
     const filters = ['u.role = ?', "s.lifecycle_state = 'active'"];
-    const args = ['student'];
+    const args: any[] = ['student'];
     if (cohortId) {
       filters.push('s.cohort_id = ?');
       args.push(cohortId);
@@ -155,8 +155,8 @@ const getLeaderboard = async (req, res) => {
       args,
     });
     const students = studentsResult.rows;
-    const studentIds = students.map(student => student.id);
-    let grades = [];
+    const studentIds = students.map((student: any) => student.id);
+    let grades: any[] = [];
     if (studentIds.length) {
       const placeholders = studentIds.map(() => '?').join(', ');
       const gradesResult = await db.execute({
@@ -168,17 +168,17 @@ const getLeaderboard = async (req, res) => {
       grades = gradesResult.rows;
     }
 
-    const gradesByStudent = new Map();
+    const gradesByStudent = new Map<string, any[]>();
     for (const grade of grades) {
       if (!gradesByStudent.has(grade.student_id)) gradesByStudent.set(grade.student_id, []);
-      gradesByStudent.get(grade.student_id).push(grade);
+      gradesByStudent.get(grade.student_id)!.push(grade);
     }
-    const gradePoints = {
+    const gradePoints: Record<string, number> = {
       'A+': 100, A: 95, 'A-': 90, 'B+': 85, B: 80, 'B-': 75,
       'C+': 70, C: 65, 'C-': 60, D: 50, F: 0,
     };
-    const ranked = students.map(student => {
-      const totalExperience = (gradesByStudent.get(student.id) || []).reduce((total, grade) => {
+    const ranked = students.map((student: any) => {
+      const totalExperience = (gradesByStudent.get(student.id) || []).reduce((total: number, grade: any) => {
         if (grade.score != null && Number(grade.max_score) > 0) {
           const percentage = (Number(grade.score) / Number(grade.max_score)) * 100;
           const bonus = percentage >= 95 ? 15 : percentage >= 90 ? 10 : percentage >= 80 ? 5 : 0;
@@ -190,20 +190,20 @@ const getLeaderboard = async (req, res) => {
       return {
         id: student.id,
         name,
-        avatar: name.split(/\s+/).map(part => part[0]).join('').toUpperCase().slice(0, 2),
+        avatar: name.split(/\s+/).map((part: string) => part[0]).join('').toUpperCase().slice(0, 2),
         prn: student.prn || '',
         totalExperience,
         level: Math.floor(totalExperience / 500) + 1,
       };
-    }).sort((left, right) =>
+    }).sort((left: any, right: any) =>
       right.totalExperience - left.totalExperience
       || left.name.localeCompare(right.name)
       || left.id.localeCompare(right.id)
     );
 
-    let previousExperience = null;
+    let previousExperience: number | null = null;
     let previousRank = 0;
-    const leaderboard = ranked.map((student, index) => {
+    const leaderboard = ranked.map((student: any, index: number) => {
       const rank = student.totalExperience === previousExperience ? previousRank : index + 1;
       previousExperience = student.totalExperience;
       previousRank = rank;
@@ -229,36 +229,36 @@ const getLeaderboard = async (req, res) => {
         label: [cohortName, className].filter(Boolean).join(' · ') || 'Your class',
       },
     });
-  } catch (err) {
+  } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
 };
 
-const getNotifications = async (req, res) => {
+const getNotifications = async (req: any, res: any) => {
   try {
     const user = req.user;
     const notifs = (await readPortalData(`notifications:${user.email}`)) || [];
     return res.json({ notifications: notifs });
-  } catch (err) {
+  } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
 };
 
-const markNotificationRead = async (req, res) => {
+const markNotificationRead = async (req: any, res: any) => {
   try {
     const user = req.user;
     const { notificationId } = req.body;
     const key = `notifications:${user.email}`;
     const notifs = (await readPortalData(key)) || [];
-    const updated = Array.isArray(notifs) ? notifs.map(n => n.id === notificationId ? { ...n, read: true } : n) : [];
+    const updated = Array.isArray(notifs) ? notifs.map((n: any) => n.id === notificationId ? { ...n, read: true } : n) : [];
     await writePortalData(key, updated);
     return res.json({ success: true });
-  } catch (err) {
+  } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
 };
 
-const updateProfile = async (req, res) => {
+const updateProfile = async (req: any, res: any) => {
   try {
     const user = req.user;
     if (user.user_metadata?.role !== 'student') {
@@ -270,7 +270,7 @@ const updateProfile = async (req, res) => {
     const allowedFields = [
       'name', 'prn', 'phone', 'address', 'bio',
     ];
-    const profileUpdates = Object.fromEntries(
+    const profileUpdates: Record<string, any> = Object.fromEntries(
       allowedFields.filter(field => req.body[field] !== undefined).map(field => [field, req.body[field]])
     );
     if (profileUpdates.prn === undefined && req.body.rollNumber !== undefined) {
@@ -290,17 +290,17 @@ const updateProfile = async (req, res) => {
       if (error) throw error;
     }
     return res.json({ success: true, profile: updatedProfile });
-  } catch (err) {
+  } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
 };
 
-const submitQuiz = async (req, res) => {
+const submitQuiz = async (req: any, res: any) => {
   try {
     const user = req.user;
     const { taskId, score, maxScore, answers } = req.body;
     const allTasks = (await readPortalData(`student_tasks:${user.email}`)) || [];
-    const task = Array.isArray(allTasks) ? allTasks.find(item => item.id === taskId) : null;
+    const task = Array.isArray(allTasks) ? allTasks.find((item: any) => item.id === taskId) : null;
 
     if (!task) return res.status(404).json({ error: 'Quiz not found' });
     await recordGrade({
@@ -316,19 +316,19 @@ const submitQuiz = async (req, res) => {
     const percentage = maxScore > 0 ? Math.round((score / maxScore) * 100) : 0;
 
     return res.json({ success: true, percentage });
-  } catch (err) {
+  } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
 };
 
-const getQuest = async (req, res) => {
+const getQuest = async (req: any, res: any) => {
   try {
     const user = req.user;
     const tasks = (await readPortalData(`student_tasks:${user.email}`)) || [];
     const tasksList = Array.isArray(tasks) ? tasks : [];
-    const pending = tasksList.filter(t => !t.completed);
+    const pending = tasksList.filter((t: any) => !t.completed);
     return res.json({ quest: pending[0] || null, tasks: tasksList });
-  } catch (err) {
+  } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
 };

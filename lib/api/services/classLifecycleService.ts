@@ -1,10 +1,33 @@
-const { randomUUID } = require('node:crypto');
-const { getDatabaseClient, withTransaction } = require('../../../database/services/dbService');
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-require-imports */
+
+const { getDatabaseClient, withTransaction } = require('../../../database/services/dbService.ts');
+
+type TransitionInput = {
+  classId: string;
+  teacherId: string;
+  status: string;
+  startsAt?: string | null;
+  endsAt?: string | null;
+};
+
+type MembershipInput = {
+  classId: string;
+  studentId: string;
+  teacherId: string;
+  actorId?: string;
+};
+
+type EndMembershipInput = {
+  classId: string;
+  studentId: string;
+  teacherId: string;
+  status?: string;
+};
 
 const classLifecycleService = {
-  async transition({ classId, teacherId, status, startsAt, endsAt }) {
+  async transition({ classId, teacherId, status, startsAt, endsAt }: TransitionInput) {
     if (!['active', 'completed', 'archived'].includes(status)) throw new Error('Invalid class status');
-    return withTransaction(async tx => {
+    return withTransaction(async (tx: any) => {
       const current = (await tx.execute({ sql: 'SELECT * FROM classes WHERE id=? AND teacher_id=?', args: [classId, teacherId] })).rows[0];
       if (!current) throw new Error('Class not found');
       await tx.execute({ sql: `UPDATE classes SET class_status=?, starts_at=COALESCE(?, starts_at),
@@ -13,8 +36,8 @@ const classLifecycleService = {
       return { ...current, class_status: status };
     });
   },
-  async addMembership({ classId, studentId, teacherId, actorId }) {
-    return withTransaction(async tx => {
+  async addMembership({ classId, studentId, teacherId, actorId }: MembershipInput) {
+    return withTransaction(async (tx: any) => {
       const klass = (await tx.execute({ sql: "SELECT id FROM classes WHERE id=? AND teacher_id=? AND class_status='active'", args: [classId, teacherId] })).rows[0];
       if (!klass) throw new Error('Active class not found or not owned by teacher');
       const student = (await tx.execute({ sql: "SELECT id FROM students WHERE id=? AND lifecycle_state='active'", args: [studentId] })).rows[0];
@@ -36,9 +59,9 @@ const classLifecycleService = {
       return { classId, studentId, status: 'active' };
     });
   },
-  async endMembership({ classId, studentId, teacherId, status = 'ended' }) {
+  async endMembership({ classId, studentId, teacherId, status = 'ended' }: EndMembershipInput) {
     if (!['ended', 'withdrawn'].includes(status)) throw new Error('Invalid membership status');
-    return withTransaction(async tx => {
+    return withTransaction(async (tx: any) => {
       const result = await tx.execute({ sql: `UPDATE class_memberships SET status=?, membership_status=?, ended_at=CURRENT_TIMESTAMP, updated_at=CURRENT_TIMESTAMP
         WHERE class_id=? AND student_id=? AND teacher_id=? AND membership_status='active'`, args: [status, status, classId, studentId, teacherId] });
       if (!result.rowsAffected) throw new Error('Active membership not found');
@@ -52,7 +75,7 @@ const classLifecycleService = {
       return { classId, studentId, status };
     });
   },
-  async getClass(classId) {
+  async getClass(classId: string) {
     return (await getDatabaseClient().execute({ sql: 'SELECT * FROM classes WHERE id=?', args: [classId] })).rows[0] || null;
   },
 };

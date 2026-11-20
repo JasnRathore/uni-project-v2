@@ -1,12 +1,37 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-require-imports */
+
 const { randomUUID } = require('node:crypto');
-const { getDatabaseClient, withTransaction } = require('../../../database/services/dbService');
+const { getDatabaseClient, withTransaction } = require('../../../database/services/dbService.ts');
 
-const tierFor = xp => xp >= 2000 ? 'master' : xp >= 1000 ? 'expert' : xp >= 500 ? 'scholar' : 'novice';
+type AwardXpInput = {
+  studentId: string;
+  points: number;
+  sourceApplication?: 'portal' | 'game' | 'admin';
+  sourceType?: 'task' | 'quiz' | 'grade' | 'streak' | 'achievement' | 'bonus' | 'reversal';
+  sourceId?: string | null;
+  idempotencyKey: string;
+  createdBy?: string | null;
+  rulesetVersion?: string;
+  reversalOf?: string | null;
+};
 
-async function awardXp({ studentId, points, sourceApplication = 'portal', sourceType = 'bonus', sourceId = null, idempotencyKey, createdBy = null, rulesetVersion = 'v1', reversalOf = null }) {
+const tierFor = (xp: number): string =>
+  xp >= 2000 ? 'master' : xp >= 1000 ? 'expert' : xp >= 500 ? 'scholar' : 'novice';
+
+async function awardXp({
+  studentId,
+  points,
+  sourceApplication = 'portal',
+  sourceType = 'bonus',
+  sourceId = null,
+  idempotencyKey,
+  createdBy = null,
+  rulesetVersion = 'v1',
+  reversalOf = null,
+}: AwardXpInput) {
   const amount = Number(points);
   if (!Number.isInteger(amount) || !idempotencyKey) throw new Error('Integer points and idempotencyKey are required');
-  return withTransaction(async tx => {
+  return withTransaction(async (tx: any) => {
     const existing = (await tx.execute({ sql: 'SELECT * FROM xp_events WHERE idempotency_key=?', args: [idempotencyKey] })).rows[0];
     if (existing) return existing;
     const student = (await tx.execute({ sql: "SELECT id FROM students WHERE id=? AND lifecycle_state='active'", args: [studentId] })).rows[0];
@@ -25,7 +50,7 @@ async function awardXp({ studentId, points, sourceApplication = 'portal', source
   });
 }
 
-async function getProgression(studentId) {
+async function getProgression(studentId: string) {
   const db = getDatabaseClient();
   const state = (await db.execute({ sql: 'SELECT * FROM progression_states WHERE student_id=?', args: [studentId] })).rows[0];
   const total = (await db.execute({ sql: 'SELECT COALESCE(SUM(points),0) AS total FROM xp_events WHERE student_id=?', args: [studentId] })).rows[0].total;

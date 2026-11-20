@@ -1,6 +1,8 @@
-const { getDatabaseClient } = require('../../../database/services/dbService');
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-require-imports */
 
-const getActiveClasses = async studentId => {
+const { getDatabaseClient } = require('../../../database/services/dbService.ts');
+
+const getActiveClasses = async (studentId: string) => {
   const db = getDatabaseClient();
   const result = await db.execute({
     sql: `SELECT DISTINCT c.id, c.name, sub.name AS subject
@@ -18,7 +20,7 @@ const getActiveClasses = async studentId => {
   return result.rows;
 };
 
-const leaderboard = async ({ studentId, scope, scopeId }) => {
+const leaderboard = async ({ studentId, scope, scopeId }: { studentId: string; scope: string; scopeId?: string }) => {
   const db = getDatabaseClient();
   const current = (await db.execute({
     sql: `SELECT s.id, s.cohort_id, c.label AS cohort_label, d.name AS degree_name
@@ -30,7 +32,7 @@ const leaderboard = async ({ studentId, scope, scopeId }) => {
   })).rows[0];
   if (!current) throw new Error('Student not found');
   let where = "s.lifecycle_state='active'";
-  const args = [];
+  const args: any[] = [];
   let label = scope;
   let scopeName = scope;
   if (scope === 'cohort') {
@@ -54,14 +56,15 @@ const leaderboard = async ({ studentId, scope, scopeId }) => {
     if (!allowed) throw new Error('Class leaderboard access denied');
     where += ` AND EXISTS (SELECT 1 FROM class_memberships cm WHERE cm.class_id=? AND cm.student_id=s.id AND cm.membership_status='active')`;
     args.push(scopeId);
-    label = scopeId;
+    label = scopeId as string;
     scopeName = allowed.name;
   } else throw new Error('Invalid leaderboard scope');
   const result = await db.execute({ sql: `SELECT s.id, s.name, COALESCE(SUM(x.points),0) AS leaderboard_xp
     FROM students s LEFT JOIN xp_events x ON x.student_id=s.id WHERE ${where}
     GROUP BY s.id ORDER BY leaderboard_xp DESC, s.name COLLATE NOCASE, s.id`, args });
-  let last = null; let rank = 0;
-  const entries = result.rows.map((row, index) => {
+  let last: number | null = null;
+  let rank = 0;
+  const entries = result.rows.map((row: any, index: number) => {
     if (Number(row.leaderboard_xp) !== last) rank = index + 1;
     last = Number(row.leaderboard_xp);
     return { studentId: row.id, displayName: row.name || 'Student', leaderboardXp: Number(row.leaderboard_xp), rank, isCurrentStudent: row.id === studentId };

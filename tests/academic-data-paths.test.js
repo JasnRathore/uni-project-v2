@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
 
-const dbServicePath = require.resolve('../database/services/dbService');
+const dbServicePath = require.resolve('../database/services/dbService.ts');
 const originalDbService = require(dbServicePath);
 let queries = [];
 let mockDatabase;
@@ -13,7 +13,7 @@ require.cache[dbServicePath].exports = {
   ...originalDbService,
   getDatabaseClient: () => mockDatabase,
 };
-const catalog = require('../lib/api/services/academicCatalogService');
+const catalog = require('../lib/api/services/academicCatalogService.ts');
 
 const result = rows => ({ rows });
 
@@ -104,11 +104,11 @@ test('the academic catalog API exposes public catalog reads and admin writes', (
 
 test('application persistence derives subject and grade identity through classes and student IDs', () => {
   const adapter = fs.readFileSync(
-    path.join(__dirname, '..', 'database', 'services', 'relationalDataService.js'),
+    path.join(__dirname, '..', 'database', 'services', 'relationalDataService.ts'),
     'utf8',
   );
   const teacherController = fs.readFileSync(
-    path.join(__dirname, '..', 'lib', 'api', 'controllers', 'teacherController.js'),
+    path.join(__dirname, '..', 'lib', 'api', 'controllers', 'teacherController.ts'),
     'utf8',
   );
   assert.match(adapter, /subject_id/);

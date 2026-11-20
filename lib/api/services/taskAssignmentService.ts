@@ -1,22 +1,23 @@
-/* eslint-disable @typescript-eslint/no-require-imports */
-const { readPortalData } = require('../../../database/services/dbService');
-const { portalStore } = require('../storage/portalStore');
-const { isActiveStudent } = require('./studentState');
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-require-imports */
 
-async function assignTaskToStudents(teacherId, task) {
+const { readPortalData } = require('../../../database/services/dbService.ts');
+const { portalStore } = require('../storage/portalStore.ts');
+const { isActiveStudent } = require('./studentState.ts');
+
+async function assignTaskToStudents(teacherId: string, task: any): Promise<number> {
   const allStudentsRaw = (await readPortalData(`students:${teacherId}`)) || [];
   const allStudents = Array.isArray(allStudentsRaw) ? allStudentsRaw : [];
   const activeStudents = allStudents.filter(isActiveStudent);
   const eligible = task.classId
-    ? activeStudents.filter(student => (
+    ? activeStudents.filter((student: any) => (
       student?.classId === task.classId
       || (Array.isArray(student?.classIds) && student.classIds.includes(task.classId))
     ) && student.email)
-    : activeStudents.filter(student => student?.email);
+    : activeStudents.filter((student: any) => student?.email);
 
   for (const student of eligible) {
     const tasks = await portalStore.readStudentTasks(student.email);
-    if (tasks.some(existing => existing.id === task.id)) continue;
+    if (tasks.some((existing: any) => existing.id === task.id)) continue;
     tasks.push({ ...task, completed: false, grade: null });
     await portalStore.writeStudentTasks(student.email, tasks);
     const notifications = await portalStore.readNotifications(student.email);

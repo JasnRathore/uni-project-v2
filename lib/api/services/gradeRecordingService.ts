@@ -1,15 +1,41 @@
-/* eslint-disable @typescript-eslint/no-require-imports */
-const { portalStore } = require('../storage/portalStore');
-const { trackStudentActivity } = require('./studentService');
-const { awardXp } = require('./xpService');
-const { getDatabaseClient } = require('../../../database/services/dbService');
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-require-imports */
 
-const gradeToScore = {
+const { portalStore } = require('../storage/portalStore.ts');
+const { trackStudentActivity } = require('./studentService.ts');
+const { awardXp } = require('./xpService.ts');
+const { getDatabaseClient } = require('../../../database/services/dbService.ts');
+
+const gradeToScore: Record<string, number> = {
   'A+': 100, A: 95, 'A-': 90, 'B+': 85, B: 80, 'B-': 75,
   'C+': 70, C: 65, 'C-': 60, D: 50, F: 0,
 };
 
-function normalizeScore(grade, score) {
+type GradeEntryInput = {
+  task?: any;
+  assignment?: string;
+  classData: any;
+  student: any;
+  teacherId?: string;
+  grade?: any;
+  score?: any;
+  maxScore?: any;
+  answers?: any;
+};
+
+type RecordGradeInput = {
+  task?: any;
+  assignment?: string;
+  student?: any;
+  studentId?: string;
+  classId?: string;
+  teacherId?: string;
+  grade?: any;
+  score?: any;
+  maxScore?: any;
+  answers?: any;
+};
+
+function normalizeScore(grade: any, score?: any): number {
   const numericScore = Number(score ?? grade);
   if (Number.isFinite(numericScore)) return numericScore;
   if (typeof grade === 'string' && Object.prototype.hasOwnProperty.call(gradeToScore, grade)) {
@@ -18,7 +44,7 @@ function normalizeScore(grade, score) {
   throw new Error('Grade must be a valid number or supported letter grade');
 }
 
-function buildGradeEntry({ task, assignment, classData, student, teacherId, grade, score, maxScore, answers }) {
+function buildGradeEntry({ task, assignment, classData, student, teacherId, grade, score, maxScore, answers }: GradeEntryInput) {
   const numericScore = normalizeScore(grade, score);
   const taskId = task?.id || null;
   return {
@@ -42,16 +68,16 @@ function buildGradeEntry({ task, assignment, classData, student, teacherId, grad
   };
 }
 
-async function upsertByTask(records, entry) {
+async function upsertByTask(records: any[], entry: any) {
   const index = entry.taskId
-    ? records.findIndex(item => item.taskId === entry.taskId || item.task_id === entry.taskId)
-    : records.findIndex(item => item.id === entry.id);
+    ? records.findIndex((item: any) => item.taskId === entry.taskId || item.task_id === entry.taskId)
+    : records.findIndex((item: any) => item.id === entry.id);
   if (index >= 0) records[index] = entry;
   else records.push(entry);
   return records;
 }
 
-async function recordGrade({ task = null, assignment, student, studentId, classId, teacherId, grade, score, maxScore, answers }) {
+async function recordGrade({ task = null, assignment, student, studentId, classId, teacherId, grade, score, maxScore, answers }: RecordGradeInput) {
   const resolvedStudentId = studentId || student?.id;
   const resolvedClassId = classId || task?.classId;
   if (!resolvedStudentId || !resolvedClassId) throw new Error('A student ID and class are required');
@@ -85,7 +111,7 @@ async function recordGrade({ task = null, assignment, student, studentId, classI
 
   await upsertByTask(studentGrades, entry);
   if (task) {
-    const taskIndex = studentTasks.findIndex(item => item.id === task.id);
+    const taskIndex = studentTasks.findIndex((item: any) => item.id === task.id);
     const completedTask = {
       ...task,
       ...(taskIndex >= 0 ? studentTasks[taskIndex] : {}),
@@ -97,7 +123,7 @@ async function recordGrade({ task = null, assignment, student, studentId, classI
     else studentTasks.push(completedTask);
   }
 
-  const writes = [
+  const writes: Promise<unknown>[] = [
     portalStore.writeStudentGrades(studentEmail, studentGrades),
     ...(task ? [portalStore.writeStudentTasks(studentEmail, studentTasks)] : []),
     trackStudentActivity(studentEmail, task?.dueDate),

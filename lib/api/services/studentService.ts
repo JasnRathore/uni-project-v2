@@ -1,19 +1,20 @@
-/* eslint-disable @typescript-eslint/no-require-imports */
-const { readPortalData, writePortalData } = require('../../../database/services/dbService');
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-require-imports */
 
-function getToday() {
+const { readPortalData, writePortalData } = require('../../../database/services/dbService.ts');
+
+function getToday(): string {
   return new Date().toISOString().split('T')[0];
 }
 
-function hasMissedDeadline(tasks, today = getToday()) {
-  return (Array.isArray(tasks) ? tasks : []).some(task =>
+function hasMissedDeadline(tasks: any, today = getToday()): boolean {
+  return (Array.isArray(tasks) ? tasks : []).some((task: any) =>
     !task.completed
     && task.dueDate
     && String(task.dueDate).slice(0, 10) < today,
   );
 }
 
-async function trackStudentActivity(email, dueDate) {
+async function trackStudentActivity(email: string, dueDate?: string | null) {
   const streakKey = `student_streak:${email}`;
   const now = new Date();
   const today = getToday();
@@ -32,16 +33,16 @@ async function trackStudentActivity(email, dueDate) {
   } else {
     streakData.currentStreak = 1;
   }
-  
+
   if (streakData.currentStreak > streakData.longestStreak) streakData.longestStreak = streakData.currentStreak;
   streakData.lastActivityDate = today;
   if (!streakData.dates.includes(today)) streakData.dates.push(today);
-  
+
   await writePortalData(streakKey, streakData);
   return streakData;
 }
 
-async function getStudentStreak(email, tasks = []) {
+async function getStudentStreak(email: string, tasks: any[] = []) {
   const streakKey = `student_streak:${email}`;
   const streakData = (await readPortalData(streakKey)) || {
     currentStreak: 0,

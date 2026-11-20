@@ -1,12 +1,12 @@
-/* eslint-disable @typescript-eslint/no-require-imports */
-const { readPortalData, writePortalData, deletePortalData, listPortalDataByPrefix, getAuthService, getDatabaseClient } = require('../../../database/services/dbService');
-const { recordGrade, normalizeScore } = require('../services/gradeRecordingService');
-const { assignTaskToStudents: assignTaskToStudentsDeep } = require('../services/taskAssignmentService');
-const classLifecycle = require('../services/classLifecycleService');
-const { normalizeLifecycleState } = require('../services/studentState');
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-require-imports */
+const { readPortalData, writePortalData, deletePortalData, listPortalDataByPrefix, getAuthService, getDatabaseClient } = require('../../../database/services/dbService.ts');
+const { recordGrade, normalizeScore } = require('../services/gradeRecordingService.ts');
+const { assignTaskToStudents: assignTaskToStudentsDeep } = require('../services/taskAssignmentService.ts');
+const classLifecycle = require('../services/classLifecycleService.ts');
+const { normalizeLifecycleState } = require('../services/studentState.ts');
 
-const runWithConcurrency = async (items, concurrency, operation) => {
-  const results = new Array(items.length);
+const runWithConcurrency = async <T, R>(items: T[], concurrency: number, operation: (item: T, index: number) => Promise<R>): Promise<R[]> => {
+  const results = new Array<R>(items.length);
   let nextIndex = 0;
   const workers = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
     while (nextIndex < items.length) {
@@ -16,41 +16,41 @@ const runWithConcurrency = async (items, concurrency, operation) => {
   });
   const outcomes = await Promise.allSettled(workers);
   const failure = outcomes.find(outcome => outcome.status === 'rejected');
-  if (failure) throw failure.reason;
+  if (failure) throw (failure as PromiseRejectedResult).reason;
   return results;
 };
 
-const updateClassLifecycle = async (req, res) => {
+const updateClassLifecycle = async (req: any, res: any) => {
   try {
     return res.json({ class: await classLifecycle.transition({
       classId: req.params.classId, teacherId: req.user.id, status: req.body?.status,
       startsAt: req.body?.startsAt, endsAt: req.body?.endsAt,
     }) });
-  } catch (error) { return res.status(error.message === 'Class not found' ? 404 : 400).json({ error: error.message }); }
+  } catch (error: any) { return res.status(error.message === 'Class not found' ? 404 : 400).json({ error: error.message }); }
 };
-const addClassMembership = async (req, res) => {
+const addClassMembership = async (req: any, res: any) => {
   try {
     return res.status(201).json({ membership: await classLifecycle.addMembership({
       classId: req.params.classId, studentId: req.body?.studentId, teacherId: req.user.id, actorId: req.user.id,
     }) });
-  } catch (error) { return res.status(400).json({ error: error.message }); }
+  } catch (error: any) { return res.status(400).json({ error: error.message }); }
 };
-const endClassMembership = async (req, res) => {
+const endClassMembership = async (req: any, res: any) => {
   try {
     return res.json({ membership: await classLifecycle.endMembership({
       classId: req.params.classId, studentId: req.params.studentId, teacherId: req.user.id, status: req.body?.status,
     }) });
-  } catch (error) { return res.status(400).json({ error: error.message }); }
+  } catch (error: any) { return res.status(400).json({ error: error.message }); }
 };
 
-const getOwnedStudent = async (teacherId, email) => {
+const getOwnedStudent = async (teacherId: string, email: string) => {
   const students = (await readPortalData(`students:${teacherId}`)) || [];
   return Array.isArray(students)
-    ? students.find(student => String(student.email).toLowerCase() === String(email).toLowerCase())
+    ? students.find((student: any) => String(student.email).toLowerCase() === String(email).toLowerCase())
     : null;
 };
 
-const getProfile = async (req, res) => {
+const getProfile = async (req: any, res: any) => {
   try {
     const user = req.user;
     const role = user.user_metadata?.role;
@@ -64,16 +64,16 @@ const getProfile = async (req, res) => {
         id: user.id,
         name,
         email: user.email,
-        avatar: name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2),
+        avatar: name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2),
         role: role || 'teacher',
       }
     });
-  } catch (err) {
+  } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
 };
 
-const getData = async (req, res) => {
+const getData = async (req: any, res: any) => {
   try {
     const user = req.user;
     const [students, classes, tasks, grades] = await Promise.all([
@@ -88,40 +88,40 @@ const getData = async (req, res) => {
       tasks: tasks || [],
       grades: grades || [],
     });
-  } catch (err) {
+  } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
 };
 
-const saveStudents = async (req, res) => {
+const saveStudents = async (req: any, res: any) => {
   try {
     const user = req.user;
     const { students } = req.body;
     if (!Array.isArray(students)) return res.status(400).json({ error: 'students array is required' });
     await writePortalData(`students:${user.id}`, students);
     return res.json({ success: true });
-  } catch (err) {
+  } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
 };
 
-const saveClasses = async (req, res) => {
+const saveClasses = async (req: any, res: any) => {
   try {
     const user = req.user;
     const { classes } = req.body;
     if (!Array.isArray(classes)) return res.status(400).json({ error: 'classes array is required' });
     await writePortalData(`classes:${user.id}`, classes);
     return res.json({ success: true });
-  } catch (err) {
+  } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
 };
 
-const deleteClass = async (req, res) => {
+const deleteClass = async (req: any, res: any) => {
   try {
     const user = req.user;
     const students = (await readPortalData(`students:${user.id}`)) || [];
-    if (Array.isArray(students) && students.some(student =>
+    if (Array.isArray(students) && students.some((student: any) =>
       student.classId === req.params.classId || (Array.isArray(student.classIds) && student.classIds.includes(req.params.classId))
     )) {
       return res.status(409).json({ error: 'Cannot delete a class while students are assigned to it' });
@@ -129,29 +129,29 @@ const deleteClass = async (req, res) => {
     const classesKey = `classes:${user.id}`;
     const classes = (await readPortalData(classesKey)) || [];
     const classList = Array.isArray(classes) ? classes : [];
-    if (!classList.some(item => item.id === req.params.classId)) {
+    if (!classList.some((item: any) => item.id === req.params.classId)) {
       return res.status(404).json({ error: 'Class not found' });
     }
-    await writePortalData(classesKey, classList.filter(item => item.id !== req.params.classId));
+    await writePortalData(classesKey, classList.filter((item: any) => item.id !== req.params.classId));
     return res.json({ success: true });
-  } catch (err) {
+  } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
 };
 
-const updateManualStudent = async (req, res) => {
+const updateManualStudent = async (req: any, res: any) => {
   try {
     const studentsKey = `students:${req.user.id}`;
     const saved = (await readPortalData(studentsKey)) || [];
     const students = Array.isArray(saved) ? saved : [];
-    const index = students.findIndex(student => String(student.id) === req.params.studentId);
+    const index = students.findIndex((student: any) => String(student.id) === req.params.studentId);
     if (index < 0) return res.status(404).json({ error: 'Student not found' });
     if (students[index].isRegistered) return res.status(403).json({ error: 'Registered student profiles must be updated by that student' });
 
     const allowedFields = [
       'name', 'prn', 'classId', 'className', 'phone', 'address', 'bio',
     ];
-    const updates = Object.fromEntries(
+    const updates: Record<string, any> = Object.fromEntries(
       allowedFields.filter(field => req.body[field] !== undefined).map(field => [field, req.body[field]])
     );
     if (updates.prn === undefined && req.body.rollNumber !== undefined) updates.prn = req.body.rollNumber;
@@ -164,12 +164,12 @@ const updateManualStudent = async (req, res) => {
     students[index] = student;
     await writePortalData(studentsKey, students);
     return res.json({ success: true, student });
-  } catch (err) {
+  } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
 };
 
-const createClass = async (req, res) => {
+const createClass = async (req: any, res: any) => {
   try {
     const teacherId = req.user.id;
     const classData = req.body?.class;
@@ -179,27 +179,27 @@ const createClass = async (req, res) => {
     const classesKey = `classes:${teacherId}`;
     const saved = (await readPortalData(classesKey)) || [];
     const classes = Array.isArray(saved) ? saved : [];
-    if (classes.some(item => String(item.id) === String(classData.id))) {
+    if (classes.some((item: any) => String(item.id) === String(classData.id))) {
       return res.status(409).json({ error: 'Class ID already exists' });
     }
     await writePortalData(classesKey, [...classes, { ...classData, grade: classData.programYearLabel }]);
-    const created = (await readPortalData(classesKey) || []).find(item => String(item.id) === String(classData.id));
+    const created = (await readPortalData(classesKey) || []).find((item: any) => String(item.id) === String(classData.id));
     return res.status(201).json({ class: created });
-  } catch (err) {
+  } catch (err: any) {
     const status = /subject|class id|class name/i.test(err.message) ? 400 : 500;
     return res.status(status).json({ error: err.message });
   }
 };
 
-const getOwnedClass = async (teacherId, classId) => {
+const getOwnedClass = async (teacherId: string, classId: string) => {
   if (!classId) return null;
   const classes = await readPortalData(`classes:${teacherId}`);
   return Array.isArray(classes)
-    ? classes.find(classItem => String(classItem.id) === String(classId))
+    ? classes.find((classItem: any) => String(classItem.id) === String(classId))
     : null;
 };
 
-const createTask = async (req, res) => {
+const createTask = async (req: any, res: any) => {
   try {
     const user = req.user;
     const task = req.body;
@@ -236,20 +236,20 @@ const createTask = async (req, res) => {
     const tasksList = Array.isArray(existingTasks) ? existingTasks : [];
     tasksList.push(newTask);
     await writePortalData(tasksKey, tasksList);
-    let assignedCount;
+    let assignedCount: number;
     try {
-      assignedCount =       await assignTaskToStudentsDeep(user.id, newTask);
+      assignedCount = await assignTaskToStudentsDeep(user.id, newTask);
     } catch (error) {
-      await writePortalData(tasksKey, tasksList.filter(item => item.id !== newTask.id));
+      await writePortalData(tasksKey, tasksList.filter((item: any) => item.id !== newTask.id));
       throw error;
     }
     return res.json({ ...newTask, assignedCount });
-  } catch (err) {
+  } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
 };
 
-const addTask = async (req, res) => {
+const addTask = async (req: any, res: any) => {
   try {
     const user = req.user;
     const { title, description, points, date, type, priority } = req.body;
@@ -281,26 +281,26 @@ const addTask = async (req, res) => {
     const tasksList = Array.isArray(tasks) ? tasks : [];
     tasksList.push(task);
     await writePortalData(tasksKey, tasksList);
-    let assignmentCount;
+    let assignmentCount: number;
     try {
       assignmentCount = await assignTaskToStudentsDeep(user.id, task);
     } catch (error) {
-      await writePortalData(tasksKey, tasksList.filter(item => item.id !== task.id));
+      await writePortalData(tasksKey, tasksList.filter((item: any) => item.id !== task.id));
       throw error;
     }
     return res.json({ success: true, task, assignedCount: assignmentCount });
-  } catch (err) {
+  } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
 };
 
-const updateTask = async (req, res) => {
+const updateTask = async (req: any, res: any) => {
   try {
     const user = req.user;
     const tasksKey = `tasks:${user.id}`;
     const tasks = (await readPortalData(tasksKey)) || [];
     const taskList = Array.isArray(tasks) ? tasks : [];
-    const index = taskList.findIndex(task => task.id === req.params.taskId);
+    const index = taskList.findIndex((task: any) => task.id === req.params.taskId);
     if (index < 0) return res.status(404).json({ error: 'Task not found' });
 
     const updates = req.body || {};
@@ -322,17 +322,17 @@ const updateTask = async (req, res) => {
       const teacherStudents = (await readPortalData(`students:${user.id}`)) || [];
       const eligibleEmails = new Set(
         (Array.isArray(teacherStudents) ? teacherStudents : [])
-          .filter(student => student?.email && (!updatedTask.classId
+          .filter((student: any) => student?.email && (!updatedTask.classId
             || student.classId === updatedTask.classId
             || (Array.isArray(student.classIds) && student.classIds.includes(updatedTask.classId))))
-          .map(student => student.email)
+          .map((student: any) => student.email)
       );
       const studentTaskEntries = await listPortalDataByPrefix('student_tasks:');
       for (const entry of studentTaskEntries) {
         if (!Array.isArray(entry.value)) continue;
         const email = entry.key.slice('student_tasks:'.length);
         let changed = false;
-        const updatedStudentTasks = entry.value.flatMap(studentTask => {
+        const updatedStudentTasks = entry.value.flatMap((studentTask: any) => {
           if (studentTask.id !== updatedTask.id) return [studentTask];
           changed = true;
           if (!eligibleEmails.has(email)) return [];
@@ -354,18 +354,18 @@ const updateTask = async (req, res) => {
     }
 
     return res.json({ task: updatedTask });
-  } catch (err) {
+  } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
 };
 
-const deleteTask = async (req, res) => {
+const deleteTask = async (req: any, res: any) => {
   try {
     const user = req.user;
     const tasksKey = `tasks:${user.id}`;
     const tasks = (await readPortalData(tasksKey)) || [];
     const taskList = Array.isArray(tasks) ? tasks : [];
-    const task = taskList.find(item => item.id === req.params.taskId);
+    const task = taskList.find((item: any) => item.id === req.params.taskId);
     if (!task) return res.status(404).json({ error: 'Task not found' });
 
     const [studentTaskEntries, studentGradeEntries, notificationEntries, teacherGrades] = await Promise.all([
@@ -374,25 +374,25 @@ const deleteTask = async (req, res) => {
       listPortalDataByPrefix('notifications:'),
       readPortalData(`dental_college_grades:${user.id}`),
     ]);
-    const updates = [];
+    const updates: Array<() => Promise<any>> = [];
     for (const entry of studentTaskEntries) {
       if (!Array.isArray(entry.value)) continue;
-      const filtered = entry.value.filter(item => item.id !== task.id);
+      const filtered = entry.value.filter((item: any) => item.id !== task.id);
       if (filtered.length !== entry.value.length) updates.push(() => writePortalData(entry.key, filtered));
     }
     for (const entry of studentGradeEntries) {
       if (!Array.isArray(entry.value)) continue;
-      const grades = entry.value.filter(grade => grade.taskId !== task.id && grade.task_id !== task.id);
+      const grades = entry.value.filter((grade: any) => grade.taskId !== task.id && grade.task_id !== task.id);
       if (grades.length !== entry.value.length) updates.push(() => writePortalData(entry.key, grades));
     }
     for (const entry of notificationEntries) {
       if (!Array.isArray(entry.value)) continue;
-      const notifications = entry.value.filter(item => item.taskId !== task.id);
+      const notifications = entry.value.filter((item: any) => item.taskId !== task.id);
       if (notifications.length !== entry.value.length) updates.push(() => writePortalData(entry.key, notifications));
     }
 
     if (Array.isArray(teacherGrades)) {
-      const filtered = teacherGrades.filter(grade => grade.taskId !== task.id && grade.task_id !== task.id);
+      const filtered = teacherGrades.filter((grade: any) => grade.taskId !== task.id && grade.task_id !== task.id);
       if (filtered.length !== teacherGrades.length) {
         updates.push(() => writePortalData(`dental_college_grades:${user.id}`, filtered));
       }
@@ -401,52 +401,52 @@ const deleteTask = async (req, res) => {
     await runWithConcurrency(updates, 20, update => update());
     await Promise.all([
       deletePortalData(`task_grades:${task.id}`),
-      writePortalData(tasksKey, taskList.filter(item => item.id !== task.id)),
+      writePortalData(tasksKey, taskList.filter((item: any) => item.id !== task.id)),
     ]);
     return res.json({ success: true });
-  } catch (err) {
+  } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
 };
 
-const getTaskStudents = async (req, res) => {
+const getTaskStudents = async (req: any, res: any) => {
   try {
     const user = req.user;
     const { taskId } = req.body;
     const allStudentsRaw = (await readPortalData(`students:${user.id}`)) || [];
     const allStudents = Array.isArray(allStudentsRaw) ? allStudentsRaw : [];
     const tasks = (await readPortalData(`tasks:${user.id}`)) || [];
-    const task = Array.isArray(tasks) ? tasks.find(t => t.id === taskId) : null;
+    const task = Array.isArray(tasks) ? tasks.find((t: any) => t.id === taskId) : null;
     const relevantStudents = task?.classId
-      ? allStudents.filter(s => s.classId === task.classId || (Array.isArray(s.classIds) && s.classIds.includes(task.classId)))
+      ? allStudents.filter((s: any) => s.classId === task.classId || (Array.isArray(s.classIds) && s.classIds.includes(task.classId)))
       : [];
     const taskGrades = (await readPortalData(`task_grades:${taskId}`)) || {};
-    const studentsWithGrades = relevantStudents.map(s => ({ id: s.id, name: s.name, email: s.email, avatar: s.avatar, classId: s.classId, className: s.className, grade: taskGrades[s.id] || null }));
+    const studentsWithGrades = relevantStudents.map((s: any) => ({ id: s.id, name: s.name, email: s.email, avatar: s.avatar, classId: s.classId, className: s.className, grade: taskGrades[s.id] || null }));
     return res.json({ students: studentsWithGrades });
-  } catch (err) {
+  } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
 };
 
-const getTaskGrades = async (req, res) => {
+const getTaskGrades = async (req: any, res: any) => {
   try {
     const tasks = (await readPortalData(`tasks:${req.user.id}`)) || [];
-    if (!Array.isArray(tasks) || !tasks.some(task => task.id === req.params.taskId)) {
+    if (!Array.isArray(tasks) || !tasks.some((task: any) => task.id === req.params.taskId)) {
       return res.status(404).json({ error: 'Task not found' });
     }
     const grades = (await readPortalData(`task_grades:${req.params.taskId}`)) || {};
     return res.json({ grades });
-  } catch (err) {
+  } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
 };
 
-const saveGrades = async (req, res) => {
+const saveGrades = async (req: any, res: any) => {
   try {
     const user = req.user;
     const { grades } = req.body;
     if (!Array.isArray(grades)) return res.status(400).json({ error: 'grades array is required' });
-    if (grades.some(grade => !grade?.studentId || !grade?.classId || !grade?.assignment)) {
+    if (grades.some((grade: any) => !grade?.studentId || !grade?.classId || !grade?.assignment)) {
       return res.status(400).json({ error: 'Each grade requires a student ID, class, and assignment' });
     }
 
@@ -458,7 +458,7 @@ const saveGrades = async (req, res) => {
       readPortalData(`classes:${user.id}`),
       readPortalData(`tasks:${user.id}`),
     ]);
-    const normalizedGrades = grades.map((grade, index) => ({
+    const normalizedGrades = grades.map((grade: any, index: number) => ({
       ...grade,
       id: grade.id || `grade-${user.id}-${grade.studentId}-${Date.now()}-${index}`,
       studentId: String(grade.studentId),
@@ -468,11 +468,11 @@ const saveGrades = async (req, res) => {
     }));
     for (const grade of normalizedGrades) {
       const student = Array.isArray(ownedStudents)
-        ? ownedStudents.find(item => String(item.id) === grade.studentId)
+        ? ownedStudents.find((item: any) => String(item.id) === grade.studentId)
         : null;
       if (!student) return res.status(403).json({ error: 'Cannot grade a student outside your roster' });
       const classData = Array.isArray(classes)
-        ? classes.find(item => String(item.id) === grade.classId)
+        ? classes.find((item: any) => String(item.id) === grade.classId)
         : null;
       if (!classData) return res.status(403).json({ error: 'Class does not belong to this teacher' });
       if (!(String(student.classId) === grade.classId
@@ -481,7 +481,7 @@ const saveGrades = async (req, res) => {
       }
       if (grade.taskId) {
         const task = Array.isArray(tasks)
-          ? tasks.find(item => String(item.id) === grade.taskId)
+          ? tasks.find((item: any) => String(item.id) === grade.taskId)
           : null;
         if (!task) return res.status(404).json({ error: 'Task not found' });
         if (String(task.classId) !== grade.classId) {
@@ -495,22 +495,22 @@ const saveGrades = async (req, res) => {
 
     for (const oldGrade of previousList) {
       const student = (Array.isArray(ownedStudents) ? ownedStudents : [])
-        .find(item => String(item.id) === String(oldGrade.studentId));
+        .find((item: any) => String(item.id) === String(oldGrade.studentId));
       if (!student?.email) continue;
       const studentKey = `student_grades:${student.email}`;
       const studentGrades = (await readPortalData(studentKey)) || [];
       if (!Array.isArray(studentGrades)) continue;
-      const filtered = studentGrades.filter(grade => grade.id !== oldGrade.id);
+      const filtered = studentGrades.filter((grade: any) => grade.id !== oldGrade.id);
       if (filtered.length !== studentGrades.length) await writePortalData(studentKey, filtered);
     }
 
     await writePortalData(gradesKey, normalizedGrades);
     for (const grade of normalizedGrades) {
-      const student = ownedStudents.find(item => String(item.id) === grade.studentId);
+      const student = ownedStudents.find((item: any) => String(item.id) === grade.studentId);
       const studentKey = `student_grades:${student.email}`;
       const stored = (await readPortalData(studentKey)) || [];
       const studentGrades = Array.isArray(stored) ? stored : [];
-      const existingIndex = studentGrades.findIndex(item => item.id === grade.id);
+      const existingIndex = studentGrades.findIndex((item: any) => item.id === grade.id);
       if (existingIndex >= 0) studentGrades[existingIndex] = grade;
       else studentGrades.push(grade);
       await writePortalData(studentKey, studentGrades);
@@ -522,7 +522,7 @@ const saveGrades = async (req, res) => {
         const tasksKey = `student_tasks:${student.email}`;
         const studentTasks = (await readPortalData(tasksKey)) || [];
         if (Array.isArray(studentTasks)) {
-          await writePortalData(tasksKey, studentTasks.map(task =>
+          await writePortalData(tasksKey, studentTasks.map((task: any) =>
             task.id === grade.taskId
               ? { ...task, completed: true, grade: grade.grade ?? grade.score, score: grade.score }
               : task
@@ -532,23 +532,23 @@ const saveGrades = async (req, res) => {
     }
 
     return res.json({ success: true, grades: normalizedGrades });
-  } catch (err) {
+  } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
 };
 
-const getAllStudents = async (req, res) => {
+const getAllStudents = async (req: any, res: any) => {
   try {
     const user = req.user;
     const supabase = getAuthService(true);
-    const users = [];
+    const users: any[] = [];
     for (let page = 1; ; page += 1) {
       const { data, error } = await supabase.auth.admin.listUsers({ page, perPage: 1000 });
       if (error) throw error;
       users.push(...(data?.users || []));
       if (!data?.users || data.users.length < 1000) break;
     }
-    const students = users.filter(u => u.user_metadata?.role === 'student');
+    const students = users.filter((u: any) => u.user_metadata?.role === 'student');
     const academicIdentityRows = (await getDatabaseClient().execute({
       sql: `SELECT s.id AS student_id, s.email, s.cohort_id,
           s.lifecycle_state, d.name AS degree_name,
@@ -563,39 +563,39 @@ const getAllStudents = async (req, res) => {
         WHERE score IS NOT NULL AND max_score > 0
         GROUP BY student_id`,
     })).rows;
-    const averageGradeByStudentId = new Map(averageGradeRows.map(row => {
+    const averageGradeByStudentId = new Map(averageGradeRows.map((row: any) => {
       const average = Number(row.average_grade);
       return [row.student_id, Number.isFinite(average) ? Math.round(average) : 0];
     }));
     const academicIdentityByEmail = new Map(
-      academicIdentityRows.map(row => [String(row.email).toLowerCase(), row]),
+      academicIdentityRows.map((row: any) => [String(row.email).toLowerCase(), row]),
     );
     const profileEntries = await listPortalDataByPrefix('student_profile:');
-    const profileMap = new Map();
+    const profileMap = new Map<string, any>();
     for (const entry of profileEntries) {
       if (entry.value?.email) profileMap.set(String(entry.value.email).toLowerCase(), entry.value);
     }
     const teacherStudents = (await readPortalData(`students:${user.id}`)) || [];
-    const assignedByEmail = new Map(Array.isArray(teacherStudents)
-      ? teacherStudents.map(student => [student.email, student])
+    const assignedByEmail = new Map<string, any>(Array.isArray(teacherStudents)
+      ? teacherStudents.map((student: any) => [student.email, student])
       : []);
-    const result = students.filter(u => {
-      const state = academicIdentityByEmail.get(String(u.email).toLowerCase())?.lifecycle_state;
+    const result = students.filter((u: any) => {
+      const state = (academicIdentityByEmail.get(String(u.email).toLowerCase()) as any)?.lifecycle_state;
       return state === 'active';
-    }).map(u => {
+    }).map((u: any) => {
       const profile = profileMap.get(String(u.email).toLowerCase()) || {};
       const meta = u.user_metadata || {};
-      const academicIdentity = academicIdentityByEmail.get(String(u.email).toLowerCase()) || {};
+      const academicIdentity: any = academicIdentityByEmail.get(String(u.email).toLowerCase()) || {};
       const teacherStudent = assignedByEmail.get(u.email);
       const classMemberships = Array.isArray(teacherStudent?.classMemberships)
         ? teacherStudent.classMemberships
         : [];
-      const activeMemberships = classMemberships.filter(membership => membership.status === 'active');
+      const activeMemberships = classMemberships.filter((membership: any) => membership.status === 'active');
       const legacyActiveClass = !classMemberships.length && teacherStudent?.classId && teacherStudent.status !== 'ended';
       const name = profile.name || meta.name || u.email?.split('@')[0] || 'Student';
       return {
         id: u.id, name, email: u.email,
-        avatar: name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2),
+        avatar: name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2),
         prn: profile.prn || profile.rollNumber || meta.prn || meta.rollNumber || '',
         degreeName: academicIdentity.degree_name || null,
         cohortId: academicIdentity.cohort_id || null,
@@ -611,7 +611,7 @@ const getAllStudents = async (req, res) => {
         classId: activeMemberships[0]?.classId || (legacyActiveClass ? teacherStudent.classId : null),
         className: activeMemberships[0]?.className || (legacyActiveClass ? teacherStudent.className : null),
         classIds: activeMemberships.length
-          ? activeMemberships.map(membership => membership.classId)
+          ? activeMemberships.map((membership: any) => membership.classId)
           : legacyActiveClass ? teacherStudent.classIds || [teacherStudent.classId] : [],
         classMemberships,
         isRegistered: true,
@@ -620,12 +620,12 @@ const getAllStudents = async (req, res) => {
       };
     });
     return res.json({ students: result });
-  } catch (err) {
+  } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
 };
 
-const getTaskStats = async (req, res) => {
+const getTaskStats = async (req: any, res: any) => {
   try {
     const user = req.user;
     const [tasks, allStudentsRaw] = await Promise.all([
@@ -634,22 +634,22 @@ const getTaskStats = async (req, res) => {
     ]);
     const tasksList = Array.isArray(tasks) ? tasks : [];
     const allStudents = Array.isArray(allStudentsRaw) ? allStudentsRaw : [];
-    const studentEmails = [...new Set(allStudents.map(student => student.email).filter(Boolean))];
+    const studentEmails = [...new Set(allStudents.map((student: any) => student.email).filter(Boolean))] as string[];
     const [taskGradeMaps, studentTaskLists] = await Promise.all([
-      runWithConcurrency(tasksList, 20, task => readPortalData(`task_grades:${task.id}`)),
-      runWithConcurrency(studentEmails, 20, email => readPortalData(`student_tasks:${email}`)),
+      runWithConcurrency(tasksList, 20, (task: any) => readPortalData(`task_grades:${task.id}`)),
+      runWithConcurrency(studentEmails, 20, (email: string) => readPortalData(`student_tasks:${email}`)),
     ]);
-    const taskGradesById = new Map(tasksList.map((task, index) => [task.id, taskGradeMaps[index] || {}]));
-    const completedTaskIdsByEmail = new Map(studentEmails.map((email, index) => [
+    const taskGradesById = new Map<string, any>(tasksList.map((task: any, index: number) => [task.id, taskGradeMaps[index] || {}]));
+    const completedTaskIdsByEmail = new Map<string, Set<any>>(studentEmails.map((email, index) => [
       email,
       new Set(Array.isArray(studentTaskLists[index])
-        ? studentTaskLists[index].filter(studentTask => studentTask.completed).map(studentTask => studentTask.id)
+        ? studentTaskLists[index].filter((studentTask: any) => studentTask.completed).map((studentTask: any) => studentTask.id)
         : []),
     ]));
-    const taskStats = {};
+    const taskStats: Record<string, any> = {};
     for (const task of tasksList) {
       const relevantStudents = task.classId
-        ? allStudents.filter(s => s.classId === task.classId || (Array.isArray(s.classIds) && s.classIds.includes(task.classId)))
+        ? allStudents.filter((s: any) => s.classId === task.classId || (Array.isArray(s.classIds) && s.classIds.includes(task.classId)))
         : allStudents;
       const totalStudents = relevantStudents.length;
       let completed = 0;
@@ -662,33 +662,33 @@ const getTaskStats = async (req, res) => {
       taskStats[task.id] = { totalStudents, completed, attempted: completed, completionRate: totalStudents > 0 ? Math.round((completed / totalStudents) * 100) : 0, attemptRate: totalStudents > 0 ? Math.round((completed / totalStudents) * 100) : 0 };
     }
     return res.json({ taskStats });
-  } catch (err) {
+  } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
 };
 
-const updateProfile = async (req, res) => {
+const updateProfile = async (req: any, res: any) => {
   try {
     const user = req.user;
     const allowedFields = [
       'name', 'phone', 'departmentId', 'specialization', 'qualification',
       'experience', 'bio', 'address', 'joinDate', 'notifications', 'preferences',
     ];
-    const updates = Object.fromEntries(
+    const updates: Record<string, any> = Object.fromEntries(
       allowedFields.filter(field => req.body[field] !== undefined).map(field => [field, req.body[field]])
     );
     const supabase = getAuthService(true);
-    const profile = { ...user.user_metadata, ...updates };
+    const profile: any = { ...user.user_metadata, ...updates };
     delete profile.department;
     const { error } = await supabase.auth.admin.updateUserById(user.id, { user_metadata: profile });
     if (error) return res.status(400).json({ error: error.message });
     return res.json({ success: true, profile: { ...profile, ...(await readPortalData(`teacher:${user.id}`)) } });
-  } catch (err) {
+  } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
 };
 
-const deactivateAccount = async (req, res) => {
+const deactivateAccount = async (req: any, res: any) => {
   try {
     const user = req.user;
     const supabase = getAuthService(true);
@@ -697,19 +697,19 @@ const deactivateAccount = async (req, res) => {
     });
     if (error) return res.status(400).json({ error: error.message });
     return res.json({ success: true });
-  } catch (err) {
+  } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
 };
 
-const deleteAccount = async (req, res) => {
+const deleteAccount = async (req: any, res: any) => {
   try {
     const user = req.user;
     const tasksKey = `tasks:${user.id}`;
     const ownedTasks = (await readPortalData(tasksKey)) || [];
-    const taskIds = new Set(Array.isArray(ownedTasks) ? ownedTasks.map(task => task.id) : []);
+    const taskIds = new Set(Array.isArray(ownedTasks) ? ownedTasks.map((task: any) => task.id) : []);
     const teacherGrades = (await readPortalData(`dental_college_grades:${user.id}`)) || [];
-    const gradeIds = new Set(Array.isArray(teacherGrades) ? teacherGrades.map(grade => grade.id) : []);
+    const gradeIds = new Set(Array.isArray(teacherGrades) ? teacherGrades.map((grade: any) => grade.id) : []);
     const assignedStudents = (await readPortalData(`students:${user.id}`)) || [];
     const [studentTaskEntries, studentGradeEntries, notificationEntries, taskGradeEntries] = await Promise.all([
       listPortalDataByPrefix('student_tasks:'),
@@ -720,12 +720,12 @@ const deleteAccount = async (req, res) => {
 
     for (const entry of studentTaskEntries) {
       if (!Array.isArray(entry.value)) continue;
-      const filtered = entry.value.filter(task => !taskIds.has(task.id));
+      const filtered = entry.value.filter((task: any) => !taskIds.has(task.id));
       if (filtered.length !== entry.value.length) await writePortalData(entry.key, filtered);
     }
     for (const entry of studentGradeEntries) {
       if (!Array.isArray(entry.value)) continue;
-      const filtered = entry.value.filter(grade =>
+      const filtered = entry.value.filter((grade: any) =>
         grade.teacherId !== user.id
         && !gradeIds.has(grade.id)
         && !taskIds.has(grade.taskId || grade.task_id)
@@ -734,7 +734,7 @@ const deleteAccount = async (req, res) => {
     }
     for (const entry of notificationEntries) {
       if (!Array.isArray(entry.value)) continue;
-      const filtered = entry.value.filter(notification => !taskIds.has(notification.taskId));
+      const filtered = entry.value.filter((notification: any) => !taskIds.has(notification.taskId));
       if (filtered.length !== entry.value.length) await writePortalData(entry.key, filtered);
     }
     for (const entry of taskGradeEntries) {
@@ -762,36 +762,36 @@ const deleteAccount = async (req, res) => {
     const { error } = await supabase.auth.admin.deleteUser(user.id);
     if (error) return res.status(400).json({ error: error.message });
     return res.json({ success: true });
-  } catch (err) {
+  } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
 };
 
-const getStudentStreak = async (req, res) => {
+const getStudentStreak = async (req: any, res: any) => {
   try {
     if (!(await getOwnedStudent(req.user.id, req.params.email))) {
       return res.status(404).json({ error: 'Student is not assigned to this teacher' });
     }
     const streakData = (await readPortalData(`student_streak:${req.params.email}`)) || { currentStreak: 0, longestStreak: 0, dates: [] };
     return res.json({ streakData });
-  } catch (err) {
+  } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
 };
 
-const getStudentTasks = async (req, res) => {
+const getStudentTasks = async (req: any, res: any) => {
   try {
     if (!(await getOwnedStudent(req.user.id, req.params.email))) {
       return res.status(404).json({ error: 'Student is not assigned to this teacher' });
     }
     const tasks = (await readPortalData(`student_tasks:${req.params.email}`)) || [];
     return res.json({ tasks });
-  } catch (err) {
+  } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
 };
 
-const assignStudent = async (req, res) => {
+const assignStudent = async (req: any, res: any) => {
   try {
     const user = req.user;
     const { studentId, studentEmail, classId, className } = req.body;
@@ -816,15 +816,15 @@ const assignStudent = async (req, res) => {
       return res.status(400).json({ error: 'Only student accounts can be assigned' });
     }
     const studentName = authData?.user?.user_metadata?.name || studentEmail.split('@')[0];
-    const avatar = studentName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+    const avatar = studentName.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2);
     const studentsKey = `students:${user.id}`;
     const existingStudents = (await readPortalData(studentsKey)) || [];
     const studentsList = Array.isArray(existingStudents) ? existingStudents : [];
-    const existingIndex = studentsList.findIndex(s => s.email === studentEmail || s.id === studentId);
-    const existingStudent = existingIndex >= 0 ? studentsList[existingIndex] : {};
+    const existingIndex = studentsList.findIndex((s: any) => s.email === studentEmail || s.id === studentId);
+    const existingStudent: any = existingIndex >= 0 ? studentsList[existingIndex] : {};
     const classIds = [...new Set([...(existingStudent.classIds || []), classId])];
     const classMemberships = [
-      ...(existingStudent.classMemberships || []).filter(membership => membership.classId !== classId),
+      ...(existingStudent.classMemberships || []).filter((membership: any) => membership.classId !== classId),
       { classId, className, status: 'active', addedAt: new Date().toISOString() },
     ];
     const studentEntry = {
@@ -836,27 +836,27 @@ const assignStudent = async (req, res) => {
     else studentsList.push(studentEntry);
     await writePortalData(studentsKey, studentsList);
     return res.json({ success: true });
-  } catch (err) {
+  } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
 };
 
-const unassignStudent = async (req, res) => {
+const unassignStudent = async (req: any, res: any) => {
   try {
     const user = req.user;
     const { studentId, classId } = req.body;
     const studentsKey = `students:${user.id}`;
     const existingStudents = (await readPortalData(studentsKey)) || [];
     const studentsList = Array.isArray(existingStudents) ? existingStudents : [];
-    const student = studentsList.find(s => s.id === studentId);
+    const student = studentsList.find((s: any) => s.id === studentId);
     if (!student) return res.status(404).json({ error: 'Student is not assigned to this teacher' });
     if (classId) {
-      const classIds = (student.classIds || []).filter(id => id !== classId);
+      const classIds = (student.classIds || []).filter((id: any) => id !== classId);
       if (classIds.length === (student.classIds || []).length) {
         return res.status(404).json({ error: 'Student is not assigned to this class' });
       }
       const classMemberships = (student.classMemberships || [])
-        .filter(membership => membership.classId !== classId);
+        .filter((membership: any) => membership.classId !== classId);
       const updatedStudent = {
         ...student,
         classId: classIds[0] || null,
@@ -864,19 +864,19 @@ const unassignStudent = async (req, res) => {
         classIds,
         classMemberships,
       };
-      const updated = studentsList.map(item => item.id === studentId ? updatedStudent : item);
+      const updated = studentsList.map((item: any) => item.id === studentId ? updatedStudent : item);
       await writePortalData(studentsKey, updated);
       return res.json({ success: true });
     }
-    const updated = studentsList.filter(s => s.id !== studentId);
+    const updated = studentsList.filter((s: any) => s.id !== studentId);
     await writePortalData(studentsKey, updated);
     return res.json({ success: true });
-  } catch (err) {
+  } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
 };
 
-const batchStudentData = async (req, res) => {
+const batchStudentData = async (req: any, res: any) => {
   try {
     const { studentIds, emails, studentEmails } = req.body;
     const requestedStudentIds = Array.isArray(studentIds)
@@ -889,12 +889,12 @@ const batchStudentData = async (req, res) => {
     const ownedStudents = (await readPortalData(`students:${req.user.id}`)) || [];
     const teacherTasks = (await readPortalData(`tasks:${req.user.id}`)) || [];
     const teacherTaskList = Array.isArray(teacherTasks) ? teacherTasks : [];
-    const requestedSet = new Set(requestedStudentIds || requestedEmails.map(email => String(email).toLowerCase()));
+    const requestedSet = new Set(requestedStudentIds || requestedEmails.map((email: any) => String(email).toLowerCase()));
     const ownedRequestedStudents = (Array.isArray(ownedStudents) ? ownedStudents : [])
-      .filter(student => requestedStudentIds
+      .filter((student: any) => requestedStudentIds
         ? requestedSet.has(String(student.id))
         : requestedSet.has(String(student.email).toLowerCase()));
-    const results = {};
+    const results: Record<string, any> = {};
     for (const student of ownedRequestedStudents) {
       const { email } = student;
       const streak = (await readPortalData(`student_streak:${email}`)) || { currentStreak: 0, longestStreak: 0, dates: [] };
@@ -905,8 +905,8 @@ const batchStudentData = async (req, res) => {
       let taskListChanged = false;
       for (const grade of gradeList) {
         const taskId = grade.taskId || grade.task_id;
-        const sourceTask = teacherTaskList.find(task => task.id === taskId);
-        if (!sourceTask || taskList.some(task => task.id === taskId)) continue;
+        const sourceTask = teacherTaskList.find((task: any) => task.id === taskId);
+        if (!sourceTask || taskList.some((task: any) => task.id === taskId)) continue;
         taskList.push({
           ...sourceTask,
           completed: true,
@@ -916,47 +916,47 @@ const batchStudentData = async (req, res) => {
         taskListChanged = true;
       }
       if (taskListChanged) await writePortalData(`student_tasks:${email}`, taskList);
-      const gradeScores = Array.isArray(grades)
+      const gradeScores: number[] = Array.isArray(grades)
         ? grades
-          .map(grade => {
+          .map((grade: any) => {
             const score = Number(grade.score ?? grade.grade);
             const maxScore = Number(grade.maxScore ?? grade.maxPoints ?? 100);
             return Number.isFinite(score) && maxScore > 0 ? (score / maxScore) * 100 : null;
           })
-          .filter(score => score !== null)
+          .filter((score: number | null): score is number => score !== null)
         : [];
       results[student.id] = {
         streak,
         streakData: streak,
         taskCount: taskList.length,
-        completedCount: taskList.filter(task => task.completed).length,
+        completedCount: taskList.filter((task: any) => task.completed).length,
         taskData: {
           totalCount: taskList.length,
-          completedCount: taskList.filter(task => task.completed).length,
+          completedCount: taskList.filter((task: any) => task.completed).length,
         },
         grades,
         averageGrade: gradeScores.length > 0
-          ? Math.round(gradeScores.reduce((sum, score) => sum + score, 0) / gradeScores.length)
+          ? Math.round(gradeScores.reduce((sum: number, score: number) => sum + score, 0) / gradeScores.length)
           : 0,
       };
     }
     return res.json({ students: results, studentsData: results });
-  } catch (err) {
+  } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
 };
 
-const saveSingleTaskGrade = async (req, res) => {
+const saveSingleTaskGrade = async (req: any, res: any) => {
   try {
     const user = req.user;
     const { taskId, studentId, grade } = req.body;
     if (!taskId || !studentId || grade === undefined) return res.status(400).json({ error: 'Task, student ID, and grade are required' });
     const allTasks = (await readPortalData(`tasks:${user.id}`)) || [];
-    const task = Array.isArray(allTasks) ? allTasks.find(t => t.id === taskId) : null;
+    const task = Array.isArray(allTasks) ? allTasks.find((t: any) => t.id === taskId) : null;
     if (!task) return res.status(404).json({ error: 'Task not found' });
     const assignedStudents = (await readPortalData(`students:${user.id}`)) || [];
     const student = Array.isArray(assignedStudents)
-      ? assignedStudents.find(item => String(item.id) === String(studentId))
+      ? assignedStudents.find((item: any) => String(item.id) === String(studentId))
       : null;
     if (!student || (task.classId && student.classId !== task.classId
       && !(Array.isArray(student.classIds) && student.classIds.includes(task.classId)))) {
@@ -973,7 +973,7 @@ const saveSingleTaskGrade = async (req, res) => {
       maxScore: 100,
     });
     return res.json({ success: true, grade: entry });
-  } catch (err) {
+  } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
 };

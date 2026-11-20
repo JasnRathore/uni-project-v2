@@ -8,8 +8,8 @@ const bcrypt = require('bcryptjs');
 const readSource = relativePath => fs.readFileSync(path.join(__dirname, '..', relativePath), 'utf8');
 
 test('student signup ignores username and stores only supported identity fields', async () => {
-  const dbServicePath = require.resolve('../database/services/dbService');
-  const controllerPath = require.resolve('../lib/api/controllers/authController');
+  const dbServicePath = require.resolve('../database/services/dbService.ts');
+  const controllerPath = require.resolve('../lib/api/controllers/authController.ts');
   const originalDbService = require(dbServicePath);
   const originalController = require.cache[controllerPath];
   let authRequest;
@@ -108,9 +108,9 @@ test('student signup ignores username and stores only supported identity fields'
 
 test('signup UI and profile services do not expose or resolve usernames', () => {
   const signup = readSource('components/StudentSignup.tsx');
-  const studentController = readSource('lib/api/controllers/studentController.js');
-  const relationalDataService = readSource('database/services/relationalDataService.js');
-  const dbService = readSource('database/services/dbService.js');
+  const studentController = readSource('lib/api/controllers/studentController.ts');
+  const relationalDataService = readSource('database/services/relationalDataService.ts');
+  const dbService = readSource('database/services/dbService.ts');
 
   assert.doesNotMatch(signup, /\busername\b/i);
   assert.doesNotMatch(studentController, /\busername\b/i);

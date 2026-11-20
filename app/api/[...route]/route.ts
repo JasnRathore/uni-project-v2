@@ -1,12 +1,14 @@
 import { NextRequest } from 'next/server';
-import authController from '@/lib/api/controllers/authController.js';
-import studentController from '@/lib/api/controllers/studentController.js';
-import teacherController from '@/lib/api/controllers/teacherController.js';
-import adminController from '@/lib/api/controllers/adminController.js';
-import gameController from '@/lib/api/controllers/gameController.js';
-import { getUser } from '@/lib/api/middleware/authMiddleware.js';
-import { ensureDatabaseReady, getDatabaseClient, readPortalData } from '@/database/services/dbService';
 import { createRouteRegistry, findRoute } from '@/lib/api/routeRegistry';
+
+/* eslint-disable @typescript-eslint/no-require-imports */
+const authController = require('../../../lib/api/controllers/authController.ts');
+const studentController = require('../../../lib/api/controllers/studentController.ts');
+const teacherController = require('../../../lib/api/controllers/teacherController.ts');
+const adminController = require('../../../lib/api/controllers/adminController.ts');
+const gameController = require('../../../lib/api/controllers/gameController.ts');
+const { getUser } = require('../../../lib/api/middleware/authMiddleware.ts');
+const { ensureDatabaseReady, getDatabaseClient, readPortalData } = require('../../../database/services/dbService.ts');
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';

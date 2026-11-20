@@ -1,8 +1,9 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
-const { randomUUID } = require('node:crypto');
-const { getDatabaseClient } = require('../../../database/services/dbService');
 
-async function listProgramYears(degreeId, includeInactive = false) {
+const { randomUUID } = require('node:crypto');
+const { getDatabaseClient } = require('../../../database/services/dbService.ts');
+
+async function listProgramYears(degreeId: string, includeInactive = false) {
   const result = await getDatabaseClient().execute({
     sql: `SELECT p.*, d.name AS degree_name FROM program_years p
       JOIN degrees d ON d.id = p.degree_id
@@ -13,7 +14,7 @@ async function listProgramYears(degreeId, includeInactive = false) {
   return result.rows;
 }
 
-async function createProgramYear({ degreeId, label }) {
+async function createProgramYear({ degreeId, label }: { degreeId: string; label?: string }) {
   if (!degreeId) throw new Error('Degree is required');
   if (!label?.trim()) throw new Error('Program-year label is required');
   const db = getDatabaseClient();
@@ -30,7 +31,7 @@ async function createProgramYear({ degreeId, label }) {
   return (await db.execute({ sql: 'SELECT * FROM program_years WHERE id = ?', args: [id] })).rows[0];
 }
 
-async function listSubjects(programYearId) {
+async function listSubjects(programYearId: string) {
   const result = await getDatabaseClient().execute({
     sql: `SELECT s.id, s.name, s.degree_id, s.program_year_id,
         d.name AS degree_name, p.label AS program_year_label
@@ -57,7 +58,7 @@ async function listCatalogSubjects() {
   return result.rows;
 }
 
-async function createSubject({ programYearId, name }) {
+async function createSubject({ programYearId, name }: { programYearId: string; name?: string }) {
   if (!programYearId) throw new Error('Program year is required');
   if (!name?.trim()) throw new Error('Subject name is required');
   const db = getDatabaseClient();

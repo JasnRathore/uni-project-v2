@@ -2,10 +2,10 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
 
-const dbServicePath = require.resolve('../database/services/dbService');
-const portalStorePath = require.resolve('../lib/api/storage/portalStore');
-const studentServicePath = require.resolve('../lib/api/services/studentService');
-const xpServicePath = require.resolve('../lib/api/services/xpService');
+const dbServicePath = require.resolve('../database/services/dbService.ts');
+const portalStorePath = require.resolve('../lib/api/storage/portalStore.ts');
+const studentServicePath = require.resolve('../lib/api/services/studentService.ts');
+const xpServicePath = require.resolve('../lib/api/services/xpService.ts');
 const dbService = require(dbServicePath);
 require(portalStorePath);
 const studentService = require(studentServicePath);
@@ -43,7 +43,7 @@ const createStore = () => ({
 require.cache[portalStorePath].exports = { portalStore: createStore() };
 require.cache[studentServicePath].exports = { ...studentService, trackStudentActivity: async () => {} };
 require.cache[xpServicePath].exports = { ...xpService, awardXp: async () => {} };
-const { recordGrade } = require('../lib/api/services/gradeRecordingService');
+const { recordGrade } = require('../lib/api/services/gradeRecordingService.ts');
 
 test('a grade can be recorded for a class without linking a task or duplicating student email', async () => {
   dbQueries = [];

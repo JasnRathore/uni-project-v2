@@ -1,15 +1,19 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-require-imports */
+
 const path = require('node:path');
-require('dotenv').config({ path: path.resolve(__dirname, '..', '..', '.env') });
+
+const baseDir = typeof __dirname === 'string' ? __dirname : process.cwd();
+require('dotenv').config({ path: path.resolve(baseDir, '..', '..', '.env') });
 
 const { createClient } = require('@libsql/client');
-const { ensureDatabaseSchema } = require('./schemaService');
+const { ensureDatabaseSchema } = require('./schemaService.ts');
 const bcrypt = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
 
-let client = null;
-let schemaReady = null;
+let client: any = null;
+let schemaReady: Promise<void> | null = null;
 
-const getDatabaseUrl = () => {
+const getDatabaseUrl = (): string => {
   const target = (process.env.DATABASE_TARGET || '').toLowerCase();
   if (target === 'local') return process.env.LOCAL_DATABASE_URL || 'file:local.db';
   if (target === 'turso') {
@@ -19,13 +23,13 @@ const getDatabaseUrl = () => {
     if (!process.env.TURSO_AUTH_TOKEN) {
       throw new Error('DATABASE_TARGET=turso requires TURSO_AUTH_TOKEN');
     }
-    return process.env.TURSO_DATABASE_URL;
+    return process.env.TURSO_DATABASE_URL as string;
   }
   if (!process.env.TURSO_DATABASE_URL) return 'file:local.db';
   throw new Error('Set DATABASE_TARGET=local or DATABASE_TARGET=turso before using the database');
 };
 
-const getDatabaseClient = () => {
+const getDatabaseClient = (): any => {
   if (!client) {
     const url = getDatabaseUrl();
     client = createClient({
@@ -36,21 +40,21 @@ const getDatabaseClient = () => {
   return client;
 };
 
-const ensureDatabaseReady = () => {
+const ensureDatabaseReady = (): Promise<void> => {
   if (!schemaReady) {
-    schemaReady = ensureDatabaseSchema(getDatabaseClient()).catch(error => {
+    schemaReady = ensureDatabaseSchema(getDatabaseClient()).catch((error: any) => {
       schemaReady = null;
       throw new Error(`Database schema initialization failed: ${error.message}`);
     });
   }
-  return schemaReady;
+  return schemaReady!;
 };
 
-const unpackMetadata = value => {
+const unpackMetadata = (value: any): { user_metadata: any; app_metadata: any } => {
   let stored = value || '{}';
   try {
     stored = typeof stored === 'string' ? JSON.parse(stored) : stored;
-  } catch (error) {
+  } catch (error: any) {
     throw new Error(`Invalid user metadata JSON: ${error.message}`);
   }
   if (stored && typeof stored === 'object' && Object.hasOwn(stored, 'user_metadata')) {
@@ -62,7 +66,7 @@ const unpackMetadata = value => {
   return { user_metadata: stored && typeof stored === 'object' ? stored : {}, app_metadata: {} };
 };
 
-const authUserFromRow = row => {
+const authUserFromRow = (row: any) => {
   const metadata = unpackMetadata(row.metadata_json);
   return {
     id: row.id,
@@ -74,10 +78,11 @@ const authUserFromRow = row => {
   };
 };
 
-const getAuthService = () => {
+const getAuthService = (force?: boolean): any => {
+  void force;
   const db = getDatabaseClient();
   const admin = {
-    listUsers: async ({ page = 1, perPage = 1000 } = {}) => {
+    listUsers: async ({ page = 1, perPage = 1000 }: { page?: number; perPage?: number } = {}) => {
       const offset = Math.max(0, page - 1) * perPage;
       const result = await db.execute({
         sql: `SELECT id, email, name, role, metadata_json, created_at
@@ -86,7 +91,7 @@ const getAuthService = () => {
       });
       return {
         data: {
-          users: result.rows.map(row => ({
+          users: result.rows.map((row: any) => ({
             ...row,
             user_metadata: unpackMetadata(row.metadata_json).user_metadata,
             app_metadata: unpackMetadata(row.metadata_json).app_metadata,
@@ -95,9 +100,9 @@ const getAuthService = () => {
         error: null,
       };
     },
-    deleteUser: async id => {
+    deleteUser: async (id: string) => {
       try {
-        await withTransaction(async tx => {
+        await withTransaction(async (tx: any) => {
           const result = await tx.execute({ sql: 'SELECT role FROM users WHERE id=?', args: [id] });
           if (result.rows[0]?.role === 'student') {
             await tx.execute({ sql: 'DELETE FROM students WHERE user_id=?', args: [id] });
@@ -109,17 +114,17 @@ const getAuthService = () => {
         return { error };
       }
     },
-    createUser: async ({ email, password, user_metadata = {} }) => {
+    createUser: async ({ email, password, user_metadata = {} }: { email?: string; password?: string; user_metadata?: any }) => {
       try {
         if (!email || !password) throw new Error('Email and password are required');
         const userId = uuidv4();
         const passwordHash = await bcrypt.hash(password, 10);
-        const metadata = {
+        const metadata: Record<string, any> = {
           ...(user_metadata && typeof user_metadata === 'object' ? user_metadata : {}),
         };
         const role = metadata.role || 'student';
         if (role === 'teacher') delete metadata.department;
-        await withTransaction(async tx => {
+        await withTransaction(async (tx: any) => {
           await tx.execute({
             sql: `INSERT INTO users (id, email, password_hash, name, role, metadata_json)
               VALUES (?, ?, ?, ?, ?, ?)`,
@@ -127,7 +132,7 @@ const getAuthService = () => {
               JSON.stringify({ user_metadata: metadata, app_metadata: {} })],
           });
           if (role === 'student') {
-            await require('./relationalDataService').ensureStudent(tx, email.trim(), {
+            await require('./relationalDataService.ts').ensureStudent(tx, email.trim(), {
               id: userId,
               name: metadata.name || '',
               prn: metadata.prn || metadata.rollNumber || null,
@@ -148,9 +153,9 @@ const getAuthService = () => {
         return { data: null, error };
       }
     },
-    updateUserById: async (id, updates = {}) => {
+    updateUserById: async (id: string, updates: any = {}) => {
       try {
-        await withTransaction(async tx => {
+        await withTransaction(async (tx: any) => {
           const result = await tx.execute({ sql: 'SELECT * FROM users WHERE id=?', args: [id] });
           const row = result.rows[0];
           if (!row) throw new Error('User not found');
@@ -174,7 +179,7 @@ const getAuthService = () => {
           });
           if (role === 'student') {
             const studentUpdates = updates.user_metadata || {};
-            await require('./relationalDataService').ensureStudent(tx, row.email, studentUpdates);
+            await require('./relationalDataService.ts').ensureStudent(tx, row.email, studentUpdates);
           } else if (role === 'teacher') {
             await tx.execute({
               sql: `INSERT INTO teacher_profiles (user_id, department_id, source_json) VALUES (?, ?, ?)
@@ -189,7 +194,7 @@ const getAuthService = () => {
         return { error };
       }
     },
-    getUserById: async id => {
+    getUserById: async (id: string) => {
       const result = await db.execute({
         sql: 'SELECT id, email, name, role, metadata_json, created_at FROM users WHERE id=?',
         args: [id],
@@ -201,11 +206,11 @@ const getAuthService = () => {
   return { auth: { admin } };
 };
 
-const readPortalData = (...args) => require('./relationalDataService').readPortalData(...args);
-const writePortalData = (...args) => require('./relationalDataService').writePortalData(...args);
-const deletePortalData = (...args) => require('./relationalDataService').deletePortalData(...args);
-const listPortalDataByPrefix = (...args) => require('./relationalDataService').listPortalDataByPrefix(...args);
-const withTransaction = (...args) => require('./relationalDataService').withTransaction(...args);
+const readPortalData = (...args: any[]) => require('./relationalDataService.ts').readPortalData(...args);
+const writePortalData = (...args: any[]) => require('./relationalDataService.ts').writePortalData(...args);
+const deletePortalData = (...args: any[]) => require('./relationalDataService.ts').deletePortalData(...args);
+const listPortalDataByPrefix = (...args: any[]) => require('./relationalDataService.ts').listPortalDataByPrefix(...args);
+const withTransaction = (...args: any[]) => require('./relationalDataService.ts').withTransaction(...args);
 
 module.exports = {
   getAuthService,

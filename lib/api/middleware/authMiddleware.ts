@@ -1,16 +1,17 @@
-/* eslint-disable @typescript-eslint/no-require-imports */
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-require-imports */
+
 const jwt = require('jsonwebtoken');
 
-const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_SECRET: string | undefined = process.env.JWT_SECRET;
 
-const getUser = async (authHeader) => {
+const getUser = async (authHeader?: string | null) => {
   const token = authHeader?.split(' ')[1];
   if (!token || !JWT_SECRET) return null;
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
 
     // Fetch full user data from DB to populate user_metadata
-    const { getDatabaseClient } = require('../../../database/services/dbService');
+    const { getDatabaseClient } = require('../../../database/services/dbService.ts');
     const db = getDatabaseClient();
     const result = await db.execute({
       sql: 'SELECT id, email, name, role, metadata_json, created_at FROM users WHERE id = ?',
@@ -19,7 +20,7 @@ const getUser = async (authHeader) => {
 
     if (result.rows.length === 0) return null;
     const row = result.rows[0];
-    const { unpackMetadata } = require('../../../database/services/dbService');
+    const { unpackMetadata } = require('../../../database/services/dbService.ts');
     const metadata = unpackMetadata(row.metadata_json);
 
     return {
@@ -35,7 +36,7 @@ const getUser = async (authHeader) => {
   }
 };
 
-const requireAuth = async (req, res, next) => {
+const requireAuth = async (req: any, res: any, next: () => void) => {
   try {
     const user = await getUser(req.headers.authorization);
     if (!user) return res.status(401).json({ error: 'Unauthorized' });
@@ -44,19 +45,19 @@ const requireAuth = async (req, res, next) => {
     }
     req.user = user;
     next();
-  } catch (err) {
+  } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
 };
 
-const requireTeacher = (req, res, next) => {
+const requireTeacher = (req: any, res: any, next: () => void) => {
   if (req.user?.user_metadata?.role === 'student') {
     return res.status(403).json({ error: 'Teacher access required' });
   }
   return next();
 };
 
-const requireStudent = (req, res, next) => {
+const requireStudent = (req: any, res: any, next: () => void) => {
   if (req.user?.user_metadata?.role !== 'student') {
     return res.status(403).json({ error: 'Student access required' });
   }
@@ -67,5 +68,5 @@ module.exports = {
   getUser,
   requireAuth,
   requireTeacher,
-  requireStudent
+  requireStudent,
 };

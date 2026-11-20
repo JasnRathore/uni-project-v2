@@ -1,36 +1,38 @@
-const { createHash, randomUUID } = require('node:crypto');
-const { getDatabaseClient } = require('./dbService');
-const { normalizeLifecycleState } = require('../../lib/api/services/studentState');
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-require-imports */
 
-const parseJson = value => {
+const { createHash, randomUUID } = require('node:crypto');
+const { getDatabaseClient } = require('./dbService.ts');
+const { normalizeLifecycleState } = require('../../lib/api/services/studentState.ts');
+
+const parseJson = (value: any): any => {
   if (typeof value !== 'string') return value;
   try {
     return JSON.parse(value);
-  } catch (error) {
+  } catch (error: any) {
     throw new Error(`Invalid relational JSON value: ${error.message}`);
   }
 };
 
-const sourceOf = row => parseJson(row.source_json) || {};
-const withoutDepartment = value => Object.fromEntries(
+const sourceOf = (row: any) => parseJson(row.source_json) || {};
+const withoutDepartment = (value: any) => Object.fromEntries(
   Object.entries(value || {}).filter(([key]) => key !== 'department'),
 );
-const finiteNumber = value => {
+const finiteNumber = (value: any): number | null => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
 };
-const asText = value => value == null ? null : String(value);
-const splitKey = key => {
+const asText = (value: any): string | null => value == null ? null : String(value);
+const splitKey = (key: string): { namespace: string; suffix: string } => {
   const separator = key.indexOf(':');
   return separator < 0
     ? { namespace: key, suffix: '' }
     : { namespace: key.slice(0, separator), suffix: key.slice(separator + 1) };
 };
-const stableStudentId = email => {
+const stableStudentId = (email: string): string => {
   const hex = createHash('sha256').update(email.trim().toLowerCase()).digest('hex').slice(0, 32);
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-5${hex.slice(13, 16)}-a${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
 };
-const parseArray = value => {
+const parseArray = (value: any): any[] => {
   if (!Array.isArray(value)) throw new TypeError('Expected an array value');
   return value;
 };
@@ -39,7 +41,7 @@ const deprecatedStudentProfileFields = new Set([
   'academicYear', 'degreeId', 'department', 'semester', 'specialization', 'qualification',
   'studentStatus', 'lifecycleChangedAt',
 ]);
-const cleanStudentProfile = profile => {
+const cleanStudentProfile = (profile: any): Record<string, any> => {
   const cleanProfile = Object.fromEntries(
     Object.entries(profile).filter(([key]) => !deprecatedStudentProfileFields.has(key)),
   );
@@ -48,14 +50,14 @@ const cleanStudentProfile = profile => {
   return cleanProfile;
 };
 
-const readRows = async (sql, args = []) => {
+const readRows = async (sql: string, args: any[] = []): Promise<any[]> => {
   const result = await getDatabaseClient().execute({ sql, args });
   return result.rows;
 };
-const run = async (executor, sql, args = []) => executor.execute({ sql, args });
+const run = async (executor: any, sql: string, args: any[] = []): Promise<any> => executor.execute({ sql, args });
 
-let transactionQueue = Promise.resolve();
-const withTransaction = operation => {
+let transactionQueue: Promise<any> = Promise.resolve();
+const withTransaction = (operation: (tx: any) => Promise<any>): Promise<any> => {
   const pending = transactionQueue.then(async () => {
     const transaction = await getDatabaseClient().transaction('write');
     try {
@@ -71,13 +73,13 @@ const withTransaction = operation => {
   return pending;
 };
 
-const findStudent = async (executor, email) => {
+const findStudent = async (executor: any, email?: string): Promise<any> => {
   if (!email) return null;
   const result = await run(executor, 'SELECT * FROM students WHERE email = ? COLLATE NOCASE', [email]);
   return result.rows[0] || null;
 };
 
-const ensureStudent = async (executor, email, record = {}) => {
+const ensureStudent = async (executor: any, email: string, record: any = {}): Promise<any> => {
   if (!email || !String(email).trim()) throw new Error('Student records require an email address');
   const normalizedEmail = String(email).trim();
   const userResult = await run(executor, 'SELECT id, name, role FROM users WHERE email = ? COLLATE NOCASE', [normalizedEmail]);
@@ -125,7 +127,7 @@ const ensureStudent = async (executor, email, record = {}) => {
   return (await findStudent(executor, normalizedEmail));
 };
 
-const classToLegacy = row => ({
+const classToLegacy = (row: any) => ({
   ...sourceOf(row),
   id: row.id,
   name: row.name,
@@ -143,7 +145,7 @@ const classToLegacy = row => ({
   endsAt: row.ends_at,
   createdAt: row.created_at,
 });
-const taskToLegacy = row => ({
+const taskToLegacy = (row: any) => ({
   ...sourceOf(row), id: row.id, title: row.title, description: row.description,
   subject: row.subject_name || '', subjectId: row.subject_id,
   className: row.class_name, dueDate: row.due_at, classId: row.class_id,
@@ -151,7 +153,7 @@ const taskToLegacy = row => ({
   totalPoints: row.total_points, createdAt: row.created_at, updatedAt: row.updated_at,
   teacherId: row.teacher_id,
 });
-const studentToLegacy = row => ({
+const studentToLegacy = (row: any) => ({
   ...cleanStudentProfile(parseJson(row.profile_json) || {}),
   id: row.id, email: row.email, name: row.name, prn: row.prn || '',
   currentLevel: row.current_level, cohortId: row.cohort_id,
@@ -159,12 +161,12 @@ const studentToLegacy = row => ({
   totalPoints: row.total_points, gameProgress: row.game_progress,
   lastActive: row.last_active_at, registeredAt: row.registered_at,
 });
-const assignmentToLegacy = row => ({
+const assignmentToLegacy = (row: any) => ({
   ...sourceOf(row), id: row.task_id, taskId: row.task_id, teacherId: row.assigned_by,
   dueDate: row.due_at, status: row.status, completed: Boolean(row.completed),
   score: row.score, grade: row.grade,
 });
-const gradeToLegacy = row => {
+const gradeToLegacy = (row: any) => {
   const { studentEmail: _studentEmail, subject: _subject, ...source } = sourceOf(row);
   return {
     ...source, id: row.id, studentId: row.student_id, taskId: row.task_id,
@@ -174,11 +176,11 @@ const gradeToLegacy = row => {
     maxScore: row.max_score, gradedAt: row.graded_at,
   };
 };
-const notificationToLegacy = row => ({ ...sourceOf(row), id: row.id, type: row.type, title: row.title, message: row.message, taskId: row.task_id, read: Boolean(row.is_read), createdAt: row.created_at });
+const notificationToLegacy = (row: any) => ({ ...sourceOf(row), id: row.id, type: row.type, title: row.title, message: row.message, taskId: row.task_id, read: Boolean(row.is_read), createdAt: row.created_at });
 
-const readPortalData = async key => {
+const readPortalData = async (key: string): Promise<any> => {
   const { namespace, suffix } = splitKey(key);
-  let rows;
+  let rows: any[];
   switch (namespace) {
     case 'classes':
       return (await readRows(`SELECT c.*, s.name AS subject_name, s.degree_id,
@@ -193,7 +195,7 @@ const readPortalData = async key => {
         ts.status AS membership_status, ts.assigned_at, ts.source_json AS membership_json
         FROM teacher_students ts JOIN students s ON s.id = ts.student_id
         WHERE ts.teacher_id = ? AND s.lifecycle_state = 'active' ORDER BY ts.rowid`, [suffix]);
-      return Promise.all(rows.map(async row => {
+      return Promise.all(rows.map(async (row: any) => {
         const membership = cleanStudentProfile(parseJson(row.membership_json) || {});
         const memberships = await readRows(`SELECT cm.class_id, c.name AS class_name,
             cm.status, cm.assigned_at, cm.source_json
@@ -201,8 +203,8 @@ const readPortalData = async key => {
           JOIN classes c ON c.id = cm.class_id AND c.teacher_id = cm.teacher_id
           WHERE cm.teacher_id = ? AND cm.student_id = ?
           ORDER BY cm.created_at, cm.class_id`, [suffix, row.id]);
-        const classIds = memberships.map(item => item.class_id);
-        const classMemberships = memberships.map(item => ({
+        const classIds = memberships.map((item: any) => item.class_id);
+        const classMemberships = memberships.map((item: any) => ({
           ...parseJson(item.source_json),
           classId: item.class_id, className: item.class_name,
           status: item.status || 'active', addedAt: item.assigned_at,
@@ -236,7 +238,7 @@ const readPortalData = async key => {
         JOIN subjects sub ON sub.id = c.subject_id
         WHERE s.email = ? COLLATE NOCASE AND s.lifecycle_state = 'active'
         ORDER BY ta.rowid`, [suffix]);
-      return rows.map(row => ({
+      return rows.map((row: any) => ({
         ...parseJson(row.task_json), ...assignmentToLegacy(row), id: row.task_id,
         title: row.title, description: row.description, subject: row.subject_name,
         subjectId: row.subject_id, classId: row.class_id, className: row.class_name,
@@ -261,8 +263,8 @@ const readPortalData = async key => {
         prn: student.prn || profile.prn || '',
         currentLevel: student.current_level, totalPoints: student.total_points,
         gameProgress: student.game_progress,
-        classIds: memberships.map(row => row.class_id),
-        classMemberships: memberships.map(row => ({
+        classIds: memberships.map((row: any) => row.class_id),
+        classMemberships: memberships.map((row: any) => ({
           teacherId: row.teacher_id, classId: row.class_id, className: row.class_name,
           status: row.status || 'active', addedAt: row.assigned_at,
         })),
@@ -309,7 +311,7 @@ const readPortalData = async key => {
     case 'task_grades': {
       const result = await readRows(`SELECT g.student_id, g.grade, g.score FROM grades g
         WHERE g.task_id = ? ORDER BY g.rowid`, [suffix]);
-      return Object.fromEntries(result.map(row => [row.student_id, row.grade ?? row.score]));
+      return Object.fromEntries(result.map((row: any) => [row.student_id, row.grade ?? row.score]));
     }
     case 'notifications': {
       const result = await readRows('SELECT * FROM notifications WHERE student_email = ? COLLATE NOCASE ORDER BY rowid', [suffix]);
@@ -323,7 +325,7 @@ const readPortalData = async key => {
       const days = await readRows('SELECT activity_date FROM student_activity_days WHERE student_id = ? ORDER BY activity_date', [result[0].student_id]);
       return { ...parseJson(result[0].source_json), currentStreak: result[0].current_streak,
         longestStreak: result[0].longest_streak, lastActivityDate: result[0].last_activity_date,
-        dates: days.map(day => day.activity_date) };
+        dates: days.map((day: any) => day.activity_date) };
     }
     case 'daily_quest': {
       const result = await readRows('SELECT * FROM daily_quests ORDER BY rowid DESC LIMIT 1');
@@ -341,7 +343,7 @@ const readPortalData = async key => {
   }
 };
 
-const deleteByIds = async (tx, table, idColumn, ids, where = '', whereArgs = []) => {
+const deleteByIds = async (tx: any, table: string, idColumn: string, ids: Set<string>, where = '', whereArgs: any[] = []) => {
   const existing = await run(tx, `SELECT ${idColumn} FROM ${table} ${where}`, whereArgs);
   for (const row of existing.rows) {
     if (!ids.has(row[idColumn])) {
@@ -350,10 +352,10 @@ const deleteByIds = async (tx, table, idColumn, ids, where = '', whereArgs = [])
   }
 };
 
-const writeClasses = async (tx, teacherId, records) => {
+const writeClasses = async (tx: any, teacherId: string, records: any) => {
   const teacher = await run(tx, 'SELECT id FROM users WHERE id=?', [teacherId]);
   if (!teacher.rows.length) throw new Error(`Cannot save classes: teacher ${teacherId} does not exist`);
-  const ids = new Set();
+  const ids = new Set<string>();
   for (const item of parseArray(records)) {
     if (!item?.id || !item.name || !item.subjectId) {
       throw new Error('Every class requires an id, name, and catalog subject');
@@ -386,10 +388,10 @@ const writeClasses = async (tx, teacherId, records) => {
   await deleteByIds(tx, 'classes', 'id', ids, 'WHERE teacher_id = ?', [teacherId]);
 };
 
-const writeRoster = async (tx, teacherId, records) => {
+const writeRoster = async (tx: any, teacherId: string, records: any) => {
   const teacher = await run(tx, 'SELECT id FROM users WHERE id = ?', [teacherId]);
   if (!teacher.rows.length) throw new Error(`Cannot save roster: teacher ${teacherId} does not exist`);
-  const emails = new Set();
+  const emails = new Set<string>();
   for (const item of parseArray(records)) {
     if (!item?.email) throw new Error('Every roster student requires an email address');
     const email = String(item.email).trim();
@@ -400,18 +402,18 @@ const writeRoster = async (tx, teacherId, records) => {
     emails.add(email.toLowerCase());
     const requestedMemberships = Array.isArray(item.classMemberships)
       ? item.classMemberships
-      : (Array.isArray(item.classIds) ? item.classIds.map(classId => ({ classId })) : []);
+      : (Array.isArray(item.classIds) ? item.classIds.map((classId: any) => ({ classId })) : []);
     const requestedClassIds = [...new Set([
-      ...requestedMemberships.map(entry => asText(entry?.classId || entry?.id)).filter(Boolean),
+      ...requestedMemberships.map((entry: any) => asText(entry?.classId || entry?.id)).filter(Boolean),
       asText(item.classId),
-    ])];
+    ])].filter(Boolean) as string[];
     for (const classId of requestedClassIds) {
       const classExists = await run(tx, "SELECT id FROM classes WHERE id=? AND teacher_id=? AND class_status='active'", [classId, teacherId]);
       if (!classExists.rows.length) throw new Error(`Class ${classId} does not belong to teacher ${teacherId}`);
     }
     await run(tx, 'DELETE FROM class_memberships WHERE teacher_id=? AND student_id=?', [teacherId, student.id]);
     for (const classId of requestedClassIds) {
-      const membership = requestedMemberships.find(entry => asText(entry?.classId || entry?.id) === classId) || {};
+      const membership = requestedMemberships.find((entry: any) => asText(entry?.classId || entry?.id) === classId) || {};
       await run(tx, `INSERT INTO class_memberships
         (teacher_id, student_id, class_id, status, membership_status, created_by, assigned_at, updated_at, source_json)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -445,8 +447,8 @@ const writeRoster = async (tx, teacherId, records) => {
   }
 };
 
-const writeTasks = async (tx, teacherId, records) => {
-  const ids = new Set();
+const writeTasks = async (tx: any, teacherId: string, records: any) => {
+  const ids = new Set<string>();
   for (const item of parseArray(records)) {
     if (!item?.id || !item.title) throw new Error('Every task requires an id and title');
     ids.add(String(item.id));
@@ -479,12 +481,12 @@ const writeTasks = async (tx, teacherId, records) => {
   await deleteByIds(tx, 'tasks', 'id', ids, 'WHERE teacher_id = ?', [teacherId]);
 };
 
-const writeStudentTasks = async (tx, email, records) => {
+const writeStudentTasks = async (tx: any, email: string, records: any) => {
   const student = await ensureStudent(tx, email);
   if (student.lifecycle_state !== 'active') {
     throw new Error('Inactive students cannot receive active task assignments');
   }
-  const taskIds = new Set();
+  const taskIds = new Set<string>();
   for (const item of parseArray(records)) {
     if (!item?.id || !item.title) throw new Error('Every assigned task requires an id and title');
     const taskId = String(item.id);
@@ -532,7 +534,7 @@ const writeStudentTasks = async (tx, email, records) => {
   }
 };
 
-const writeGrades = async (tx, namespace, suffix, records) => {
+const writeGrades = async (tx: any, namespace: string, suffix: string, records: any) => {
   const grades = namespace === 'task_grades'
     ? Object.entries(records && typeof records === 'object' && !Array.isArray(records) ? records : {}).map(([studentId, value]) => ({ studentId, taskId: suffix, grade: value, score: finiteNumber(value) }))
     : parseArray(records);
@@ -544,7 +546,7 @@ const writeGrades = async (tx, namespace, suffix, records) => {
     await run(tx, 'DELETE FROM grades WHERE graded_by=?', [suffix]);
   } else if (namespace === 'task_grades') {
     const existing = await run(tx, 'SELECT id, student_id FROM grades WHERE task_id=?', [suffix]);
-    const studentIds = new Set(grades.map(grade => String(grade.studentId)));
+    const studentIds = new Set(grades.map((grade: any) => String(grade.studentId)));
     for (const row of existing.rows) {
       if (!studentIds.has(String(row.student_id))) {
         await run(tx, 'DELETE FROM grades WHERE id=?', [row.id]);
@@ -607,7 +609,7 @@ const writeGrades = async (tx, namespace, suffix, records) => {
   }
 };
 
-const writeNotifications = async (tx, email, records) => {
+const writeNotifications = async (tx: any, email: string, records: any) => {
   const student = await ensureStudent(tx, email);
   await run(tx, 'DELETE FROM notifications WHERE student_email=? COLLATE NOCASE', [email]);
   for (const item of parseArray(records)) {
@@ -623,7 +625,7 @@ const writeNotifications = async (tx, email, records) => {
   }
 };
 
-const writeActivity = async (tx, email, value) => {
+const writeActivity = async (tx: any, email: string, value: any) => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new TypeError('Activity data must be an object');
   const student = await ensureStudent(tx, email);
   await run(tx, `INSERT INTO student_activity
@@ -642,7 +644,7 @@ const writeActivity = async (tx, email, value) => {
   }
 };
 
-const writeProfile = async (tx, email, value) => {
+const writeProfile = async (tx: any, email: string, value: any) => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new TypeError('Student profile must be an object');
   const student = await ensureStudent(tx, email, value);
   const profile = cleanStudentProfile({ ...value, email: String(email) });
@@ -658,9 +660,9 @@ const writeProfile = async (tx, email, value) => {
   ]);
 };
 
-const writePortalData = (key, value) => {
+const writePortalData = (key: string, value: any): Promise<any> => {
   const { namespace, suffix } = splitKey(key);
-  return withTransaction(async tx => {
+  return withTransaction(async (tx: any) => {
     switch (namespace) {
       case 'classes':
         await writeClasses(tx, suffix, value); return;
@@ -733,9 +735,9 @@ const writePortalData = (key, value) => {
   });
 };
 
-const deletePortalData = (key) => {
+const deletePortalData = (key: string): Promise<any> => {
   const { namespace, suffix } = splitKey(key);
-  return withTransaction(async tx => {
+  return withTransaction(async (tx: any) => {
     switch (namespace) {
       case 'classes':
         await run(tx, 'DELETE FROM classes WHERE teacher_id=?', [suffix]); return;
@@ -776,17 +778,17 @@ const deletePortalData = (key) => {
   });
 };
 
-const listPortalDataByPrefix = async prefix => {
+const listPortalDataByPrefix = async (prefix: string): Promise<any[]> => {
   const { namespace } = splitKey(prefix.endsWith(':') ? prefix.slice(0, -1) : prefix);
-  let suffixes = [];
+  let suffixes: any[] = [];
   switch (namespace) {
     case 'classes':
-      suffixes = (await readRows('SELECT DISTINCT teacher_id AS suffix FROM classes')).map(row => row.suffix); break;
+      suffixes = (await readRows('SELECT DISTINCT teacher_id AS suffix FROM classes')).map((row: any) => row.suffix); break;
     case 'students':
     case 'teacher_students':
-      suffixes = (await readRows('SELECT DISTINCT teacher_id AS suffix FROM teacher_students')).map(row => row.suffix); break;
+      suffixes = (await readRows('SELECT DISTINCT teacher_id AS suffix FROM teacher_students')).map((row: any) => row.suffix); break;
     case 'tasks':
-      suffixes = (await readRows('SELECT DISTINCT teacher_id AS suffix FROM tasks WHERE teacher_id IS NOT NULL')).map(row => row.suffix); break;
+      suffixes = (await readRows('SELECT DISTINCT teacher_id AS suffix FROM tasks WHERE teacher_id IS NOT NULL')).map((row: any) => row.suffix); break;
     case 'student_tasks':
     case 'student_grades':
     case 'notifications':
@@ -797,18 +799,18 @@ const listPortalDataByPrefix = async prefix => {
         ${namespace === 'student_tasks' ? "WHERE lifecycle_state='active' AND id IN (SELECT student_id FROM task_assignments)" : ''}
         ${namespace === 'student_grades' ? 'WHERE id IN (SELECT student_id FROM grades)' : ''}
         ${namespace === 'notifications' ? 'WHERE email COLLATE NOCASE IN (SELECT student_email COLLATE NOCASE FROM notifications)' : ''}
-        ${namespace === 'student_streak' || namespace === 'student_activity' ? 'WHERE id IN (SELECT student_id FROM student_activity)' : ''}`)).map(row => row.suffix); break;
+        ${namespace === 'student_streak' || namespace === 'student_activity' ? 'WHERE id IN (SELECT student_id FROM student_activity)' : ''}`)).map((row: any) => row.suffix); break;
     case 'dental_college_grades':
-      suffixes = (await readRows('SELECT DISTINCT graded_by AS suffix FROM grades WHERE graded_by IS NOT NULL')).map(row => row.suffix); break;
+      suffixes = (await readRows('SELECT DISTINCT graded_by AS suffix FROM grades WHERE graded_by IS NOT NULL')).map((row: any) => row.suffix); break;
     case 'task_grades':
-      suffixes = (await readRows('SELECT DISTINCT task_id AS suffix FROM grades WHERE task_id IS NOT NULL')).map(row => row.suffix); break;
+      suffixes = (await readRows('SELECT DISTINCT task_id AS suffix FROM grades WHERE task_id IS NOT NULL')).map((row: any) => row.suffix); break;
     case 'daily_quest_seen':
       return (await readRows('SELECT legacy_key AS key, has_seen FROM daily_quest_views WHERE legacy_key LIKE ?', [`${prefix}%`]))
-        .map(row => ({ key: row.key, value: Boolean(row.has_seen) }));
+        .map((row: any) => ({ key: row.key, value: Boolean(row.has_seen) }));
     case 'teacher':
-      suffixes = (await readRows('SELECT id AS suffix FROM users WHERE role != ?', ['student'])).map(row => row.suffix); break;
+      suffixes = (await readRows('SELECT id AS suffix FROM users WHERE role != ?', ['student'])).map((row: any) => row.suffix); break;
     case 'student':
-      suffixes = (await readRows('SELECT id AS suffix FROM students')).map(row => row.suffix); break;
+      suffixes = (await readRows('SELECT id AS suffix FROM students')).map((row: any) => row.suffix); break;
     case 'daily_quest': {
       const value = await readPortalData('daily_quest');
       return value ? [{ key: 'daily_quest', value }] : [];
@@ -816,7 +818,7 @@ const listPortalDataByPrefix = async prefix => {
     default:
       throw new Error(`No relational prefix mapping is defined for "${namespace}"`);
   }
-  const results = [];
+  const results: any[] = [];
   for (const suffix of suffixes) {
     const key = `${namespace}:${suffix}`;
     results.push({ key, value: await readPortalData(key) });

@@ -3,16 +3,16 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { createClient } = require('@libsql/client');
-const { ensureDatabaseSchema } = require('../database/services/schemaService');
+const { ensureDatabaseSchema } = require('../database/services/schemaService.ts');
 
 const schema = fs.readFileSync(path.join(__dirname, '..', 'new_schema.sql'), 'utf8');
-const { normalizeScore } = require('../lib/api/services/gradeRecordingService');
+const { normalizeScore } = require('../lib/api/services/gradeRecordingService.ts');
 const authControllerSource = fs.readFileSync(
-  path.join(__dirname, '..', 'lib', 'api', 'controllers', 'authController.js'),
+  path.join(__dirname, '..', 'lib', 'api', 'controllers', 'authController.ts'),
   'utf8',
 );
 const studentControllerSource = fs.readFileSync(
-  path.join(__dirname, '..', 'lib', 'api', 'controllers', 'studentController.js'),
+  path.join(__dirname, '..', 'lib', 'api', 'controllers', 'studentController.ts'),
   'utf8',
 );
 const routeRegistrySource = fs.readFileSync(
@@ -188,7 +188,7 @@ test('teacher profile persistence uses department IDs and resolves display names
   const previousLocalUrl = process.env.LOCAL_DATABASE_URL;
   process.env.DATABASE_TARGET = 'local';
   process.env.LOCAL_DATABASE_URL = 'file::memory:';
-  const database = require('../database/services/dbService');
+  const database = require('../database/services/dbService.ts');
   try {
     await database.ensureDatabaseReady();
     const auth = database.getAuthService();
@@ -350,7 +350,7 @@ test('student leaderboard offers cohort and active class scopes', () => {
 
 test('active class leaderboard query resolves subjects through the subjects table', () => {
   const leaderboardServiceSource = fs.readFileSync(
-    path.join(__dirname, '..', 'lib', 'api', 'services', 'leaderboardService.js'),
+    path.join(__dirname, '..', 'lib', 'api', 'services', 'leaderboardService.ts'),
     'utf8',
   );
   assert.match(leaderboardServiceSource, /sub\.name AS subject/);
@@ -360,9 +360,9 @@ test('active class leaderboard query resolves subjects through the subjects tabl
 
 test('teacher and student task snapshots persist tasks with all schema columns', async () => {
   const db = createClient({ url: 'file::memory:' });
-  const dbServicePath = require.resolve('../database/services/dbService');
+  const dbServicePath = require.resolve('../database/services/dbService.ts');
   const originalDbService = require(dbServicePath);
-  const relationalDataServicePath = require.resolve('../database/services/relationalDataService');
+  const relationalDataServicePath = require.resolve('../database/services/relationalDataService.ts');
   const originalRelationalDataService = require.cache[relationalDataServicePath];
 
   require.cache[dbServicePath].exports = {

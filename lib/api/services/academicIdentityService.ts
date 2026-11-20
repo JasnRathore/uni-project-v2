@@ -1,5 +1,17 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-require-imports */
+
 const { randomUUID } = require('node:crypto');
-const { getDatabaseClient, withTransaction } = require('../../../database/services/dbService');
+const { getDatabaseClient, withTransaction } = require('../../../database/services/dbService.ts');
+
+type DegreeInput = { name: string; status?: string };
+type CohortInput = { degreeId: string; label: string; status?: string };
+type AssignStudentInput = {
+  studentId: string;
+  degreeId?: string;
+  cohortId: string;
+  actorId?: string;
+  reason: string;
+};
 
 const identityService = {
   async listDegrees(includeInactive = false) {
@@ -10,18 +22,18 @@ const identityService = {
     });
     return result.rows;
   },
-  async createDegree({ name, status = 'active' }) {
+  async createDegree({ name, status = 'active' }: DegreeInput) {
     if (!String(name || '').trim()) throw new Error('Degree name is required');
     const id = randomUUID();
     await getDatabaseClient().execute({ sql: 'INSERT INTO degrees (id, name, status) VALUES (?, ?, ?)', args: [id, name.trim(), status] });
     return (await getDatabaseClient().execute({ sql: 'SELECT * FROM degrees WHERE id=?', args: [id] })).rows[0];
   },
-  async setDegreeStatus(id, status) {
+  async setDegreeStatus(id: string, status: string) {
     if (!['active', 'inactive'].includes(status)) throw new Error('Invalid degree status');
     await getDatabaseClient().execute({ sql: 'UPDATE degrees SET status=?, updated_at=CURRENT_TIMESTAMP WHERE id=?', args: [status, id] });
     return (await getDatabaseClient().execute({ sql: 'SELECT * FROM degrees WHERE id=?', args: [id] })).rows[0] || null;
   },
-  async listCohorts(degreeId, includeInactive = false) {
+  async listCohorts(degreeId: string, includeInactive = false) {
     const result = await getDatabaseClient().execute({
       sql: `SELECT c.*, d.name AS degree_name FROM graduation_cohorts c
         JOIN degrees d ON d.id=c.degree_id WHERE c.degree_id=?
@@ -30,20 +42,20 @@ const identityService = {
     });
     return result.rows;
   },
-  async createCohort({ degreeId, label, status = 'active' }) {
+  async createCohort({ degreeId, label, status = 'active' }: CohortInput) {
     if (!degreeId || !String(label || '').trim()) throw new Error('degreeId and label are required');
     const id = randomUUID();
     await getDatabaseClient().execute({ sql: 'INSERT INTO graduation_cohorts (id, degree_id, label, status) VALUES (?, ?, ?, ?)', args: [id, degreeId, label.trim(), status] });
     return (await getDatabaseClient().execute({ sql: 'SELECT * FROM graduation_cohorts WHERE id=?', args: [id] })).rows[0];
   },
-  async setCohortStatus(id, status) {
+  async setCohortStatus(id: string, status: string) {
     if (!['active', 'inactive'].includes(status)) throw new Error('Invalid cohort status');
     await getDatabaseClient().execute({ sql: 'UPDATE graduation_cohorts SET status=?, updated_at=CURRENT_TIMESTAMP WHERE id=?', args: [status, id] });
     return (await getDatabaseClient().execute({ sql: 'SELECT * FROM graduation_cohorts WHERE id=?', args: [id] })).rows[0] || null;
   },
-  async assignStudent({ studentId, degreeId, cohortId, actorId, reason }) {
+  async assignStudent({ studentId, degreeId, cohortId, actorId, reason }: AssignStudentInput) {
     if (!reason || !String(reason).trim()) throw new Error('A reason is required for identity corrections');
-    return withTransaction(async tx => {
+    return withTransaction(async (tx: any) => {
       const student = (await tx.execute({
         sql: `SELECT s.id, s.cohort_id, c.degree_id FROM students s
           LEFT JOIN graduation_cohorts c ON c.id=s.cohort_id WHERE s.id=?`,

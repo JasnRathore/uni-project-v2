@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { isActiveStudent, normalizeLifecycleState } = require('../lib/api/services/studentState');
+const { isActiveStudent, normalizeLifecycleState } = require('../lib/api/services/studentState.ts');
 
 test('normalizes graduation and other non-active states to inactive', () => {
   assert.equal(normalizeLifecycleState('active'), 'active');
@@ -20,9 +20,9 @@ test('only explicitly active students pass the active-student check', () => {
 });
 
 test('task assignment excludes inactive students from assignment and notification writes', async () => {
-  const dbServicePath = require.resolve('../database/services/dbService');
-  const portalStorePath = require.resolve('../lib/api/storage/portalStore');
-  const assignmentPath = require.resolve('../lib/api/services/taskAssignmentService');
+  const dbServicePath = require.resolve('../database/services/dbService.ts');
+  const portalStorePath = require.resolve('../lib/api/storage/portalStore.ts');
+  const assignmentPath = require.resolve('../lib/api/services/taskAssignmentService.ts');
   const originalDbService = require.cache[dbServicePath];
   const originalPortalStore = require.cache[portalStorePath];
   const originalAssignmentService = require.cache[assignmentPath];
