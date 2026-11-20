@@ -9,10 +9,11 @@ controller or service implementations.
 
 - `app/api/[...route]/route.ts` — Node.js, force-dynamic adapter; HTTP method
   exports, request dispatch, CORS, auth/role checks, and response conversion.
-- `lib/api/routeRegistry.ts` — 66 method/path definitions and the exact-first,
+- `lib/api/routeRegistry.ts` — 69 method/path definitions and the exact-first,
   parameterized route matcher.
-- `lib/api/middleware/authMiddleware.js` — token verification, database-backed
-  user lookup, and Express-shaped `requireAuth` / role helper exports.
+- `lib/api/middleware/authMiddleware.ts` — token/cookie verification,
+  database-backed user lookup, session revocation check, and Express-shaped
+  `requireAuth` / role helper exports.
 
 ## Adapter behavior
 
@@ -23,6 +24,8 @@ include these CORS headers:
 
 - Allowed origin: `NEXT_PUBLIC_APP_URL`, falling back to
   `http://localhost:3000`.
+- Credentials: allowed (`Access-Control-Allow-Credentials: true`), so the
+  session cookies can travel on cross-origin calls.
 - Allowed methods: `GET, POST, PUT, DELETE, OPTIONS`.
 - Allowed headers: `Content-Type, Authorization`.
 
@@ -36,34 +39,40 @@ JSON `404` (there is no adapter-level `405` distinction).
 
 For non-`GET`, non-`DELETE` requests, invalid or absent JSON is treated as an
 empty object. The controller-compatible request shape contains `body`,
-`params`, `user`, and request headers; adapter responses are wrapped with the
-shared JSON/CORS helper. A handler exception is logged and converted to JSON
-`500`; a handler that does not write a response also yields `500`.
+`params`, `user`, `cookies` (the parsed `portal_access_token` /
+`portal_refresh_token` values), and request headers. The response shim provides
+`json`, `status().json()`, `setHeader`, `cookie`, and `clearCookie`; cookies are
+serialized via the `cookie` package and emitted as multiple `Set-Cookie`
+headers. A handler exception is logged and converted to JSON `500`; a handler
+that does not write a response also yields `500`.
 
 ## Registered method/path coverage
 
-The 66 registered routes are grouped below by the registry's access flags.
+The 69 registered routes are grouped below by the registry's access flags.
 `:name` denotes a single path segment parameter.
 
 | Access classification | Methods and paths |
 | --- | --- |
-| Public | `POST /auth/login`, `POST /signup`, `POST /student/signup`; `GET /academic/degrees`, `/academic/departments`, `/academic/cohorts`, `/academic/degrees/:degreeId/cohorts`, `/academic/degrees/:degreeId/program-years`, `/academic/program-years/:programYearId/subjects` |
-| Authenticated, not student-only | `POST /account/reactivate`; `GET /teacher/profile`, `/teacher/data`, `/teacher/all-students`, `/teacher/task-stats`, `/teacher/task-grades/:taskId`, `/teacher/student-streak/:email`, `/teacher/student-tasks/:email`; `POST /teacher/students`, `/teacher/classes`, `/teacher/classes/create`, `/teacher/tasks`, `/teacher/add-task`, `/teacher/quest`, `/teacher/task-students`, `/teacher/grades`, `/teacher/profile/update`, `/teacher/account/deactivate`, `/teacher/assign-student`, `/teacher/unassign-student`, `/teacher/students-batch-data`, `/teacher/task-grade`, `/teacher/classes/:classId/memberships`; `PUT /teacher/students/:studentId`, `/teacher/tasks/:taskId`, `/teacher/classes/:classId/lifecycle`; `DELETE /teacher/account`, `/teacher/classes/:classId`, `/teacher/tasks/:taskId`, `/teacher/classes/:classId/memberships/:studentId`; `GET /admin/degrees`, `/admin/degrees/:degreeId/program-years`, `/admin/degrees/:degreeId/cohorts`; `POST /admin/degrees`, `/admin/degrees/:degreeId/program-years`, `/admin/program-years/:programYearId/subjects`, `/admin/degrees/:degreeId/cohorts`; `PUT /admin/degrees/:degreeId`, `/admin/cohorts/:cohortId`, `/admin/students/:studentId/identity`; `GET /game/progression`; `POST /game/rewards` |
+| Public | `POST /auth/login`, `/auth/refresh`, `/auth/logout`, `/auth/signup/request-otp`, `/auth/forgot-password`, `/auth/reset-password`, `/signup`, `/student/signup`; `GET /academic/degrees`, `/academic/departments`, `/academic/cohorts`, `/academic/degrees/:degreeId/cohorts`, `/academic/degrees/:degreeId/program-years`, `/academic/program-years/:programYearId/subjects` |
+| Authenticated, not student-only | `GET /auth/me`, `POST /auth/change-password`; `POST /account/reactivate`; `GET /teacher/profile`, `/teacher/data`, `/teacher/all-students`, `/teacher/task-stats`, `/teacher/task-grades/:taskId`, `/teacher/student-streak/:email`, `/teacher/student-tasks/:email`; `POST /teacher/students`, `/teacher/classes`, `/teacher/classes/create`, `/teacher/tasks`, `/teacher/add-task`, `/teacher/quest`, `/teacher/task-students`, `/teacher/grades`, `/teacher/profile/update`, `/teacher/account/deactivate`, `/teacher/assign-student`, `/teacher/unassign-student`, `/teacher/students-batch-data`, `/teacher/task-grade`, `/teacher/classes/:classId/memberships`; `PUT /teacher/students/:studentId`, `/teacher/tasks/:taskId`, `/teacher/classes/:classId/lifecycle`; `DELETE /teacher/account`, `/teacher/classes/:classId`, `/teacher/tasks/:taskId`, `/teacher/classes/:classId/memberships/:studentId`; `GET /admin/degrees`, `/admin/degrees/:degreeId/program-years`, `/admin/degrees/:degreeId/cohorts`; `POST /admin/degrees`, `/admin/degrees/:degreeId/program-years`, `/admin/program-years/:programYearId/subjects`, `/admin/degrees/:degreeId/cohorts`; `PUT /admin/degrees/:degreeId`, `/admin/cohorts/:cohortId`, `/admin/students/:studentId/identity`; `GET /game/progression`; `POST /game/rewards` |
 | Authenticated and student-only | `GET /student/profile`, `/student/data`, `/student/dashboard`, `/student/leaderboard`, `/student/leaderboards/cohort`, `/student/leaderboards/classes`, `/student/leaderboards/classes/:classId`, `/leaderboards/cohort`, `/leaderboards/classes/:classId`, `/student/notifications`, `/student/quest`, `/quest`; `POST /student/notifications/read`, `/student/profile/update`, `/student/quiz/submit` |
 
 `GET /debug/students` is an additional adapter-only special case, not one of the
-66 registry entries. It requires a resolvable user but is not checked for role
+69 registry entries. It requires a resolvable user but is not checked for role
 or disabled status by this branch. `GET /health` is another special case in
 the adapter; its effective URL considerations are covered in
 [health endpoints](./health-endpoints.md).
 
 ## Authentication and authorization
 
-The adapter calls `getUser` for routes with `protectedRoute: true`.
-`getUser` expects the second space-delimited authorization-header token to be a
-JWT, verifies it with `JWT_SECRET`, and then reads the user's stored identity
-and metadata. Missing token/secret, a failed verification, or a missing user
-returns no user; protected calls receive `401 Unauthorized`.
+The adapter calls `getUser` for routes with `protectedRoute: true`, passing the
+authorization header and the request cookie header. `getUser` expects the second
+space-delimited authorization-header token to be a JWT, falling back to the
+`portal_access_token` cookie, verifies it with `JWT_SECRET`, rejects it when its
+`auth_sessions` row is revoked or expired, and then reads the user's stored
+identity and metadata. Missing token/secret, a failed verification, a revoked
+session, or a missing user returns no user; protected calls receive
+`401 Unauthorized`.
 
 After authentication, the adapter:
 

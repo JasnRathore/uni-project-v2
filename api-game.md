@@ -19,10 +19,14 @@ endpoints require the bearer token returned by `POST /api/auth/login`:
 Authorization: Bearer <access-token>
 ```
 
-The current login endpoint accepts `email` and `password` and returns
-`{ "success": true, "token": "...", "user": { ... } }`. The current JWT
-expires after seven days. It is signed with the server's `JWT_SECRET`; clients
-must treat it as a secret and must not log it.
+The login endpoint accepts `email` and `password` and returns
+`{ "success": true, "token": "...", "expiresIn": 900, "user": { ... } }`. The
+access token is a short-lived JWT (15 minutes) signed with the server's
+`JWT_SECRET`; clients must treat it as a secret and must not log it. Login also
+sets an HttpOnly rotating refresh-token cookie, and
+`POST /api/auth/refresh` exchanges that cookie for a new access token.
+`POST /api/auth/logout` revokes the session, and `GET /api/auth/me` returns the
+current account. Repeated failed logins are throttled per email.
 
 ## Authentication and authorization
 
@@ -33,13 +37,13 @@ Missing/invalid credentials return `401 Unauthorized`. A valid non-student
 token on `/game/*` endpoints returns `403 Student access required`. Missing
 student profile returns `404 Student profile not found`.
 
-**Important integration limitation:** the current token is a general portal
-JWT, not a game-specific token with an audience, scope, or refresh/revocation
-contract. The API currently checks the user's student role for game routes,
-but does not enforce a separate game audience or per-endpoint scope. Do not
-treat this as a production-ready cross-service authentication design if the
-game is deployed separately; establish a scoped game token/service-to-service
-contract first.
+**Important integration limitation:** the access token is a general portal
+JWT, not a game-specific token with an audience or scope. It is short-lived and
+tied to a revocable server-side session (`sid` claim), but game routes still
+check only the user's student role and do not enforce a separate game audience
+or per-endpoint scope. Do not treat this as a production-ready cross-service
+authentication design if the game is deployed separately; establish a scoped
+game token/service-to-service contract first.
 
 ## Endpoints
 

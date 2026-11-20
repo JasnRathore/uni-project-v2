@@ -10,6 +10,7 @@
 - **Work and grades:** `tasks`, `task_assignments`, `grades`. Assignments use `(task_id, student_id)` primary key, completion is boolean constrained, and grade rows have a partial unique index for `(student_id, task_id)`. Deleting classes/tasks/students cascades where specified; deleting a referenced task/teacher on grade rows sets the FK null.
 - **Student activity and game:** `notifications`, `student_activity`, `student_activity_days`, `xp_events`, `progression_states`, `daily_quests`, `daily_quest_views`. XP events have unique idempotency keys, points and source metadata; progression state is one row per student. Notification seen flags and activity booleans are checked.
 - **Migration provenance:** `legacy_record_map` stores imported source keys/entity descriptors and JSON provenance.
+- **Auth sessions and throttling:** `auth_sessions` stores server-side refresh-token sessions (SHA-256 token hash, family ID, expiry, and revocation/replacement columns) with a unique token hash and indexes on user and family; `login_attempts` records per-email/IP success/failure rows used to throttle repeated failed logins.
 
 ## Initialization and consistency implications
 

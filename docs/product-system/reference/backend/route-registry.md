@@ -12,7 +12,7 @@
 
 ## Registry contents and behavior
 
-The registry binds POST login/signup/student-signup and public academic catalog GETs; protected account reactivation; student profile/data/dashboard/leaderboard/notifications/quiz/quest routes; teacher profile/data, roster/class/task/grade, account, identity and membership operations; admin degree/cohort/program-year/subject and student-identity operations; and game progression/reward endpoints. Student routes set `studentOnly`; other protected routes set `protectedRoute` without that flag. Cohort/class leaderboard paths include legacy aliases. Methods, full paths, route order, selected handler property, and flags are explicit in the source array.
+The registry binds POST login/refresh/logout and signup/student-signup plus public academic catalog GETs; the authenticated `GET /auth/me`; protected account reactivation; student profile/data/dashboard/leaderboard/notifications/quiz/quest routes; teacher profile/data, roster/class/task/grade, account, identity and membership operations; admin degree/cohort/program-year/subject and student-identity operations; and game progression/reward endpoints. Student routes set `studentOnly`; other protected routes set `protectedRoute` without that flag. Cohort/class leaderboard paths include legacy aliases. Methods, full paths, route order, selected handler property, and flags are explicit in the source array.
 
 `findRoute` searches exact method/path first. Otherwise, it checks routes containing `/:`, replaces each parameter segment with a single non-slash capture, anchors the regex, and decodes captured values with `decodeURIComponent`. It returns the first match, so declaration order resolves any overlaps.
 
